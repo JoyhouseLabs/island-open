@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="论语学而开篇">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef0e2"/>
+      <stop offset="1" stop-color="#dfe3cc"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#paper)"/>
+  <rect x="18" y="18" width="604" height="324" fill="none" stroke="#a8b184" stroke-width="2"/>
+  <text x="320" y="92" text-anchor="middle" font-family="'Songti SC','STSong','SimSun',serif" font-size="30" letter-spacing="8" fill="#4a5236">论语 · 学而</text>
+  <text x="320" y="172" text-anchor="middle" font-family="'Kaiti SC','STKaiti','KaiTi',serif" font-size="40" fill="#333a26">学而时习之，不亦说乎？</text>
+  <text x="320" y="236" text-anchor="middle" font-family="'Kaiti SC','STKaiti','KaiTi',serif" font-size="40" fill="#333a26">有朋自远方来，不亦乐乎？</text>
+  <rect x="556" y="274" width="46" height="46" rx="4" fill="#7d8ea6"/>
+  <text x="579" y="304" text-anchor="middle" font-family="'Kaiti SC','STKaiti','KaiTi',serif" font-size="19" fill="#eef0e2">学而</text>
+</svg>

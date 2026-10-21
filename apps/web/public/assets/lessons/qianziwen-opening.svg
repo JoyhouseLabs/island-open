@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="千字文开篇">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6efdd"/>
+      <stop offset="1" stop-color="#eadfc4"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#paper)"/>
+  <rect x="18" y="18" width="604" height="324" fill="none" stroke="#c9b48a" stroke-width="2"/>
+  <rect x="26" y="26" width="588" height="308" fill="none" stroke="#dccb9f" stroke-width="1"/>
+  <text x="320" y="92" text-anchor="middle" font-family="'Songti SC','STSong','SimSun',serif" font-size="30" letter-spacing="8" fill="#5a4a32">千字文 · 开篇</text>
+  <text x="320" y="168" text-anchor="middle" font-family="'Kaiti SC','STKaiti','KaiTi',serif" font-size="46" fill="#3d3226">天地玄黄　宇宙洪荒</text>
+  <text x="320" y="238" text-anchor="middle" font-family="'Kaiti SC','STKaiti','KaiTi',serif" font-size="46" fill="#3d3226">日月盈昃　辰宿列张</text>
+  <rect x="556" y="274" width="46" height="46" rx="4" fill="#b56a5a"/>
+  <text x="579" y="304" text-anchor="middle" font-family="'Kaiti SC','STKaiti','KaiTi',serif" font-size="19" fill="#f6efdd">启蒙</text>
+</svg>

@@ -1,0 +1,21 @@
+{
+  "name": "mind-island-open",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "build:shared": "pnpm --filter @island/contracts build && pnpm --filter @island/world-core build",
+    "build": "pnpm build:shared && pnpm --filter @island/web build",
+    "dev": "pnpm build:shared && pnpm --filter @island/web dev",
+    "typecheck": "pnpm build:shared && pnpm --filter @island/web typecheck",
+    "test": "pnpm build:shared && vitest run",
+    "assets:prepare": "node scripts/prepare-assets.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "prettier": "^3.9.10",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  },
+  "type": "module"
+}

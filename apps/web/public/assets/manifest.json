@@ -1,0 +1,76 @@
+{
+  "id": "island/core",
+  "version": "1.1.0",
+  "assets": [
+    {
+      "id": "fox",
+      "url": "/api/content/core/fox",
+      "sha256": "d97044e701822bac5a62696459b27d7b375aada5de8574ed4362edbba94771f7",
+      "bytes": 162852,
+      "mime": "model/gltf-binary"
+    },
+    {
+      "id": "shore",
+      "url": "/api/content/core/shore",
+      "sha256": "827879fd1158cac797650c369ab7608bb882530f0a0b6dc313160ee265ce01cb",
+      "bytes": 705644,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "rain",
+      "url": "/api/content/core/rain",
+      "sha256": "5913daff04433e522fd729246cbe7765da6edd7283350f035a0658e27264c5ac",
+      "bytes": 705644,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "wind",
+      "url": "/api/content/core/wind",
+      "sha256": "8e18727dde30d7fa4ca64c8d60ea9283540e32a99f2168ac11a814ee2bec0e4e",
+      "bytes": 705644,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "thunder",
+      "url": "/api/content/core/thunder",
+      "sha256": "aab3e192c88b8a9c8032763bbde917c25e6126d8a9e9d9b0010e082d92b1ab40",
+      "bytes": 264644,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "voice-panda",
+      "url": "/api/content/core/voice-panda",
+      "sha256": "17f4fc0f05a4a14cc7d11c0ae51f6ed3f9d4f331877b6030bebe39e7d1cd73d9",
+      "bytes": 27386,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "voice-giraffe",
+      "url": "/api/content/core/voice-giraffe",
+      "sha256": "c7d817c7ca6324476e79b969b704fa0973f31f9c7e88822ba2cd3e6fd6a34a2d",
+      "bytes": 52964,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "voice-wolf",
+      "url": "/api/content/core/voice-wolf",
+      "sha256": "97063e79d68243d33f25d36c0e50f0997a1d5ccb395ea9d652977cbe855df11f",
+      "bytes": 66194,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "voice-fox",
+      "url": "/api/content/core/voice-fox",
+      "sha256": "94e020f21e0bd2294b9e58bc4374725a2b5b71d06b2a665e9b136efb98bbcaa5",
+      "bytes": 11510,
+      "mime": "audio/wav"
+    },
+    {
+      "id": "voice-friend",
+      "url": "/api/content/core/voice-friend",
+      "sha256": "5b0e2d1b2346f60fdb61ee496a3332dd8b5d35133e39968b3a94df3243567add",
+      "bytes": 22976,
+      "mime": "audio/wav"
+    }
+  ]
+}
