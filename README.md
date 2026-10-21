@@ -41,4 +41,11 @@ pnpm build
 
 ## 许可证
 
-许可证尚未确定。在仓库加入 `LICENSE` 文件之前，代码保留所有权利。第三方素材的来源与许可见 [CREDITS](apps/web/public/assets/CREDITS.md)；名称与标识不随代码授权。
+| 部分 | 许可 |
+|---|---|
+| 客户端 `apps/web` 及仓库默认部分 | [AGPL-3.0-only](LICENSE) |
+| `packages/contracts`、`packages/world-core` | [Apache-2.0](packages/contracts/LICENSE) |
+| 素材 | 见 [素材许可](apps/web/public/assets/LICENSE.md) 与 [CREDITS](apps/web/public/assets/CREDITS.md) |
+| 名称与标识 | 不随代码授权，见 [商标说明](TRADEMARKS.md) |
+
+完整说明见 [LICENSING](LICENSING.md)。参与贡献前请阅读 [CONTRIBUTING](CONTRIBUTING.md) 并签署 [CLA](CLA.md)。
