@@ -510,5 +510,46 @@ dialog.physics-workshop .physics-actions {
     flex: 0 0 auto;
     white-space: nowrap;
   }
-  .physics-scene-nav span { flex-shrink: 0; }
+  .physics-scene-nav span {
+    flex-shrink: 0;
+  }
+}
+
+.physics-dinosaur-guide {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  width: min(380px, calc(100vw - 24px));
+  max-height: 65dvh;
+}
+.physics-dinosaur-guide::backdrop {
+  background: #15291e18;
+}
+.physics-dinosaur-guide h2 {
+  margin: 0;
+}
+.physics-dinosaur-guide header {
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  padding: 12px 0;
+  background: #f6f4ea;
+}
+.physics-dinosaur-guide nav button:first-child {
+  background: white;
+  color: #294336;
+}
+.physics-dinosaur-guide nav button[aria-pressed="true"] {
+  background: #486e51;
+  color: white;
+}
+@media (max-width: 600px) {
+  .physics-dinosaur-guide header {
+    top: -12px;
+  }
+  .physics-dinosaur-guide {
+    inset: auto 8px 8px;
+    width: calc(100vw - 16px);
+    max-height: 46dvh;
+  }
 }

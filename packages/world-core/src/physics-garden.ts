@@ -1,3 +1,4 @@
+import { dinosaurPlantingError } from "./physics-dinosaur.js";
 import { mountainPlantingError } from "./physics-mountain.js";
 import {
   homeFeatures,
@@ -356,6 +357,7 @@ export function physicsPlantingError(
       return "苗床里只种花";
   }
   const key = scene.template.id;
+  if (key === "core:dinosaur") return dinosaurPlantingError(x, z);
   if (key === "core:mountain") return mountainPlantingError(x, z, tree);
   if (
     key === "core:home" &&

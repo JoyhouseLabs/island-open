@@ -9,7 +9,10 @@ import {
 } from "@island/world-core";
 import LibraryAmbience from "./LibraryAmbience";
 import IslandAmbience from "./IslandAmbience";
-import { useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
+import type { DinosaurHabitatId } from "@island/world-core";
+import type { DinosaurFocus } from "./DinosaurGuide";
+import DinosaurCamera from "./DinosaurCamera";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Group, Quaternion, Vector3 } from "three";
@@ -28,6 +31,7 @@ import { PhysicsPart } from "./PhysicsPart";
 import type { PhysicsConnection } from "./PhysicsConnection";
 
 const indices = new WeakMap<PhysicsFrame, Map<string, BodyState>>();
+const DinosaurAmbience = lazy(() => import("./DinosaurAmbience"));
 function bodyIndex(frame: PhysicsFrame) {
   let index = indices.get(frame);
   if (!index) {
@@ -201,7 +205,11 @@ function Contents({
   placeAt,
   night,
   paused,
+  dinosaurFocus,
+  inspectDinosaur,
 }: {
+  dinosaurFocus: DinosaurFocus | null;
+  inspectDinosaur(id: DinosaurHabitatId): void;
   night: boolean;
   paused: boolean;
   conn: PhysicsConnection;
@@ -409,6 +417,18 @@ function Contents({
         />
       )}
       <ThemeAmbience template={scene.template.id} night={night} />
+      {scene.template.id === "core:dinosaur" && (
+        <>
+          <DinosaurCamera focus={dinosaurFocus} />
+          <Suspense fallback={null}>
+            <DinosaurAmbience
+              inspect={inspectDinosaur}
+              interactive={!paused && !conn.editing}
+              night={night}
+            />
+          </Suspense>
+        </>
+      )}
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
@@ -488,9 +508,11 @@ function Contents({
         maxDistance={
           scene.template.id === "core:island"
             ? 400
-            : scene.template.id === "core:mountain"
-              ? 140
-              : 35
+            : scene.template.id === "core:dinosaur"
+              ? 350
+              : scene.template.id === "core:mountain"
+                ? 140
+                : 35
         }
         maxPolarAngle={Math.PI * 0.48}
       />
@@ -498,6 +520,8 @@ function Contents({
   );
 }
 export default function OnlineScene(props: {
+  dinosaurFocus: DinosaurFocus | null;
+  inspectDinosaur(id: DinosaurHabitatId): void;
   night: boolean;
   paused: boolean;
   conn: PhysicsConnection;

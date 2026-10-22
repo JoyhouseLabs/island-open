@@ -1,3 +1,5 @@
+import DinosaurGuide, { type DinosaurFocus } from "./DinosaurGuide";
+import { dinosaurHabitats } from "@island/world-core";
 import { physicalThemeSpecs } from "@island/world-core";
 import PhysicsMechanisms from "./PhysicsMechanisms";
 import { snapBlockPosition } from "@island/physics-core";
@@ -48,11 +50,20 @@ export default function OnlinePhysics() {
     [, update] = useState(0),
     [selected, select] = useState<string | null>(null);
   const [reading, setReading] = useState<null | "books" | "tutor">(null);
+  const [dinosaurFocus, setDinosaurFocus] = useState<DinosaurFocus | null>(
+    null,
+  );
+  const overlayOpen = !!reading || dinosaurFocus !== null;
   const [learningEnabled, setLearningEnabled] = useState(false);
   const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
   const sceneNav = useRef<HTMLElement>(null);
+  const inspectDinosaur = (id: DinosaurFocus) => {
+    keys.clear();
+    window.scrollTo({ top: 0 });
+    setDinosaurFocus(id);
+  };
   useEffect(() => {
     const nav = sceneNav.current;
     const current = nav?.querySelector<HTMLButtonElement>(
@@ -132,6 +143,7 @@ export default function OnlinePhysics() {
     select(null);
     setNight(false);
     setReading(null);
+    setDinosaurFocus(null);
     keys.clear();
     if (!sceneId || !user) {
       setConn(null);
@@ -285,7 +297,7 @@ export default function OnlinePhysics() {
     <main
       className={`physics-playground ${world ? "physics-has-scenes" : ""} ${conn?.scene ? "" : "physics-lobby"}`}
     >
-      <header className="physics-header" inert={!!reading}>
+      <header className="physics-header" inert={overlayOpen}>
         <Link to="/physics/online">← 我的世界</Link>
         <div>
           <h1>{world?.name ?? "在线物理世界"}</h1>
@@ -298,7 +310,7 @@ export default function OnlinePhysics() {
           ref={sceneNav}
           className="physics-actions physics-scene-nav"
           aria-label="切换场景"
-          inert={!!reading}
+          inert={overlayOpen}
         >
           {sceneChoices
             .filter(
@@ -378,9 +390,11 @@ export default function OnlinePhysics() {
         </section>
       ) : conn?.scene ? (
         <>
-          <section className="physics-viewport" inert={!!reading}>
+          <section className="physics-viewport" inert={overlayOpen}>
             <OnlineScene
-              paused={busy || !!reading}
+              dinosaurFocus={dinosaurFocus}
+              inspectDinosaur={inspectDinosaur}
+              paused={busy || overlayOpen}
               night={night}
               conn={conn}
               keys={keys}
@@ -388,6 +402,20 @@ export default function OnlinePhysics() {
               select={(id) => {
                 select(id);
                 const object = conn.scene?.objects.find((o) => o.id === id);
+                if (
+                  !conn.editing &&
+                  conn.scene?.template.id === "core:dinosaur"
+                ) {
+                  const habitat = dinosaurHabitats.find(
+                    (h) => object?.infrastructureKey === `habitat-${h.id}`,
+                  );
+                  if (
+                    habitat ||
+                    object?.infrastructureKey?.startsWith("nest-")
+                  ) {
+                    inspectDinosaur(habitat?.id ?? "nest");
+                  }
+                }
                 if (
                   !conn.editing &&
                   conn.scene?.template.id === "core:library" &&
@@ -424,7 +452,21 @@ export default function OnlinePhysics() {
                 : "方向键/按钮移动 · E 搬动或坐下 · F 坐下/起身"}
             </div>
           </section>
-          <section className="physics-controls" inert={busy || !!reading}>
+          <section className="physics-controls" inert={busy || overlayOpen}>
+            {conn.scene.template.id === "core:dinosaur" && (
+              <section
+                className="physics-library-activities"
+                aria-label="公园活动"
+              >
+                <button
+                  disabled={conn.editing}
+                  onClick={() => inspectDinosaur("all")}
+                >
+                  公园导览 · 四处发现
+                </button>
+                <span>也可以点击园区标牌、蛋巢或动物，打开观察介绍。</span>
+              </section>
+            )}
             {physicalThemeSpecs.some(
               (s) => `core:${s.key}` === conn.scene!.template.id,
             ) && (
@@ -769,6 +811,16 @@ export default function OnlinePhysics() {
               ? "这个场景尚未开辟或未开放，请选择上方场景"
               : "正在连接世界…"}
         </p>
+      )}
+      {dinosaurFocus !== null && (
+        <DinosaurGuide
+          focus={dinosaurFocus}
+          choose={setDinosaurFocus}
+          close={() => {
+            keys.clear();
+            setDinosaurFocus(null);
+          }}
+        />
       )}
       {reading && user && (
         <IslandConfigProvider userId={user.id}>
