@@ -135,10 +135,17 @@ export default function TrainingPlayer() {
     [notice, setNotice] = useState("");
   const [three, setThree] = useState(false),
     [formation, setFormation] = useState(1);
+  const generation = useRef(0);
+  const [draftConflict, setDraftConflict] = useState<TrainingAnswer | null>(
+    null,
+  );
   const submission = useRef<string>(crypto.randomUUID());
   const draftKey = `island-training:${user.id}:${attemptId}`;
   useEffect(() => {
     let cancelled = false;
+    generation.current++;
+    setBusy(false);
+    setDraftConflict(null);
     setAttempt(null);
     setPlan(null);
     setError("");
@@ -167,10 +174,10 @@ export default function TrainingPlayer() {
               restored = parsed.data;
               if (raw.submissionId) submission.current = raw.submissionId;
               setNotice("已恢复这台设备尚未提交的草稿。");
-            } else if (raw && parsed.success)
-              setNotice(
-                "云端版本已更新，已显示云端记录；旧本机草稿保留，可导出后核对。",
-              );
+            } else if (raw && parsed.success) {
+              setDraftConflict(parsed.data);
+              setNotice("云端和本机各有一份记录，请选择要继续编辑的内容。");
+            }
           } catch {
             /* Storage can be unavailable; cloud checkpoints still work. */
           }
@@ -188,6 +195,7 @@ export default function TrainingPlayer() {
       });
     return () => {
       cancelled = true;
+      generation.current++;
     };
   }, [attemptId, user.id, draftKey]);
   function change(next: TrainingAnswer) {
@@ -208,7 +216,8 @@ export default function TrainingPlayer() {
     }
   }
   async function save(submit: boolean, skip = false) {
-    if (!attempt) return;
+    if (!attempt || busy) return;
+    const current = generation.current;
     setBusy(true);
     setError("");
     try {
@@ -223,6 +232,7 @@ export default function TrainingPlayer() {
           }),
         },
       );
+      if (current !== generation.current) return;
       setAttempt(a);
       setAnswer(a.answer);
       setNotice(
@@ -236,13 +246,15 @@ export default function TrainingPlayer() {
         /* Cloud save succeeded. */
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "保存失败，请保留页面重试。");
+      if (current === generation.current)
+        setError(e instanceof Error ? e.message : "保存失败，请保留页面重试。");
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
   async function hint() {
-    if (!attempt) return;
+    if (!attempt || busy) return;
+    const current = generation.current;
     setBusy(true);
     setError("");
     try {
@@ -254,11 +266,13 @@ export default function TrainingPlayer() {
           body: JSON.stringify({ revision: attempt.revision, answer }),
         },
       );
+      if (current !== generation.current) return;
       setAttempt(saved);
       const a = await api<TrainingAttempt>(
         `/learning/attempts/${attempt.id}/hint`,
         { method: "POST", body: "{}", signal: AbortSignal.timeout(35000) },
       );
+      if (current !== generation.current) return;
       setAttempt(a);
       setAnswer(a.answer);
       setNotice("提示使用已记入本次尝试；可在下次变式中独立试试。");
@@ -271,13 +285,16 @@ export default function TrainingPlayer() {
       // Keep the revision associated with our input. A timed-out hint may have
       // reserved assistance, so explicitly reload rather than silently adopting
       // a different device's revision and overwriting its answer.
-      setError(e instanceof Error ? e.message : "提示暂时无法连接，请重新读取。");
+      if (current === generation.current)
+        setError(
+          e instanceof Error ? e.message : "提示暂时无法连接，请重新读取。",
+        );
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
   function exportDraft() {
-    const raw = localStorage.getItem(draftKey) ?? JSON.stringify({ answer });
+    const raw = JSON.stringify({ answer: draftConflict ?? answer });
     const url = URL.createObjectURL(
       new Blob([raw], { type: "application/json" }),
     );
@@ -287,9 +304,26 @@ export default function TrainingPlayer() {
     a.click();
     URL.revokeObjectURL(url);
   }
+  function resolveDraft(useLocal: boolean) {
+    if (!attempt || !draftConflict) return;
+    setDraftConflict(null);
+    if (useLocal) change(draftConflict);
+    else {
+      setAnswer(attempt.answer);
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        /* Optional cache. */
+      }
+      setNotice("已选择云端内容。");
+    }
+  }
   const activity = attempt?.activity;
   const disabled =
-    busy || attempt?.status === "submitted" || plan?.paused === true;
+    busy ||
+    !!draftConflict ||
+    attempt?.status === "submitted" ||
+    plan?.paused === true;
   const work: GeometryWork = {
     ...initialGeometry(),
     ...activity?.model,
@@ -322,13 +356,50 @@ export default function TrainingPlayer() {
           </div>
         </div>
       )}
+      {draftConflict && (
+        <section className="training-draft-conflict" aria-label="草稿冲突处理">
+          <h2>选择要继续编辑的记录</h2>
+          <p>云端内容已显示在下方。本机草稿尚未覆盖它，请先比较，再选择。</p>
+          <details>
+            <summary>查看本机草稿</summary>
+            <ul>
+              {Object.entries(draftConflict.choices).map(([key, value]) => (
+                <li key={key}>
+                  {
+                    attempt?.activity.questions.find((q) => q.id === key)
+                      ?.prompt
+                  }
+                  ：
+                  {attempt?.activity.questions
+                    .find((q) => q.id === key)
+                    ?.options.find((o) => o.id === value)?.text ?? value}
+                </li>
+              ))}
+            </ul>
+            {draftConflict.solid && (
+              <p>
+                模型：{solidFacts[draftConflict.solid].name} · 高{" "}
+                {draftConflict.height} · 底面大小 {draftConflict.size}
+              </p>
+            )}
+            <p>{draftConflict.explanation}</p>
+          </details>
+          <div className="training-actions">
+            <button onClick={() => resolveDraft(true)}>
+              恢复本机草稿继续编辑
+            </button>
+            <button onClick={() => resolveDraft(false)}>保留云端内容</button>
+            <button onClick={exportDraft}>导出本机草稿</button>
+          </div>
+        </section>
+      )}
       {notice && (
         <p role="status" className="training-notice">
           {notice}
         </p>
       )}
       {!attempt || !activity ? (
-        <p role="status">正在打开练习…</p>
+        !error && <p role="status">正在打开练习…</p>
       ) : (
         <>
           <span className="learn-eyebrow">
@@ -337,6 +408,14 @@ export default function TrainingPlayer() {
             {attempt.mode === "review" ? "延后回顾" : "每一次尝试独立保留"}
           </span>
           <h1>{activity.task.title}</h1>
+          {plan && (
+            <p className="training-position">
+              第{" "}
+              {plan.program.tasks.findIndex((t) => t.id === activity.task.id) +
+                1}{" "}
+              / {plan.program.tasks.length} 项活动 · 可随时保存后休息
+            </p>
+          )}
           <p className="training-objective">{activity.task.objective}</p>
           <p>{activity.introduction}</p>
           {plan?.paused && (
@@ -549,7 +628,7 @@ export default function TrainingPlayer() {
             </aside>
           )}
           {attempt.status === "active" && (
-            <div className="training-actions">
+            <div className="training-actions training-submit-bar">
               <button disabled={disabled} onClick={() => void save(false)}>
                 保存到云端
               </button>

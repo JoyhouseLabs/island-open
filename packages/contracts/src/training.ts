@@ -110,9 +110,25 @@ export interface TrainingPlan {
   reviewAt: string | null;
   recommendation: {
     taskId: string;
+    kind: "resume" | "remediate" | "practice" | "review" | "next";
     reason: string;
     evidenceIds: string[];
   } | null;
+  taskProgress: {
+    taskId: string;
+    status:
+      "active" | "revisit" | "skipped" | "completed" | "available" | "locked";
+    attempts: number;
+    latestAttemptId: string | null;
+  }[];
+  summary: {
+    completedTasks: number;
+    skippedTasks: number;
+    totalTasks: number;
+    submittedAttempts: number;
+    supportedAttempts: number;
+    reviewDue: boolean;
+  };
   skills: { id: string; title: string; state: string; evidenceIds: string[] }[];
 }
 export interface TrainingCatalog {

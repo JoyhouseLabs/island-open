@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import type { TrainingAttempt, TrainingPlan as Plan } from "@island/contracts";
 import { api } from "../api";
@@ -15,38 +15,55 @@ export default function TrainingPlan() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [saved, setSaved] = useState("");
+  const generation = useRef(0);
   function load() {
+    const current = ++generation.current;
     setError("");
     void api<Plan>(`/learning/plans/${planId}`)
-      .then(setPlan)
-      .catch((e) => setError(e.message));
+      .then((next) => {
+        if (current === generation.current) setPlan(next);
+      })
+      .catch((e) => {
+        if (current === generation.current) setError(e.message);
+      });
   }
-  useEffect(load, [planId, user.id]);
+  useEffect(() => {
+    setPlan(null);
+    setBusy(false);
+    setSaved("");
+    load();
+    return () => {
+      generation.current++;
+    };
+  }, [planId, user.id]);
   async function update(paused: boolean, reviewInDays?: number) {
-    if (!plan) return;
+    if (!plan || busy) return;
+    const current = generation.current;
     setBusy(true);
     setError("");
     try {
-      setPlan(
-        await api<Plan>(`/learning/plans/${plan.id}`, {
-          method: "PUT",
-          body: JSON.stringify({
-            revision: plan.revision,
-            preferences: plan.preferences,
-            paused,
-            ...(reviewInDays ? { reviewInDays } : {}),
-          }),
+      const updated = await api<Plan>(`/learning/plans/${plan.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          revision: plan.revision,
+          preferences: plan.preferences,
+          paused,
+          ...(reviewInDays ? { reviewInDays } : {}),
         }),
-      );
+      });
+      if (current !== generation.current) return;
+      setPlan(updated);
       setSaved(paused ? "计划已暂停，不会扣分或清空记录。" : "安排已保存。");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "无法保存。");
+      if (current === generation.current)
+        setError(e instanceof Error ? e.message : "无法保存。");
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
   async function start(taskId: string) {
-    if (!plan) return;
+    if (!plan || busy) return;
+    const current = generation.current;
     setBusy(true);
     setError("");
     try {
@@ -54,11 +71,13 @@ export default function TrainingPlan() {
         `/learning/plans/${plan.id}/attempts`,
         { method: "POST", body: JSON.stringify({ taskId }) },
       );
-      void navigate(`/learn/attempts/${a.id}`);
+      if (current === generation.current)
+        void navigate(`/learn/attempts/${a.id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "无法开始。");
+      if (current === generation.current)
+        setError(e instanceof Error ? e.message : "无法开始。");
     } finally {
-      setBusy(false);
+      if (current === generation.current) setBusy(false);
     }
   }
   const active = plan?.attempts.find((a) => a.status === "active");
@@ -71,7 +90,7 @@ export default function TrainingPlan() {
         </div>
       )}
       {!plan ? (
-        <p role="status">正在读取计划…</p>
+        !error && <p role="status">正在读取计划…</p>
       ) : (
         <>
           <span className="learn-eyebrow">
@@ -94,18 +113,20 @@ export default function TrainingPlan() {
               已经暂停。过去的记录仍可阅读，准备好时再恢复。
             </p>
           )}
-          {!report && (
-            <>
-              <Preferences
-                value={plan.preferences}
-                onChange={(preferences) => setPlan({ ...plan, preferences })}
-                disabled={busy}
-              />
-              <button disabled={busy} onClick={() => void update(plan.paused)}>
-                保存我的安排
-              </button>
-            </>
-          )}
+          <div className="training-summary" aria-label="活动进展">
+            <span>
+              <strong>
+                {plan.summary.completedTasks} / {plan.summary.totalTasks}
+              </strong>{" "}
+              活动已完成
+            </span>
+            <span>
+              <strong>{plan.summary.skippedTasks}</strong> 活动已跳过
+            </span>
+            <span>
+              <strong>{plan.summary.submittedAttempts}</strong> 次已提交尝试
+            </span>
+          </div>
           {plan.recommendation && !report && (
             <section className="learn-current">
               <div>
@@ -131,6 +152,28 @@ export default function TrainingPlan() {
                 接着练习 →
               </button>
             </section>
+          )}
+          {!report && !plan.paused && !plan.recommendation && (
+            <p className="training-notice">
+              当前没有待推荐的活动。可以休息，也可以从下面选择一项重新开始；跳过不会算作掌握。
+            </p>
+          )}
+          {!report && (
+            <details className="training-settings">
+              <summary>调整学习安排</summary>
+              <Preferences
+                value={plan.preferences}
+                audience={plan.program.audience}
+                onChange={(preferences) => {
+                  setPlan({ ...plan, preferences });
+                  setSaved("安排有改动，保存后生效。");
+                }}
+                disabled={busy}
+              />
+              <button disabled={busy} onClick={() => void update(plan.paused)}>
+                保存我的安排
+              </button>
+            </details>
           )}
           {plan.reviewAt && (
             <p className="training-notice">
@@ -160,7 +203,18 @@ export default function TrainingPlan() {
                   const unlocked = plan.program.tasks
                     .slice(0, i)
                     .every((t) => plan.completedTaskIds.includes(t.id));
-                  const completed = plan.completedTaskIds.includes(t.id);
+                  const progress = plan.taskProgress.find(
+                    (p) => p.taskId === t.id,
+                  );
+                  const completed = progress?.status === "completed";
+                  const labels = {
+                    active: "正在进行",
+                    revisit: "需要补练 · 查看上次反馈",
+                    skipped: "已跳过 · 不算掌握",
+                    completed: "已完成 · 可再做一个变式",
+                    available: "可以开始",
+                    locked: "先完成或跳过前面的活动",
+                  };
                   return (
                     <li key={t.id}>
                       <span className="training-number">{i + 1}</span>
@@ -168,12 +222,17 @@ export default function TrainingPlan() {
                         <h3>{t.title}</h3>
                         <p>{t.objective}</p>
                         <span className="learn-muted">
-                          {completed
-                            ? "已完成或跳过，可再做一个变式"
-                            : unlocked
-                              ? "可以开始"
-                              : "先完成前面的活动"}
+                          {progress ? labels[progress.status] : "尚无记录"}
                         </span>
+                        {progress?.latestAttemptId && (
+                          <p>
+                            <Link
+                              to={`/learn/attempts/${progress.latestAttemptId}`}
+                            >
+                              上次记录 · {progress.attempts} 次已提交尝试 →
+                            </Link>
+                          </p>
+                        )}
                       </div>
                       <button
                         disabled={
@@ -186,7 +245,9 @@ export default function TrainingPlan() {
                       >
                         {active?.activity.task.id === t.id
                           ? "继续"
-                          : completed
+                          : completed ||
+                              progress?.status === "revisit" ||
+                              progress?.status === "skipped"
                             ? "再练一次"
                             : "开始"}
                       </button>
@@ -198,7 +259,7 @@ export default function TrainingPlan() {
           )}
           <h2>目前有哪些证据</h2>
           <p>
-            这里只说明具体任务表现，不生成总能力分数。文字解释尚未自动评阅；同一变式重复完成不会算成多个新变式。
+            这里只说明具体任务表现，不生成总能力分数。“独立完成”仅表示本次未请求系统提示；文字解释尚未自动评阅，同一变式重复完成不会算成多个新变式。
           </p>
           <div className="learn-grid">
             {plan.skills.map((s) => (
@@ -226,19 +287,20 @@ export default function TrainingPlan() {
                   </Link>
                   <p>{a.assessment?.summary ?? "尚未提交，可以继续"}</p>
                   <small>
-                    {a.activity.variantId} ·{" "}
-                    {a.mode === "review"
-                      ? "延后回顾"
-                      : a.assessment?.assistance === "supported"
-                        ? "使用过提示"
-                        : "未请求提示"}
+                    {a.submittedAt
+                      ? new Date(a.submittedAt).toLocaleString("zh-CN")
+                      : "尚未提交"}{" "}
+                    · {a.mode === "review" ? "延后回顾 · " : ""}
+                    {a.assessment?.assistance === "supported" || a.hint
+                      ? "使用过提示"
+                      : "未请求提示"}
                   </small>
                 </li>
               ))}
             </ol>
           )}
           <p className="learn-muted">
-            计划里的“完成”包括明确选择的跳过；报告中的证据会单独区分。成人的个人感受和回应偏好不计作正确率。
+            跳过只解锁后续活动，不计作完成或掌握。成人的个人感受和回应偏好不计作正确率。
           </p>
         </>
       )}

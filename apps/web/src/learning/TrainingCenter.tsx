@@ -12,10 +12,12 @@ export function Preferences({
   value,
   onChange,
   disabled = false,
+  audience,
 }: {
   value: TrainingPreferences;
   onChange: (v: TrainingPreferences) => void;
   disabled?: boolean;
+  audience?: "student" | "adult";
 }) {
   return (
     <fieldset className="training-preferences" disabled={disabled}>
@@ -36,22 +38,24 @@ export function Preferences({
           <option value="15">约 15 分钟</option>
         </select>
       </label>
-      <label>
-        几何呈现方式
-        <select
-          value={value.presentation}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              presentation: e.target
-                .value as TrainingPreferences["presentation"],
-            })
-          }
-        >
-          <option value="2d">平面图与数值（轻量）</option>
-          <option value="3d">三维交互</option>
-        </select>
-      </label>
+      {audience !== "adult" && (
+        <label>
+          几何呈现方式
+          <select
+            value={value.presentation}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                presentation: e.target
+                  .value as TrainingPreferences["presentation"],
+              })
+            }
+          >
+            <option value="2d">平面图与数值（轻量）</option>
+            <option value="3d">三维交互</option>
+          </select>
+        </label>
+      )}
       <label>
         这次的目标
         <select
@@ -95,6 +99,11 @@ export default function TrainingCenter() {
     return () => controller.abort();
   }, [user.id]);
   async function enroll(id: string) {
+    const existing = data?.plans.find((p) => p.programId === id);
+    if (existing) {
+      void navigate(`/learn/plans/${existing.id}`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -157,6 +166,7 @@ export default function TrainingCenter() {
         value={preferences}
         onChange={setPreferences}
         disabled={busy}
+        audience={data?.programs.find((p) => p.id === programId)?.audience}
       />
       <div className="learn-grid">
         {data?.programs
