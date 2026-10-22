@@ -403,6 +403,9 @@ export default function DinosaurScene(props: SceneProps) {
     setSelected(id);
     setOpen(true);
   };
+  useEffect(() => {
+    if (props.guideRequest !== undefined) setOpen(props.guideRequest > 0);
+  }, [props.guideRequest]);
   const card = selected ? observations[selected] : null;
   return (
     <>
@@ -425,14 +428,14 @@ export default function DinosaurScene(props: SceneProps) {
         ))}
       </div>
       <aside className="dino-guide" aria-label="恐龙公园导览">
-        {props.onExplore && <button className="dino-explore" onClick={props.onExplore}>北部出口 · 探索外围 ↗</button>}
-        <button
+        {props.onExplore && props.guideRequest === undefined && <button className="dino-explore" onClick={props.onExplore}>北部出口 · 探索外围 ↗</button>}
+        {(props.guideRequest === undefined || open) && <button
           className="dino-guide-toggle"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
           {open ? "收起导览" : "公园导览 · 四处发现"}
-        </button>
+        </button>}
         {open && (
           <div className="dino-guide-content">
             <p className="dino-guide-intro">

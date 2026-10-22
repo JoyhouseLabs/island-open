@@ -1,3 +1,4 @@
+import SceneMenu from "./SceneMenu";
 import LearningInvitation from "./learning/LearningInvitation";
 import DeviceLabels, { type DeviceScreenPoint } from "./building/DeviceLabels";
 import {
@@ -17,7 +18,6 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowLeft,
-  BookOpen,
   Compass,
   Footprints,
   Glasses,
@@ -107,9 +107,35 @@ export default function SceneExperience({
       bookId?: string;
       focusChat?: boolean;
     } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [guideRequest, setGuideRequest] = useState(0);
+  const previousWalking = useRef(walking);
+  const editReason = !room.ready
+    ? "场景正在加载，请稍等"
+    : leaving
+      ? "正在离开场景"
+      : room.unsupported
+        ? "此存档包含新版内容，当前只能参观"
+        : room.status === "conflict"
+          ? "请先处理右上角的存档冲突，再继续布置"
+          : "";
+  const finishEditing = () => {
+    setEditing(false);
+    setTool("explore");
+    setWalking(previousWalking.current);
+  };
+  const startEditing = (plant = false) => {
+    if (editReason) return;
+    previousWalking.current = walking;
+    setGuideRequest(0);
+    setEditing(true);
+    setWalking(false);
+    setTool(plant ? "flower" : "explore");
+    setReset((n) => n + 1);
+  };
   const buildMode =
     tool === "build" || tool === "remove" || tool === "device" ? tool : null;
-  const builder = useBuilder(room, room.unsupported ? null : buildMode);
+  const builder = useBuilder(room, editReason ? null : buildMode);
   const [devicePoints, setDevicePoints] = useState<DeviceScreenPoint[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   // 空格 near 小墨老师 opens the lesson chat directly.
@@ -249,9 +275,16 @@ export default function SceneExperience({
               onDevicePositions={setDevicePoints}
               low={quality === "low" || (quality === "auto" && narrow)}
               reset={reset}
-              onPlace={room.place}
+              onPlace={(x, z, kind) => {
+                if (!editReason) room.place(x, z, kind);
+              }}
+              guideRequest={scene === "dinosaur" ? guideRequest : undefined}
               onExit={() => void exit()}
-              onExplore={scene === "dinosaur" ? () => void exit(paths.wilderness) : undefined}
+              onExplore={
+                scene === "dinosaur"
+                  ? () => void exit(paths.wilderness)
+                  : undefined
+              }
               walk={walking}
               avatar={avatar}
               onGate={(dest) => void navigate(paths[dest])}
@@ -349,7 +382,7 @@ export default function SceneExperience({
         </p>
         <span>{config.noteHint}</span>
       </aside>
-      {scene === "library" && <LearningInvitation parent={parent} room={room} />}
+
       <div className="view-controls">
         <button
           className={`circle-button ${walking ? "active" : ""}`}
@@ -360,6 +393,7 @@ export default function SceneExperience({
               room.notify("先回主岛选一个形象，就可以在这里行走了。");
               return;
             }
+            setEditing(false);
             setTool("explore");
             if (!walking) emitGrowth({ type: "avatar.walked" });
             setWalking(!walking);
@@ -375,16 +409,6 @@ export default function SceneExperience({
             onClick={() => cameraMode.toggle()}
           >
             <Glasses size={18} />
-          </button>
-        )}
-        {scene === "library" && (
-          <button
-            className="circle-button"
-            title="读书"
-            aria-label="打开书架"
-            onClick={() => setReading({})}
-          >
-            <BookOpen size={18} />
           </button>
         )}
         <button
@@ -428,105 +452,128 @@ export default function SceneExperience({
               : tool === "device"
                 ? "单击预览，双击地面或完整支撑的顶面摆放装置。"
                 : tool === "explore"
-                  ? config.hints.explore
+                  ? editing
+                    ? "选择下面的工具布置场景 · 完成后继续探索"
+                    : walking
+                      ? "点击地面或用方向键行走 · 空格跳跃或交谈"
+                      : "拖动环顾 · 缩放查看场景"
                   : tool === "flower"
                     ? config.hints.flower
                     : tool === "tree"
                       ? config.hints.tree
                       : config.hints.bench}
         </div>
-        <nav className="toolbar" aria-label="场景编辑工具">
-          {(
-            [
-              { id: "explore", label: "漫游", icon: Compass },
-              { id: "flower", label: "种花" },
-              { id: "tree", label: "种树" },
-              { id: "bench", label: "长椅" },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              disabled={!room.ready || leaving}
-              className={`tool ${tool === t.id ? "active" : ""}`}
-              aria-pressed={tool === t.id}
-              onClick={() => {
-                setTool(t.id);
-                if (t.id === "explore") setWalking(true);
-              }}
-            >
-              {"icon" in t ? (
-                <t.icon size={20} />
-              ) : (
-                <ItemGlyph id={t.id} size={22} />
-              )}
-              <span>{t.label}</span>
-            </button>
-          ))}
-          {scene === "library" &&
-            builder.enabled &&
-            (["build", "device", "remove"] as const).map((mode) => (
-              <button
-                key={mode}
-                className={`tool ${tool === mode ? "active" : ""}`}
-                aria-pressed={tool === mode}
-                onClick={() => {
-                  setTool(mode);
-                  setWalking(false);
-                  setReset((n) => n + 1);
-                }}
-              >
-                <ItemGlyph
-                  id={
-                    mode === "build"
-                      ? "blocks"
-                      : mode === "device"
-                        ? glyphForKind(builder.kind)
-                        : "shovel"
+        <SceneMenu
+          scene={scene}
+          short={config.short}
+          editing={editing}
+          reason={editReason}
+          onEdit={startEditing}
+          onDone={finishEditing}
+          onWalk={() => {
+            setTool("explore");
+            setWalking(true);
+          }}
+          onRead={() => setReading({})}
+          onWorks={
+            scene === "library" && builder.enabled
+              ? () => {
+                  const d = room.snapshot.devices?.find(
+                    (d) => d.payload.kind === "bookshelf",
+                  );
+                  if (d) setDeviceId(d.id);
+                  else {
+                    startEditing();
+                    setTool("device");
+                    room.notify("在布置中摆一座书架，就可以写自己的作品。");
                   }
-                  size={22}
-                />
-                <span>
-                  {mode === "build"
-                    ? "建造"
-                    : mode === "device"
-                      ? "装置"
-                      : "铲子"}
-                </span>
+                }
+              : undefined
+          }
+          onGuide={() => setGuideRequest((n) => n + 1)}
+          onExplore={() => void exit(paths.wilderness)}
+          learning={<LearningInvitation parent={parent} room={room} compact />}
+        >
+          <fieldset className="scene-tools" disabled={!!editReason}>
+            <nav className="toolbar" aria-label="场景编辑工具">
+              {(
+                [
+                  { id: "explore", label: "环顾", icon: Compass },
+                  { id: "flower", label: "种花" },
+                  { id: "tree", label: "种树" },
+                  { id: "bench", label: "长椅" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.id}
+                  disabled={!room.ready || leaving}
+                  className={`tool ${tool === t.id ? "active" : ""}`}
+                  aria-pressed={tool === t.id}
+                  onClick={() => {
+                    setTool(t.id);
+                    setWalking(false);
+                  }}
+                >
+                  {"icon" in t ? (
+                    <t.icon size={20} />
+                  ) : (
+                    <ItemGlyph id={t.id} size={22} />
+                  )}
+                  <span>{t.label}</span>
+                </button>
+              ))}
+              {scene === "library" &&
+                builder.enabled &&
+                (["build", "device", "remove"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    className={`tool ${tool === mode ? "active" : ""}`}
+                    aria-pressed={tool === mode}
+                    onClick={() => {
+                      setTool(mode);
+                      setWalking(false);
+                      setReset((n) => n + 1);
+                    }}
+                  >
+                    <ItemGlyph
+                      id={
+                        mode === "build"
+                          ? "blocks"
+                          : mode === "device"
+                            ? glyphForKind(builder.kind)
+                            : "shovel"
+                      }
+                      size={22}
+                    />
+                    <span>
+                      {mode === "build"
+                        ? "建造"
+                        : mode === "device"
+                          ? "装置"
+                          : "铲子"}
+                    </span>
+                  </button>
+                ))}
+              <span className="toolbar-divider" />
+              <button
+                className="tool"
+                disabled={!room.ready || leaving}
+                onClick={room.grow}
+              >
+                <Sprout size={20} />
+                <span>生长</span>
               </button>
-            ))}
-          {scene === "library" && builder.enabled && (
-            <button
-              className="tool"
-              onClick={() => {
-                const d = room.snapshot.devices?.find(
-                  (d) => d.payload.kind === "bookshelf",
-                );
-                if (d) setDeviceId(d.id);
-                else room.notify("先摆一座书架，再来写自己的作品。");
-              }}
-            >
-              <ItemGlyph id="notebook" size={22} />
-              <span>作品</span>
-            </button>
-          )}
-          <span className="toolbar-divider" />
-          <button
-            className="tool"
-            disabled={!room.ready || leaving}
-            onClick={room.grow}
-          >
-            <Sprout size={20} />
-            <span>生长</span>
-          </button>
-          <button
-            className="tool undo"
-            aria-label="撤销修改"
-            disabled={!room.history.length || leaving}
-            onClick={room.undo}
-          >
-            <Undo2 size={17} />
-          </button>
-        </nav>
+              <button
+                className="tool undo"
+                aria-label="撤销修改"
+                disabled={!room.history.length || leaving}
+                onClick={room.undo}
+              >
+                <Undo2 size={17} />
+              </button>
+            </nav>
+          </fieldset>
+        </SceneMenu>
       </div>
       <footer className="room-footer">
         <span>{room.snapshot.entities.length} 个物件</span>

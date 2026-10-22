@@ -3525,3 +3525,25 @@ a.place {
     height: 42px;
   }
 }
+
+/* Activity menus: one short row to play, a wrapped tool palette to decorate. */
+.activity-toolbar { flex-wrap: nowrap; }
+.activity-toolbar .tool { width: 72px; flex-shrink: 0; letter-spacing: 0; }
+.scene-editor { width: min(480px, calc(100vw - 24px)); padding: 12px; border-radius: 20px; background: #f8f9eff5; box-shadow: 0 8px 25px #294d3b20; }
+.scene-editor header, .home-editor header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 13px; }
+.scene-editor header button { display: flex; align-items: center; gap: 5px; }
+.scene-tools { border: 0; padding: 0; margin: 0; min-width: 0; }
+.scene-room .scene-tools .toolbar { background: transparent; border: 0; padding: 0; box-shadow: none; flex-wrap: wrap; overflow: visible; max-width: 100%; }
+.scene-tools .tool:disabled, .activity-toolbar .tool:disabled { opacity: .45; cursor: not-allowed; }
+.menu-status, .scene-editor p, .home-editor p { font-size: 12px; max-width: 320px; margin: 4px 0; }
+.home-editor { min-width: 280px; }
+.scene-room .bottom-center .menu-learning { position: absolute; left: 50%; right: auto; top: auto; bottom: 86px; transform: translateX(-50%); width: min(330px, calc(100vw - 32px)); max-height: 50dvh; overflow: auto; box-sizing: border-box; }
+.menu-learning > button[aria-label] { float: right; }
+.night .scene-editor { background: #253c35f5; color: #e3e8d6; }
+@media(max-width:699px) {
+  .activity-toolbar .tool { width: 65px; min-width: 44px; height: 56px; }
+  .scene-room .activity-toolbar { max-width: calc(100vw - 24px); overflow: visible; }
+  .scene-editor { padding: 10px; box-sizing: border-box; max-height: 48dvh; overflow-y: auto; }
+  .scene-editor .tool { width: 58px; }
+  .bottom-center .tool-hint { max-width: calc(100vw - 28px); text-align: center; line-height: 1.6; letter-spacing: 0; }
+}

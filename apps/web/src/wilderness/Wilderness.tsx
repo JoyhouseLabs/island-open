@@ -230,6 +230,7 @@ export default function Wilderness({
       "id" | "kind" | "chunk"
     > | null>(null),
     [showJournal, setShowJournal] = useState(false);
+  const [showMap, setShowMap] = useState(() => window.innerWidth >= 700);
   const [journalPage, setJournalPage] = useState(0);
   const pageCount = Math.max(
       1,
@@ -445,7 +446,7 @@ export default function Wilderness({
         </div>
         <button onClick={onExit}>返回恐龙公园</button>
       </header>
-      <aside className="wild-map" aria-label="探索地图">
+      {showMap && <aside className="wild-map" aria-label="探索地图">
         <div className="wild-map-grid">
           {cells.map((c) => (
             <span
@@ -473,8 +474,7 @@ export default function Wilderness({
           营地 {distance} 米
         </p>
         <small>北 ↑ · ● 你的位置 · ⌂ 营地</small>
-        <button onClick={returnCamp}>回到营地</button>
-      </aside>
+      </aside>}
       <footer className="wild-hint">
         WASD / 方向键行走 · Shift 奔跑 · 拖动画面转向
         <br />
@@ -494,13 +494,17 @@ export default function Wilderness({
           保存进度
         </button>
       </footer>
-      <section className="wild-discovery" aria-label="探索发现">
+      <nav className="toolbar activity-toolbar wild-activities" aria-label="探索活动">
+        <button aria-expanded={showMap} onClick={() => { setShowMap((v) => !v); if (window.innerWidth < 700) setShowJournal(false); }}>地图</button>
         <button
-          onClick={() => setShowJournal((v) => !v)}
+          onClick={() => { setShowJournal((v) => !v); setSelected(null); if (window.innerWidth < 700) setShowMap(false); }}
           aria-expanded={showJournal}
         >
           探索手记 · {journal.state.discoveries.length} 处发现
         </button>
+        <button onClick={returnCamp}>回到营地</button>
+      </nav>
+      <section className="wild-discovery" aria-label="探索发现">
         {nearby
           .filter((e) => Math.hypot(e.x - p.x, e.z - p.z) <= 26)
           .slice(0, 2)

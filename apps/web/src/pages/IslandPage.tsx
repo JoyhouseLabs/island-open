@@ -124,8 +124,8 @@ export default function IslandPage() {
   const [tool, setTool] = useState<Tool>("explore"),
     [selected, setSelected] = useState<string>(
       islandEntry
-        ? (landmarks.find((p) =>
-            Math.hypot(p.x - islandEntry.x, p.z - islandEntry.z) < 4,
+        ? (landmarks.find(
+            (p) => Math.hypot(p.x - islandEntry.x, p.z - islandEntry.z) < 4,
           )?.id ?? "home")
         : "home",
     ),
@@ -140,9 +140,9 @@ export default function IslandPage() {
     [pinnedDock, setPinnedDock] = useState<
       "places" | "tools" | "settings" | null
     >(null),
-    [hoverDock, setHoverDock] = useState<"places" | "tools" | "settings" | null>(
-      null,
-    ),
+    [hoverDock, setHoverDock] = useState<
+      "places" | "tools" | "settings" | null
+    >(null),
     [draft, setDraft] = useState<AvatarConfig>(
       () =>
         avatar ?? {
@@ -157,10 +157,9 @@ export default function IslandPage() {
     [shareBusy, setShareBusy] = useState(false);
   const publishedPlaces = useContentFeed()?.places ?? [];
   const location = useLocation();
-  // The bottom dock keeps one drawer open at a time. Pointer users get pure
-  // hover behaviour — the drawer leaves with the mouse; click-pinning only
-  // serves touch screens, which have no hover. The backpack panel is a
-  // drawer of its own: while it is open the dock stays quiet.
+  // Hover previews a category; clicking pins it for touch and keyboard use.
+  // Keep the decoration palette open until the player finishes or changes
+  // activities. The backpack closes any active decoration session.
   const canHover = useMemo(
     () =>
       typeof window !== "undefined" &&
@@ -169,20 +168,15 @@ export default function IslandPage() {
   );
   const packOpen = usePackOpen();
   useEffect(() => {
-    if (packOpen) setPinnedDock(null);
+    if (packOpen) finishDecorating();
   }, [packOpen]);
   const dockShown = packOpen
     ? null
-    : canHover
-      ? hoverDock
-      : pinnedDock;
+    : (pinnedDock ?? (canHover ? hoverDock : null));
   // Leaving a category starts a short grace timer: a mouse travelling up
   // into the drawer (or back to another one) must not drop it mid-air.
   const dockLeave = useRef<number>(undefined);
-  useEffect(
-    () => () => window.clearTimeout(dockLeave.current),
-    [],
-  );
+  useEffect(() => () => window.clearTimeout(dockLeave.current), []);
   const enterCat = (id: "places" | "tools" | "settings") => {
     window.clearTimeout(dockLeave.current);
     setHoverDock(id);
@@ -329,8 +323,32 @@ export default function IslandPage() {
     emitGrowth({ type: "weather.changed", detail: weather });
     world.edit((w) => ({ ...w, environment: { ...w.environment, weather } }));
   };
+  const beforeDecorating = useRef(walking);
+  const decorating = useRef(false);
+  const finishDecorating = () => {
+    if (decorating.current) setWalking(beforeDecorating.current);
+    decorating.current = false;
+    setTool("explore");
+    setPinnedDock(null);
+    setHoverDock(null);
+  };
+  const beginDecorating = () => {
+    if (!decorating.current) beforeDecorating.current = walking;
+    decorating.current = true;
+    setPinnedDock("tools");
+    setWalking(false);
+  };
+  const editReason = !world.ready
+    ? "小岛正在加载，请稍等"
+    : world.unsupported
+      ? "此存档包含新版内容，当前只能参观"
+      : world.status === "conflict"
+        ? "请先处理右上角的存档冲突，再继续布置"
+        : "";
   const changeTool = (t: Tool) => {
+    if (editReason) return;
     setTool(t);
+    beginDecorating();
     if (t !== "explore") world.notify("点击岛上的空地，放下你的小小心意。");
   };
   return (
@@ -355,7 +373,9 @@ export default function IslandPage() {
               focus={focus}
               cameraReset={cameraReset}
               quality={quality}
-              onPlace={world.place}
+              onPlace={(x, z, kind) => {
+                if (!editReason) world.place(x, z, kind);
+              }}
               onSelect={select}
               onAsset={setAsset}
               onNote={() => setNoteOpen(true)}
@@ -457,10 +477,49 @@ export default function IslandPage() {
         <small>慢一点，也很好</small>
       </div>
 
+      <div className="view-controls resident-controls">
+        {" "}
+        <button
+          className={`circle-button ${walking ? "active" : ""}`}
+          title={walking ? "停下脚步" : "化身行走"}
+          aria-label={walking ? "停下脚步" : "化身行走"}
+          aria-pressed={walking}
+          onClick={() => {
+            if (!avatar) {
+              setPickerOpen(true);
+              return;
+            }
+            decorating.current = false;
+            setPinnedDock(null);
+            setHoverDock(null);
+            setTool("explore");
+            if (!walking) emitGrowth({ type: "avatar.walked" });
+            setWalking(!walking);
+          }}
+        >
+          <Footprints size={19} />
+        </button>
+        {walking && avatar && (
+          <button
+            className={`circle-button ${fpView ? "active" : ""}`}
+            title={fpView ? "切回跟随视角（V）" : "试试第一人称（V）"}
+            aria-label={fpView ? "切回跟随视角" : "第一人称视角"}
+            onClick={() => cameraMode.toggle()}
+          >
+            <Glasses size={19} />
+          </button>
+        )}
+        <DressingButton />
+        <JumpButton visible={walking} />
+      </div>
       <div className="bottom-center">
         <div className="tool-hint">
           {tool === "explore"
-            ? "拖动环顾 · 滚轮或双指缩放"
+            ? pinnedDock === "tools"
+              ? "选择工具布置小岛 · 完成后继续探索"
+              : walking
+                ? "点击地面或用方向键行走 · 空格跳跃或交谈"
+                : "拖动环顾 · 滚轮或双指缩放"
             : tool === "tree"
               ? "在空地种下一棵树"
               : tool === "flower"
@@ -477,16 +536,22 @@ export default function IslandPage() {
               <button
                 className={`tool ${dockShown === "places" ? "active" : ""}`}
                 aria-expanded={dockShown === "places"}
-                aria-label="导航 · 岛上的小地方"
+                aria-label="去哪里 · 岛上的小地方"
                 title="导航 · 岛上的小地方"
-                onClick={() =>
-                  setPinnedDock(pinnedDock === "places" ? null : "places")
-                }
+                onClick={() => {
+                  const next = pinnedDock === "places" ? null : "places";
+                  finishDecorating();
+                  setPinnedDock(next);
+                }}
               >
                 <MapPin size={19} />
-                <span>导航</span>
+                <span>去哪里</span>
               </button>
-              <nav className="dock-drawer place-drawer" aria-label="岛屿分区">
+              <nav
+                className="dock-drawer place-drawer"
+                aria-label="岛屿分区"
+                inert={dockShown !== "places"}
+              >
                 <span className="section-caption">岛上的小地方</span>
                 {landmarks.map((p) => {
                   const Icon = places[p.id] ?? Compass,
@@ -558,62 +623,73 @@ export default function IslandPage() {
               <button
                 className={`tool ${dockShown === "tools" ? "active" : ""}`}
                 aria-expanded={dockShown === "tools"}
-                aria-label="操作 · 打理小岛"
-                title="操作 · 打理小岛"
-                onClick={() =>
-                  setPinnedDock(pinnedDock === "tools" ? null : "tools")
-                }
+                aria-label="布置家园"
+                title="布置家园"
+                onClick={() => {
+                  if (decorating.current) finishDecorating();
+                  else beginDecorating();
+                }}
               >
                 <Wrench size={19} />
-                <span>操作</span>
+                <span>布置家园</span>
               </button>
-              <nav className="dock-drawer" aria-label="打理小岛">
-                <div className="drawer-row">
-                  {(
-                    [
-                      { id: "explore", label: "漫游", icon: Compass },
-                      { id: "tree", label: "种树", icon: TreePine },
-                      { id: "flower", label: "种花", icon: Flower2 },
-                      { id: "bench", label: "长椅", icon: Armchair },
-                    ] as const
-                  ).map((t) => (
+              <nav
+                className="dock-drawer home-editor"
+                aria-label="打理小岛"
+                inert={dockShown !== "tools"}
+              >
+                <header>
+                  <strong>布置家园</strong>
+                  <button className="small-button" onClick={finishDecorating}>
+                    完成布置
+                  </button>
+                </header>
+                {editReason && <p role="status">{editReason}</p>}
+                <fieldset className="scene-tools" disabled={!!editReason}>
+                  <div className="drawer-row">
+                    {(
+                      [
+                        { id: "explore", label: "环顾", icon: Compass },
+                        { id: "tree", label: "种树", icon: TreePine },
+                        { id: "flower", label: "种花", icon: Flower2 },
+                        { id: "bench", label: "长椅", icon: Armchair },
+                      ] as const
+                    ).map((t) => (
+                      <button
+                        key={t.id}
+                        className={tool === t.id ? "tool active" : "tool"}
+                        aria-pressed={tool === t.id}
+                        onClick={() => {
+                          changeTool(t.id);
+                        }}
+                      >
+                        <t.icon size={21} strokeWidth={1.65} />
+                        <span>{t.label}</span>
+                      </button>
+                    ))}
+                    <span className="toolbar-line" />
                     <button
-                      key={t.id}
-                      className={tool === t.id ? "tool active" : "tool"}
-                      aria-pressed={tool === t.id}
+                      className="tool grow"
                       onClick={() => {
-                        changeTool(t.id);
-                        setPinnedDock(null);
+                        world.grow();
                       }}
                     >
-                      <t.icon size={21} strokeWidth={1.65} />
-                      <span>{t.label}</span>
+                      <Sprout size={21} strokeWidth={1.65} />
+                      <span>生长</span>
                     </button>
-                  ))}
-                  <span className="toolbar-line" />
-                  <button
-                    className="tool grow"
-                    onClick={() => {
-                      world.grow();
-                      setPinnedDock(null);
-                    }}
-                  >
-                    <Sprout size={21} strokeWidth={1.65} />
-                    <span>生长</span>
-                  </button>
-                  <button
-                    className="tool undo"
-                    aria-label="撤销上一步"
-                    title="撤销上一步"
-                    disabled={!world.history.length}
-                    onClick={() => {
-                      world.undo();
-                      setPinnedDock(null);
-                    }}
-                  >
-                    <Undo2 size={19} />
-                  </button>
-                </div>
+                    <button
+                      className="tool undo"
+                      aria-label="撤销上一步"
+                      title="撤销上一步"
+                      disabled={!world.history.length}
+                      onClick={() => {
+                        world.undo();
+                      }}
+                    >
+                      <Undo2 size={19} />
+                    </button>
+                  </div>
+                </fieldset>
               </nav>
             </div>
             <div
@@ -624,16 +700,22 @@ export default function IslandPage() {
               <button
                 className={`tool ${dockShown === "settings" ? "active" : ""}`}
                 aria-expanded={dockShown === "settings"}
-                aria-label="配置 · 视角与环境"
+                aria-label="环境 · 视角与声音"
                 title="配置 · 视角与环境"
-                onClick={() =>
-                  setPinnedDock(pinnedDock === "settings" ? null : "settings")
-                }
+                onClick={() => {
+                  const next = pinnedDock === "settings" ? null : "settings";
+                  finishDecorating();
+                  setPinnedDock(next);
+                }}
               >
                 <SlidersHorizontal size={19} />
-                <span>配置</span>
+                <span>环境</span>
               </button>
-              <nav className="dock-drawer" aria-label="视角与环境">
+              <nav
+                className="dock-drawer"
+                aria-label="视角与环境"
+                inert={dockShown !== "settings"}
+              >
                 <div className="drawer-row">
                   <button
                     className="tool"
@@ -679,42 +761,11 @@ export default function IslandPage() {
                     )}
                     <span>声音</span>
                   </button>
-                  <DressingButton tool />
                 </div>
               </nav>
             </div>
             <span className="toolbar-line" />
-            <BackpackButton tool />
-            <button
-              className={`tool ${walking ? "active" : ""}`}
-              title={walking ? "停下脚步" : "化身行走"}
-              aria-label={walking ? "停下脚步" : "化身行走"}
-              aria-pressed={walking}
-              onClick={() => {
-                if (!avatar) {
-                  setPickerOpen(true);
-                  return;
-                }
-                setTool("explore");
-                if (!walking) emitGrowth({ type: "avatar.walked" });
-                setWalking(!walking);
-              }}
-            >
-              <Footprints size={19} />
-              <span>行走</span>
-            </button>
-            {walking && avatar && (
-              <button
-                className={`tool ${fpView ? "active" : ""}`}
-                title={fpView ? "切回跟随视角（V）" : "试试第一人称（V）"}
-                aria-label={fpView ? "切回跟随视角" : "第一人称视角"}
-                onClick={() => cameraMode.toggle()}
-              >
-                <Glasses size={19} />
-                <span>视角</span>
-              </button>
-            )}
-            <JumpButton visible={walking} tool />
+            <BackpackButton tool label="我的发现" />
           </nav>
         </div>
       </div>
@@ -934,7 +985,9 @@ export default function IslandPage() {
                         aria-pressed={share?.sharing === "link"}
                         onClick={() => void toggleShare()}
                       >
-                        {share?.sharing === "link" ? "关闭参观链接" : "开放参观链接"}
+                        {share?.sharing === "link"
+                          ? "关闭参观链接"
+                          : "开放参观链接"}
                       </button>
                       {share?.sharing === "link" && share.shareUrl && (
                         <>
@@ -959,10 +1012,14 @@ export default function IslandPage() {
                             onClick={() => void togglePlant()}
                           >
                             <Sprout size={14} />
-                            {share.plant ? "已开放一起种植（点我关闭）" : "允许朋友一起种植"}
+                            {share.plant
+                              ? "已开放一起种植（点我关闭）"
+                              : "允许朋友一起种植"}
                           </button>
                           <small>
-                            朋友打开链接只能走走看看{share.plant ? "，还可以种下小树和花" : ""}；关闭链接后立即失效。
+                            朋友打开链接只能走走看看
+                            {share.plant ? "，还可以种下小树和花" : ""}
+                            ；关闭链接后立即失效。
                           </small>
                         </>
                       )}
@@ -1100,10 +1157,23 @@ export default function IslandPage() {
               </p>
               <div className="panel-divider" />
               <strong className="credits-title">开放的客户端</strong>
-              <p className="credits-copy">客户端采用 AGPL-3.0-only；共享协议与世界规则采用 Apache-2.0。</p>
+              <p className="credits-copy">
+                客户端采用 AGPL-3.0-only；共享协议与世界规则采用 Apache-2.0。
+              </p>
               <div className="credit-links">
-                <a href="https://github.com/JoyhouseLabs/island-open" target="_blank" rel="noreferrer">开源项目 ↗</a>
-                <a href="https://app.joyhouse.chat/source/island-open-20261021.tar.gz" download>此版本客户端源码 ↓</a>
+                <a
+                  href="https://github.com/JoyhouseLabs/island-open"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  开源项目 ↗
+                </a>
+                <a
+                  href="https://app.joyhouse.chat/source/island-open-20261021.tar.gz"
+                  download
+                >
+                  此版本客户端源码 ↓
+                </a>
               </div>
               <div className="panel-divider" />
               <strong className="credits-title">狐狸与声音</strong>
@@ -1172,10 +1242,16 @@ export default function IslandPage() {
             </p>
             {world.config?.joyhouse && (
               <>
-                <a className="primary-button" href="/api/auth/joyhouse/start?mode=scan">
+                <a
+                  className="primary-button"
+                  href="/api/auth/joyhouse/start?mode=scan"
+                >
                   微信扫码登录 <ArrowUpRight size={17} />
                 </a>
-                <a className="small-button" href="/api/auth/joyhouse/start?mode=h5">
+                <a
+                  className="small-button"
+                  href="/api/auth/joyhouse/start?mode=h5"
+                >
                   微信内授权登录
                 </a>
               </>
@@ -1193,12 +1269,14 @@ export default function IslandPage() {
                 微信内授权登录
               </a>
             )}
-            {!world.config?.joyhouse && !world.config?.website && !world.config?.h5 && (
-              <div className="wechat-pending">
-                <ShieldCheck size={17} />
-                <span>微信登录等待开放平台配置</span>
-              </div>
-            )}
+            {!world.config?.joyhouse &&
+              !world.config?.website &&
+              !world.config?.h5 && (
+                <div className="wechat-pending">
+                  <ShieldCheck size={17} />
+                  <span>微信登录等待开放平台配置</span>
+                </div>
+              )}
             {world.config?.development && (
               <button
                 disabled={world.busy}
@@ -1220,7 +1298,11 @@ export default function IslandPage() {
               先在岛上走走 <ChevronRight size={14} />
             </button>
             <small className="tiny-note">
-              {world.config?.joyhouse ? "在微信内打开可直接授权，电脑上请使用微信扫码。" : world.config?.development ? "开发账号仅用于本机联调，不代表微信授权。" : "登录后可保存和恢复你的家园。"}
+              {world.config?.joyhouse
+                ? "在微信内打开可直接授权，电脑上请使用微信扫码。"
+                : world.config?.development
+                  ? "开发账号仅用于本机联调，不代表微信授权。"
+                  : "登录后可保存和恢复你的家园。"}
             </small>
           </div>
         </div>
@@ -1277,7 +1359,10 @@ export default function IslandPage() {
             <span className="eyebrow">WHO WALKS YOUR ISLAND</span>
             <h2 id="avatar-title">选择你的形象</h2>
             <div className="avatar-stage">
-              <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0.95, 3.3], fov: 38 }}>
+              <Canvas
+                dpr={[1, 1.5]}
+                camera={{ position: [0, 0.95, 3.3], fov: 38 }}
+              >
                 <ambientLight intensity={1.1} />
                 <directionalLight position={[2, 4, 3]} intensity={2} />
                 <AvatarPreview config={draft} />
@@ -1311,8 +1396,7 @@ export default function IslandPage() {
             </label>
             <div className="avatar-hats" id="hat-row">
               {avatarHats.map((h) => {
-                const locked =
-                  !!h.unlockId && !growth.state.owned[h.unlockId];
+                const locked = !!h.unlockId && !growth.state.owned[h.unlockId];
                 const def = h.unlockId
                   ? growth.unlocks.find((u) => u.id === h.unlockId)
                   : null;
@@ -1351,7 +1435,10 @@ export default function IslandPage() {
             >
               <Footprints size={16} /> 就这样出发
             </button>
-            <button className="text-button" onClick={() => setPickerOpen(false)}>
+            <button
+              className="text-button"
+              onClick={() => setPickerOpen(false)}
+            >
               先在岛上看看
             </button>
           </div>

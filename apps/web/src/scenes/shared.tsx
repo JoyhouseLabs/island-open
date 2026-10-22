@@ -33,6 +33,8 @@ export type SceneProps = {
   onExit: () => void;
   /** Owner-side procedural exploration, outside editable room snapshots. */
   onExplore?: () => void;
+  /** Owner activity menu requests the park guide; visitors use its inline toggle. */
+  guideRequest?: number;
   /** Avatar walking: when set with `avatar`, a resident walks this room. */
   walk?: boolean;
   avatar?: AvatarConfig | null;

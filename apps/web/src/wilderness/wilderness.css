@@ -420,3 +420,21 @@
     max-height: calc(100dvh - 280px);
   }
 }
+
+.wild-activities { position: absolute; bottom: calc(24px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); gap: 4px; flex-wrap: nowrap; }
+.wild-activities button { min-height: 44px; padding: 10px 14px; white-space: nowrap; font-size: 12px; }
+.wild-activities button[aria-expanded="true"] { background: #54735c; color: white; }
+.wild-header { flex-direction: row-reverse; }
+.wild-header > div { padding: 12px 18px; }
+.wild-hint { left: auto; right: 28px; top: 145px; bottom: auto; max-width: 240px; }
+.wild-map { top: 260px; }
+.wild-discovery { top: 100px; }
+@media(max-width:699px) {
+  .wild-activities { bottom: calc(12px + env(safe-area-inset-bottom)); width: max-content; max-width: calc(100vw - 24px); }
+  .wild-activities button { padding: 8px; font-size: 11px; }
+  .wild-pad { bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .wild-hint { top: 118px; right: 12px; left: auto; bottom: auto; max-width: 140px; }
+  .wild-map { top: 240px; }
+  .wild-discovery { top: 100px; max-height: calc(100dvh - 310px); }
+  .wild-header > div { max-width: 210px; padding: 10px; }
+}

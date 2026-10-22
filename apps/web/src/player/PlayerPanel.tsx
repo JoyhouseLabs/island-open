@@ -122,24 +122,23 @@ function useAwayClose(
 /** Backpack entry in a page's view-controls cluster. */
 /** `tool` renders the island toolbar style with a label; the default is the
  *  round side-button used by sub-scene pages. */
-export function BackpackButton({ tool = false }: { tool?: boolean }) {
+export function BackpackButton({ tool = false, label = "背包" }: { tool?: boolean; label?: string }) {
   const isOpen = usePackOpen();
   return (
     <button
       className={`${tool ? "tool" : "circle-button"} ${isOpen ? "active" : ""}`}
       title="背包"
-      aria-label="打开背包"
+      aria-label={label === "背包" ? "打开背包" : label}
       aria-expanded={isOpen}
       ref={(el) => {
         packInvoker = el;
       }}
-      onPointerEnter={canHover ? () => toggle(true) : undefined}
       onClick={() => {
-        if (!canHover) toggle();
+        toggle();
       }}
     >
       <Backpack size={18} />
-      {tool && <span>背包</span>}
+      {tool && <span>{label}</span>}
     </button>
   );
 }

@@ -1,4 +1,5 @@
 import "./learning.css";
+import { GraduationCap, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import type {
@@ -12,11 +13,14 @@ import { learningTravel, rememberReturn } from "./travel";
 export default function LearningInvitation({
   parent,
   room,
+  compact = false,
 }: {
+  compact?: boolean;
   parent: ReturnType<typeof useWorld>;
   room: ReturnType<typeof useWorld>;
 }) {
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const [enabled, setEnabled] = useState(false),
     [lessons, setLessons] = useState<LearningCatalog["lessons"]>([]),
     [error, setError] = useState(""),
@@ -77,30 +81,55 @@ export default function LearningInvitation({
     }
   }
   return (
-    <div className="learning-invitation">
-      <strong>小狐狸的学习邀请</strong>
-      <p>一起发现形状，带一件自己的作品回来。</p>
-      {lessons
-        .filter((l) => !l.locked)
-        .slice(0, 2)
-        .map(({ lesson, locked }) => (
+    <>
+      {compact && (
+        <button
+          className="tool"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          <GraduationCap size={20} />
+          <span>学习</span>
+        </button>
+      )}
+      {(!compact || open) && (
+        <div
+          className={`learning-invitation${compact ? " menu-learning" : ""}`}
+        >
+          {compact && (
+            <button
+              className="small-button"
+              aria-label="关闭学习菜单"
+              onClick={() => setOpen(false)}
+            >
+              <X size={16} />
+            </button>
+          )}
+          <strong>小狐狸的学习邀请</strong>
+          <p>一起发现形状，带一件自己的作品回来。</p>
+          {lessons
+            .filter((l) => !l.locked)
+            .slice(0, 2)
+            .map(({ lesson, locked }) => (
+              <button
+                className="small-button"
+                key={lesson.id}
+                disabled={busy || locked}
+                onClick={() => void launch(lesson.id)}
+              >
+                {locked ? "完成前置活动后解锁" : `开始：${lesson.title}`}
+              </button>
+            ))}
           <button
             className="small-button"
-            key={lesson.id}
-            disabled={busy || locked}
-            onClick={() => void launch(lesson.id)}
+            disabled={busy}
+            onClick={() => void launch()}
           >
-            {locked ? "完成前置活动后解锁" : `开始：${lesson.title}`}
+            打开学习中心
           </button>
-        ))}
-      <button
-        className="small-button"
-        disabled={busy}
-        onClick={() => void launch()}
-      >
-        打开学习中心
-      </button>
-      {error && <p role="alert">{error}</p>}
-    </div>
+          {error && <p role="alert">{error}</p>}
+        </div>
+      )}
+    </>
   );
 }
