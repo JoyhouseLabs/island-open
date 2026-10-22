@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  tableTops,
+  labFeatures,
+  walkSpecs,
   landingY,
   mantleBoost,
   pushOut,
@@ -57,13 +60,14 @@ describe("a full jump onto a bench (integration)", () => {
       vy = 7.2;
     const dt = 1 / 60;
     for (let step = 0; step < 240; step++) {
-      // Walk toward the bench the whole flight, like a running jump.
-      x -= 6 * dt;
+      // Approach the seat and stop over it rather than running off the far edge.
+      x = Math.max(0, x - 6 * dt);
       const pushed = pushOut(x, z, y, obstacles, 0.4);
       x = pushed.x;
+      const previousFeetY = y;
       vy += -22 * dt;
       y += vy * dt;
-      const land = landingY(x, z, 0, obstacles, y);
+      const land = landingY(x, z, 0, obstacles, y, previousFeetY);
       if (vy <= 0 && y <= land) {
         y = land;
         vy = 0;
@@ -72,5 +76,73 @@ describe("a full jump onto a bench (integration)", () => {
     }
     expect(Math.abs(x)).toBeLessThan(1.4); // ended over the bench
     expect(y).toBeCloseTo(0.45); // standing ON it
+  });
+});
+
+describe("tabletop jumping", () => {
+  it("blocks the full rectangular table, including its corners, below the top", () => {
+    const table = { x: 0, z: 0, ...tableTops.lab };
+    expect(pushOut(4, 1.9, 0, [table], 0.4).z).toBeCloseTo(2.2);
+    const corner = pushOut(4.4, 1.9, 0, [table], 0.4);
+    expect(Math.hypot(corner.x - 4.3, corner.z - 1.8)).toBeCloseTo(0.4);
+    expect(pushOut(4, 1.5, table.standY, [table], 0.4)).toEqual({
+      x: 4,
+      z: 1.5,
+    });
+    expect(supportY(4, 1.5, 0, [table], 2)).toBe(table.standY);
+    expect(supportY(0, 1.81, 0, [table], 2)).toBe(0);
+    expect(landingY(0, 1.81, 0, [table], 2)).toBe(0);
+  });
+
+  for (const [name, dimensions] of Object.entries(tableTops)) {
+    for (const dt of [1 / 60, 1 / 30, 1 / 20]) {
+      it(`jumps onto ${name} at ${Math.round(1 / dt)} fps, stands, jumps again and walks off`, () => {
+        const table = { x: 0, z: 0, ...dimensions };
+        const edge =
+          "halfSize" in dimensions ? dimensions.halfSize.z : dimensions.r;
+        let z = edge + 0.4,
+          y = 0,
+          vy = 7.2,
+          mantled = false;
+        for (let frame = 0; frame < 120; frame++) {
+          // Approach from the rim, stop once safely over the tabletop.
+          z = pushOut(0, Math.max(edge - 0.4, z - 6 * dt), y, [table], 0.4).z;
+          const boost = mantleBoost(vy, 0, z, y, [table], mantled);
+          vy = boost.vy;
+          mantled = boost.mantled;
+          const previousFeetY = y;
+          vy -= 22 * dt;
+          y += vy * dt;
+          const land = landingY(0, z, 0, [table], y, previousFeetY);
+          if (vy <= 0 && y <= land) {
+            y = land;
+            break;
+          }
+        }
+        expect(y).toBeCloseTo(table.standY);
+        expect(supportY(0, z, 0, [table], y)).toBe(table.standY);
+        expect(pushOut(0, z, y, [table], 0.4).z).toBe(z);
+        // A second jump clears the top; landing returns to the same height.
+        vy = 7.2;
+        for (let frame = 0; frame < 120; frame++) {
+          const previousFeetY = y;
+          vy -= 22 * dt;
+          y += vy * dt;
+          const land = landingY(0, z, 0, [table], y, previousFeetY);
+          if (vy <= 0 && y <= land) {
+            y = land;
+            break;
+          }
+        }
+        expect(y).toBeCloseTo(table.standY);
+        expect(supportY(0, edge + 0.1, 0, [table], y)).toBe(0);
+        expect(landingY(0, edge + 0.1, 0, [table], y)).toBe(0);
+      });
+    }
+  }
+
+  it("allows walking over lab table footprints, with physics handling the height", () => {
+    for (const table of labFeatures.benches)
+      expect(walkSpecs.lab.walkable(table.x, table.z)).toBe(true);
   });
 });

@@ -362,11 +362,14 @@ export function PlayerRig({
     }
 
     // Actions from the bus: panel buttons, number keys, the mobile jump.
+    let explicitJump = false;
     for (;;) {
       const action = playerAction.take();
       if (!action) break;
-      if (action === "jump") wantJump.current = true;
-      else if (action === "sit") {
+      if (action === "jump") {
+        wantJump.current = true;
+        explicitJump = true;
+      } else if (action === "sit") {
         if (sitting.current) sitting.current = false;
         else {
           const seat = raisedSeats.find(
@@ -501,9 +504,13 @@ export function PlayerRig({
       // Standing in a doorway: Space steps through it (a conversation
       // partner nearby still takes priority). gatePrompt.enter() counts
       // the deed and runs the veil transition, same as the chip.
-      if (gateNear && !proximity.speaker) {
+      if (!explicitJump && gateNear && !proximity.speaker) {
         gatePrompt.enter();
-      } else if (grounded.current && !proximity.speaker && !sitting.current) {
+      } else if (
+        grounded.current &&
+        (explicitJump || !proximity.speaker) &&
+        !sitting.current
+      ) {
         vy.current = JUMP_V;
         grounded.current = false;
         mantled.current = false;
@@ -528,6 +535,8 @@ export function PlayerRig({
       if (ground < pos.current.y - 0.25) {
         // Walked off an edge: let gravity take over.
         grounded.current = false;
+        // Climb assistance belongs to an intentional jump, not a step off.
+        mantled.current = true;
         vy.current = 0;
       } else pos.current.y = ground;
     }
@@ -543,15 +552,17 @@ export function PlayerRig({
       );
       vy.current = boost.vy;
       mantled.current = boost.mantled;
+      const previousFeetY = pos.current.y;
       vy.current += GRAVITY * dt;
       pos.current.y += vy.current * dt;
-      // Falling uses the generous rim: near the seat still settles on it.
+      // Land on the actual top, using the same footprint as standing.
       const land = landingY(
         pos.current.x,
         pos.current.z,
         spec.height(pos.current.x, pos.current.z),
         obstacles,
         pos.current.y,
+        previousFeetY,
       );
       if (vy.current <= 0 && pos.current.y <= land) {
         pos.current.y = land;

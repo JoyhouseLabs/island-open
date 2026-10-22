@@ -3,7 +3,7 @@ import BuildingLayer from "../building/BuildingLayer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as T from "three";
 import { useFrame } from "@react-three/fiber";
-import { libraryFeatures, random } from "@island/world-core";
+import { libraryFeatures, tableTops, random } from "@island/world-core";
 import { books as shelfBooks } from "@island/contracts";
 import { Plants, Box, palettes } from "../Plants";
 import { PlayerRig } from "../player/Player";
@@ -259,8 +259,16 @@ function ReadingNook() {
         <meshStandardMaterial color="#c58f7a" roughness={1} />
       </mesh>
       <Box
-        position={[table.x, 0.75, table.z]}
-        scale={[2.6, 0.18, 1.6]}
+        position={[
+          table.x,
+          tableTops.library.standY - tableTops.library.thickness / 2,
+          table.z,
+        ]}
+        scale={[
+          tableTops.library.halfSize.x * 2,
+          tableTops.library.thickness,
+          tableTops.library.halfSize.z * 2,
+        ]}
         color="#a8814f"
       />
       {[

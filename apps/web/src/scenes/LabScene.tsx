@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import * as T from "three";
 import { useFrame } from "@react-three/fiber";
-import { labFeatures, random } from "@island/world-core";
+import { labFeatures, tableTops, random } from "@island/world-core";
 import { Plants, Box, palettes } from "../Plants";
 import { PlayerRig } from "../player/Player";
 import {
@@ -52,7 +52,15 @@ function Bench({ x, z, seed }: { x: number; z: number; seed: number }) {
         <boxGeometry args={[9.4, 0.24, 4.6]} />
         <meshStandardMaterial color="#b9b3a0" roughness={1} />
       </mesh>
-      <Box position={[0, 1.5, 0]} scale={[8.6, 0.35, 3.6]} color="#c8b48c" />
+      <Box
+        position={[0, tableTops.lab.standY - tableTops.lab.thickness / 2, 0]}
+        scale={[
+          tableTops.lab.halfSize.x * 2,
+          tableTops.lab.thickness,
+          tableTops.lab.halfSize.z * 2,
+        ]}
+        color="#c8b48c"
+      />
       {(
         [
           [-3.6, -1.3],

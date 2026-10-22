@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as T from "three";
 import {
+  tableTops,
   gardenBeds,
   gardenPond,
   gardenGreenhouse,
@@ -313,8 +314,22 @@ function Garden(props: SceneProps) {
         ))}
       </group>
       <group position={[-17, 0, -10]}>
-        <mesh position={[0, 1.6, 0]} castShadow>
-          <cylinderGeometry args={[2.5, 2.5, 0.3, 24]} />
+        <mesh
+          position={[
+            0,
+            tableTops.garden.standY - tableTops.garden.thickness / 2,
+            0,
+          ]}
+          castShadow
+        >
+          <cylinderGeometry
+            args={[
+              tableTops.garden.r,
+              tableTops.garden.r,
+              tableTops.garden.thickness,
+              24,
+            ]}
+          />
           <meshStandardMaterial color="#c6aa7c" />
         </mesh>
         <Box position={[0, 0.8, 0]} scale={[0.6, 1.6, 0.6]} color="#8c7254" />

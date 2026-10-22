@@ -145,7 +145,6 @@ export const walkSpecs: Record<"island" | SubSceneId, WalkSpec> = {
     walkable: (x, z) =>
       Math.abs(x) <= 38 &&
       Math.abs(z) <= 32 &&
-      !labFeatures.benches.some((b) => disc(x, z, b.x, b.z, 5)) &&
       !disc(x, z, labFeatures.armillary.x, labFeatures.armillary.z, 4.5) &&
       !disc(x, z, labFeatures.dome.x, labFeatures.dome.z, 5.6),
     height: () => 0,

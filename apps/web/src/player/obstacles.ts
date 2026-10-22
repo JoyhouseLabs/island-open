@@ -9,12 +9,13 @@ import {
   nurseryFeatures,
   random,
   starlightFeatures,
+  tableTops,
 } from "@island/world-core";
 
 /**
  * Object "surface attributes": everything the walking player can bump into
  * or stand on. One table per source — entity kinds, each scene's static
- * structures, published-place props — all expressed as circles with an
+ * structures, published-place props — all expressed as circles or rectangles with an
  * optional standable top (standY).
  */
 
@@ -52,9 +53,9 @@ const sceneStatics: Record<string, Obstacle[]> = {
   garden: [
     { x: gardenGreenhouse.x, z: gardenGreenhouse.z, r: 9.5 },
     // The stump tea table and its two crates: jump onto a crate, then up.
-    { x: -17, z: -10, r: 1.3, standY: 1.75 },
-    { x: -20.5, z: -10, r: 1.1, standY: 1.6 },
-    { x: -13.5, z: -10, r: 1.1, standY: 1.6 },
+    { x: -17, z: -10, ...tableTops.garden },
+    { x: -20.5, z: -10, r: 0.9, halfSize: { x: 0.9, z: 0.9 }, standY: 1.6 },
+    { x: -13.5, z: -10, r: 0.9, halfSize: { x: 0.9, z: 0.9 }, standY: 1.6 },
   ],
   home: [
     ...homeFeatures.cabins.map((c) => ({
@@ -66,11 +67,11 @@ const sceneStatics: Record<string, Obstacle[]> = {
   ],
   library: [
     { x: libraryFeatures.pavilion.x, z: libraryFeatures.pavilion.z, r: 5.5 },
-    { x: libraryFeatures.table.x, z: libraryFeatures.table.z, r: 2.2, standY: 0.72 },
+    { ...libraryFeatures.table, ...tableTops.library },
     ...libraryFeatures.lamps.map((l) => ({ x: l.x, z: l.z, r: 0.6 })),
   ],
   lab: [
-    ...labFeatures.benches.map((b) => ({ x: b.x, z: b.z, r: 2.2, standY: 0.78 })),
+    ...labFeatures.benches.map((b) => ({ ...b, ...tableTops.lab })),
     { x: labFeatures.armillary.x, z: labFeatures.armillary.z, r: 1.7 },
     { x: labFeatures.dome.x, z: labFeatures.dome.z, r: 4.6 },
     ...labFeatures.beds.map((b) => ({ x: b.x, z: b.z, r: 2 })),
@@ -79,18 +80,31 @@ const sceneStatics: Record<string, Obstacle[]> = {
     {
       x: nurseryFeatures.greenhouse.x,
       z: nurseryFeatures.greenhouse.z,
-      r: Math.max(nurseryFeatures.greenhouse.w, nurseryFeatures.greenhouse.d) / 2 + 1,
+      r:
+        Math.max(nurseryFeatures.greenhouse.w, nurseryFeatures.greenhouse.d) /
+          2 +
+        1,
     },
     ...nurseryFeatures.beds.map((b) => ({ x: b.x, z: b.z, r: 1.6 })),
     { x: nurseryFeatures.barrel.x, z: nurseryFeatures.barrel.z, r: 1 },
   ],
   mountain: [
     { x: mountainFeatures.platform.x, z: mountainFeatures.platform.z, r: 5.2 },
-    { x: mountainFeatures.bench.x, z: mountainFeatures.bench.z, r: 1, standY: 0.45 },
+    {
+      x: mountainFeatures.bench.x,
+      z: mountainFeatures.bench.z,
+      r: 1,
+      standY: 0.45,
+    },
   ],
   starlight: [
     { x: starlightFeatures.cave.x, z: starlightFeatures.cave.z, r: 2.6 },
-    ...starlightFeatures.stones.map((s) => ({ x: s.x, z: s.z, r: 1.1, standY: 0.55 })),
+    ...starlightFeatures.stones.map((s) => ({
+      x: s.x,
+      z: s.z,
+      r: 1.1,
+      standY: 0.55,
+    })),
   ],
 };
 
