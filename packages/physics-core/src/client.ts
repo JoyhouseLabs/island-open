@@ -86,6 +86,43 @@ export class PhysicsPrediction {
   static async create(scene: PhysicsScene, id: string) {
     return new PhysicsPrediction(await PhysicsRuntime.create(scene), id);
   }
+  /** Reuse collision chunks for ordinary single-object layout edits; bulk replacement gets a fresh world. */
+  updateLayout(scene: PhysicsScene): boolean {
+    const old = this.runtime.scene;
+    if (
+      scene.id !== old.id ||
+      JSON.stringify([scene.spawn, scene.bounds, scene.physicsVersion]) !==
+        JSON.stringify([old.spawn, old.bounds, old.physicsVersion])
+    )
+      return false;
+    const oldObjects = new Map(old.objects.map((o) => [o.id, o])),
+      nextObjects = new Map(scene.objects.map((o) => [o.id, o]));
+    const changed = [
+      ...new Set([...oldObjects.keys(), ...nextObjects.keys()]),
+    ].filter(
+      (id) =>
+        JSON.stringify(oldObjects.get(id)) !==
+        JSON.stringify(nextObjects.get(id)),
+    );
+    if (changed.length > 1) return false;
+    const definitions = new Map(
+      scene.definitions.map((d) => [`${d.id}@${d.version}`, d]),
+    );
+    if (
+      old.definitions.some((d) => {
+        const next = definitions.get(`${d.id}@${d.version}`);
+        return next && JSON.stringify(d) !== JSON.stringify(next);
+      })
+    )
+      return false;
+    if (changed.length) {
+      this.runtime.applyLayout(scene, changed[0]!);
+      const body = this.runtime.bodies.get(changed[0]!);
+      if (body?.isDynamic())
+        body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, false);
+    }
+    return true;
+  }
   private applyBodies(states: BodyState[]) {
     for (const state of states) {
       const body = this.runtime.bodies.get(state.id);

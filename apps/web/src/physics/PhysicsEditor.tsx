@@ -328,6 +328,9 @@ export default function PhysicsEditor({
           </div>
           {draft && (
             <>
+              {draft.definition.id === "core:block" && (
+                <p>点击表面时，方块吸附到 1 米网格；也可以输入坐标精调。</p>
+              )}
               <div className="physics-editor-row">
                 {(["x", "y", "z"] as const).map((axis, i) => (
                   <label key={axis}>
@@ -335,7 +338,7 @@ export default function PhysicsEditor({
                     <input
                       aria-label={`布置 ${axis.toUpperCase()}`}
                       type="number"
-                      step="0.25"
+                      step={draft.definition.id === "core:block" ? "1" : "0.25"}
                       value={draft.object.position[axis]}
                       disabled={blocked}
                       onChange={(e) => coordinate(axis, e.target.value)}

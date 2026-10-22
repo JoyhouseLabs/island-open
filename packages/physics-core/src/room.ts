@@ -386,13 +386,7 @@ export class PhysicsRoom {
     };
   }
   frame(full = false): PhysicsFrame {
-    const bodies = this.runtime.states().filter((state) => {
-      if (
-        !full &&
-        !this.runtime.bodies.get(state.id)!.isDynamic() &&
-        !this.runtime.bodies.get(state.id)!.isKinematic()
-      )
-        return false;
+    const bodies = this.runtime.states(!full).filter((state) => {
       const signature = JSON.stringify({
         ...state,
         position: Object.fromEntries(

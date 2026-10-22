@@ -41,7 +41,7 @@ describe("layout edits at simulation boundaries", () => {
       room.commitEdit("b");
       expect(room.runtime.bodies.get(playgroundIds.box)).toBe(box);
       expect(box.linvel()).toEqual(velocity);
-      expect(room.runtime.bodies.has(id)).toBe(true);
+      expect(room.runtime.state(id).id).toBe(id);
       expect(room.layoutRevision).toBe(2);
       expect(() => room.prepareEdit("c", 1, place(), definition)).toThrow(
         "布局已更新",
@@ -52,7 +52,7 @@ describe("layout edits at simulation boundaries", () => {
         2,
         room.checkpoint(1),
       );
-      expect(restored.runtime.bodies.has(id)).toBe(true);
+      expect(restored.runtime.state(id).id).toBe(id);
       restored.dispose();
     } finally {
       room.dispose();

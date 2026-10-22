@@ -1,3 +1,4 @@
+import { snapBlockPosition } from "@island/physics-core";
 import PhysicsTransfer from "./PhysicsTransfer";
 import PhysicsContent from "./PhysicsContent";
 import { useEffect, useMemo, useState } from "react";
@@ -243,19 +244,23 @@ export default function OnlinePhysics() {
               selected={selected}
               select={select}
               draft={conn.editing ? draft : null}
-              placeAt={(point) => {
+              placeAt={(point, normal) => {
                 if (!draft || !conn.editing || conn.editPending) return;
                 setDraft({
                   ...draft,
                   object: {
                     ...draft.object,
-                    position: {
-                      x: Math.round(point.x * 4) / 4,
-                      y:
-                        Math.round((point.y - bottomOf(draft.definition)) * 4) /
-                        4,
-                      z: Math.round(point.z * 4) / 4,
-                    },
+                    position:
+                      draft.definition.id === "core:block"
+                        ? snapBlockPosition(point, normal)
+                        : {
+                            x: Math.round(point.x * 4) / 4,
+                            y:
+                              Math.round(
+                                (point.y - bottomOf(draft.definition)) * 4,
+                              ) / 4,
+                            z: Math.round(point.z * 4) / 4,
+                          },
                   },
                 });
               }}
@@ -448,6 +453,7 @@ export default function OnlinePhysics() {
                   lease: conn.lease,
                   frame: conn.buffer.latest,
                   predicted: conn.prediction?.player.snapshot(),
+                  blocks: conn.prediction?.runtime.blockStats,
                 })}
               </output>
             </details>

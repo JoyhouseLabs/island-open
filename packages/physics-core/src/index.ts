@@ -1,3 +1,4 @@
+import { BlockChunks, isConstructionBlock } from "./block-chunks.js";
 import { createPlayground } from "./playground.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PhysicsCharacter } from "./character.js";
@@ -64,7 +65,12 @@ export function colliderDescription(shape: ColliderShape): RAPIER.ColliderDesc {
 export class PhysicsRuntime {
   readonly world: RAPIER.World;
   readonly scene: PhysicsScene;
+  /** Individually simulated objects. Construction blocks are represented by blockChunks. */
   readonly bodies = new Map<string, RAPIER.RigidBody>();
+  private blockChunks!: BlockChunks;
+  get blockStats() {
+    return this.blockChunks.stats();
+  }
   private characters = new Map<string, PhysicsCharacter>();
   private previous = new Map<string, BodyState>();
   private ccdThresholds = new Map<string, number>();
@@ -90,15 +96,19 @@ export class PhysicsRuntime {
       const definitions = new Map(
         this.scene.definitions.map((d) => [`${d.id}@${d.version}`, d]),
       );
+      const blocks: ObjectInstance[] = [];
       for (const instance of this.scene.objects) {
         const def = definitions.get(
           `${instance.definitionId}@${instance.definitionVersion}`,
         )!;
-        this.addBody(instance, def);
+        if (isConstructionBlock(def)) blocks.push(instance);
+        else this.addBody(instance, def);
       }
+      this.blockChunks = new BlockChunks(this.world, blocks, (handle, id) => {
+        if (id) this.colliderObjects.set(handle, { id, material: "wood" });
+        else this.colliderObjects.delete(handle);
+      });
       this.capturePrevious();
-      for (const state of this.states())
-        this.recoveryAnchors.set(state.id, state);
     } catch (error) {
       this.dispose();
       throw error;
@@ -190,6 +200,14 @@ export class PhysicsRuntime {
   }
   state(id: string): BodyState {
     this.checkAlive();
+    const block = this.blockChunks?.instances.get(id);
+    if (block)
+      return {
+        id,
+        position: { ...block.position },
+        rotation: { ...block.rotation },
+        sleeping: false,
+      };
     const body = this.bodies.get(id);
     if (!body) throw new Error("物体不存在");
     return {
@@ -199,11 +217,16 @@ export class PhysicsRuntime {
       sleeping: body.isSleeping(),
     };
   }
-  states(): BodyState[] {
-    return [...this.bodies.keys()].map((id) => this.state(id));
+  states(movingOnly = false): BodyState[] {
+    return movingOnly
+      ? [...this.bodies]
+          .filter(([, body]) => !body.isFixed())
+          .map(([id]) => this.state(id))
+      : this.scene.objects.map((o) => this.state(o.id));
   }
   private capturePrevious() {
-    for (const id of this.bodies.keys()) this.previous.set(id, this.state(id));
+    for (const [id, body] of this.bodies)
+      if (!body.isFixed()) this.previous.set(id, this.state(id));
   }
   previousState(id: string) {
     return this.previous.get(id) ?? this.state(id);
@@ -438,6 +461,8 @@ export class PhysicsRuntime {
               throw new Error("物品与现有物体重叠，请换一个位置");
           }
         }
+        if (this.blockChunks.overlaps(shape, radius, excluding))
+          throw new Error("物品与现有方块重叠，请换一个位置");
         for (const character of this.characters.values())
           if (
             (shape.contactCollider(character.collider, 0)?.distance ?? 0) <
@@ -477,18 +502,21 @@ export class PhysicsRuntime {
         );
     }
     this.world.propagateModifiedBodyPositionsToColliders();
+    const shapes = [...this.bodies.values()]
+      .flatMap((body) =>
+        Array.from({ length: body.numColliders() }, (_, i) => body.collider(i)),
+      )
+      .concat(this.blockChunks.colliders());
     for (const character of this.characters.values())
-      for (const body of this.bodies.values())
-        for (let i = 0; i < body.numColliders(); i++) {
-          const shape = body.collider(i);
-          if (
-            !shape.isSensor() &&
-            (shape.contactCollider(character.collider, 0)?.distance ?? 0) <
-              -0.005
-          )
-            throw new Error("导入布局会挡住正在场景中的人，请移到空地再试");
-        }
+      for (const shape of shapes) {
+        if (
+          !shape.isSensor() &&
+          (shape.contactCollider(character.collider, 0)?.distance ?? 0) < -0.005
+        )
+          throw new Error("导入布局会挡住正在场景中的人，请移到空地再试");
+      }
   }
+
   /** Called only after durable commit, between simulation steps. Unchanged bodies keep velocity. */
   applyLayout(next: PhysicsScene, changedId: string) {
     const existing = this.bodies.get(changedId);
@@ -504,15 +532,16 @@ export class PhysicsRuntime {
     this.scene.objects = next.objects;
     this.scene.definitions = next.definitions;
     const instance = next.objects.find((o) => o.id === changedId);
-    if (instance)
-      this.addBody(
-        instance,
-        next.definitions.find(
-          (d) =>
-            d.id === instance.definitionId &&
-            d.version === instance.definitionVersion,
-        )!,
-      );
+    const definition =
+      instance &&
+      next.definitions.find(
+        (d) =>
+          d.id === instance.definitionId &&
+          d.version === instance.definitionVersion,
+      )!;
+    const block = definition && isConstructionBlock(definition);
+    this.blockChunks.replace(changedId, block ? instance : undefined);
+    if (instance && definition && !block) this.addBody(instance, definition);
     // Supporting geometry can disappear under sleeping objects.
     for (const body of this.bodies.values())
       if (body.isDynamic()) body.wakeUp();
@@ -523,8 +552,10 @@ export class PhysicsRuntime {
     this.checkAlive();
     const checkpoint = physicsCheckpointSchema.parse(input);
     if (
-      checkpoint.states.length !== this.bodies.size ||
-      checkpoint.states.some((s) => !this.bodies.has(s.id))
+      checkpoint.states.length !== this.scene.objects.length ||
+      checkpoint.states.some(
+        (s) => !this.bodies.has(s.id) && !this.blockChunks.instances.has(s.id),
+      )
     )
       throw new Error("检查点不属于当前布局");
     if (
@@ -538,6 +569,22 @@ export class PhysicsRuntime {
     )
       throw new Error("检查点超出场景边界");
     for (const state of checkpoint.states) {
+      const block = this.blockChunks.instances.get(state.id);
+      if (
+        block &&
+        ((["x", "y", "z"] as const).some(
+          (axis) =>
+            Math.abs(block.position[axis] - state.position[axis]) > 1e-5,
+        ) ||
+          (["x", "y", "z", "w"] as const).some(
+            (axis) =>
+              Math.abs(block.rotation[axis] - state.rotation[axis]) > 1e-5,
+          ))
+      )
+        throw new Error("建造方块状态必须与布局一致");
+    }
+    for (const state of checkpoint.states) {
+      if (this.blockChunks.instances.has(state.id)) continue;
       const body = this.bodies.get(state.id)!;
       body.setTranslation(state.position, true);
       body.setRotation(state.rotation, true);
@@ -558,6 +605,7 @@ export class PhysicsRuntime {
     for (const character of this.characters.values()) character.dispose();
     this.characters.clear();
     this.disposed = true;
+    this.blockChunks?.dispose();
     this.bodies.clear();
     this.previous.clear();
     this.ccdThresholds.clear();
@@ -570,3 +618,9 @@ export class PhysicsRuntime {
   }
 }
 export * from "./furniture.js";
+
+export {
+  BLOCK_CHUNK_SIZE,
+  blockChunkKey,
+  snapBlockPosition,
+} from "./block-chunks.js";

@@ -35,7 +35,7 @@ function Body({
   definition: ObjectDefinition;
   selected: boolean;
   select: (id: string) => void;
-  placeAt?: (position: Position) => void;
+  placeAt?: (position: Position, normal?: Position) => void;
 }) {
   const mesh = useRef<Group>(null),
     q = useMemo(() => new Quaternion(), []),
@@ -70,7 +70,13 @@ function Body({
       ref={mesh}
       onClick={(event) => {
         event.stopPropagation();
-        if (placeAt) placeAt(event.point);
+        if (placeAt)
+          placeAt(
+            event.point,
+            event.face?.normal
+              .clone()
+              .transformDirection(event.object.matrixWorld),
+          );
         else select(object.id);
       }}
     >
@@ -128,7 +134,7 @@ function Contents({
   selected: string | null;
   select: (id: string) => void;
   draft: PhysicsDraft | null;
-  placeAt: (position: Position) => void;
+  placeAt: (position: Position, normal?: Position) => void;
 }) {
   const { camera, controls } = useThree();
   const forward = useMemo(() => new Vector3(), []),
@@ -362,7 +368,7 @@ export default function OnlineScene(props: {
   selected: string | null;
   select: (id: string) => void;
   draft: PhysicsDraft | null;
-  placeAt: (position: Position) => void;
+  placeAt: (position: Position, normal?: Position) => void;
 }) {
   const scene = props.conn.scene!;
   return (

@@ -152,7 +152,13 @@ export class PhysicsConnection {
         this.clearPending();
         this.visiblePending = null;
         const you = welcome.type === "welcome" ? welcome.you : this.you;
-        void PhysicsPrediction.create(welcome.scene, you)
+        void Promise.resolve()
+          .then(() =>
+            welcome.type === "layout" &&
+            this.prediction?.updateLayout(welcome.scene)
+              ? this.prediction
+              : PhysicsPrediction.create(welcome.scene, you),
+          )
           .then((prediction) => {
             if (
               this.disposed ||
@@ -160,10 +166,10 @@ export class PhysicsConnection {
               this.socket !== socket ||
               socket.readyState !== WebSocket.OPEN
             ) {
-              prediction.dispose();
+              if (prediction !== this.prediction) prediction.dispose();
               return;
             }
-            this.prediction?.dispose();
+            if (prediction !== this.prediction) this.prediction?.dispose();
             this.prediction = prediction;
             this.scene = welcome.scene;
             this.layoutRevision = welcome.frame.layoutRevision;
