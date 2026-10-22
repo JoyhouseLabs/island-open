@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { wildEncounters, chunkKey, type WildSpecies } from "./src/wilderness";
+import {
+  wildIdentity,
+  wildEncounters,
+  chunkKey,
+  type WildSpecies,
+} from "./src/wilderness";
 import {
   ExplorationJournal,
   blankExploration,
@@ -200,5 +205,20 @@ describe("wildlife and exploration journal", () => {
     await b.resolve("local");
     expect((await remote.read()).state?.position).toEqual(packPosition(9, 10));
     expect(b.status).toBe("synced");
+  });
+  it("keeps display numbers unique for generated individuals and reads existing saved ids", () => {
+    const numbers = new Set<string>();
+    for (let x = -4; x <= 4; x++)
+      for (let z = -4; z <= 4; z++)
+        for (const e of wildEncounters(717, { x, z })) {
+          const identity = wildIdentity(e.id)!;
+          expect(identity.id).toBe(e.id);
+          expect(identity.kind).toBe(e.kind);
+          expect(numbers.has(identity.number)).toBe(false);
+          numbers.add(identity.number);
+        }
+    expect(wildIdentity("wild2:-2:3:1:raptor")?.number).toBe("RAP-2-W2-S3-02");
+    expect(wildIdentity("wild2:0:0:2:nest")?.number).toBe("NEST-2-E0-N0-03");
+    expect(wildIdentity("unknown")).toBeNull();
   });
 });

@@ -198,3 +198,29 @@ export function wildEncounters(
   }
   return result;
 }
+
+/** Display identity is scoped to the current home; storage keeps the existing stable id. */
+export function wildIdentity(id: string) {
+  const match =
+    /^wild2:(-?\d{1,6}):(-?\d{1,6}):([0-2]):(raptor|pterosaur|peacock|nest)$/.exec(
+      id,
+    );
+  if (!match) return null;
+  const x = Number(match[1]),
+    z = Number(match[2]);
+  if (String(x) !== match[1] || String(z) !== match[2]) return null;
+  const kind = match[4] as WildSpecies,
+    slot = Number(match[3]);
+  const prefix = {
+    raptor: "RAP",
+    pterosaur: "PTE",
+    peacock: "PEA",
+    nest: "NEST",
+  }[kind];
+  return {
+    id,
+    kind,
+    chunk: { x, z },
+    number: `${prefix}-2-${x < 0 ? "W" : "E"}${Math.abs(x).toString(36).toUpperCase()}-${z > 0 ? "S" : "N"}${Math.abs(z).toString(36).toUpperCase()}-${String(slot + 1).padStart(2, "0")}`,
+  };
+}

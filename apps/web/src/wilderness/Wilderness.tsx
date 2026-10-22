@@ -21,6 +21,7 @@ import {
   wildBiome,
   WildStream,
   wildEncounters,
+  wildIdentity,
   wildRing,
   type WildEncounter,
   type ChunkCoord,
@@ -29,7 +30,8 @@ import { AvatarMesh, type AvatarAnim } from "../player/AvatarModel";
 import { loadAvatar, type AvatarConfig } from "../player/avatar";
 import RendererCleanup from "../RendererCleanup";
 import Terrain from "./Terrain";
-import { Wildlife, wildlifeNames, wildlifeNotes } from "./Wildlife";
+import { Wildlife, wildlifeNames } from "./Wildlife";
+import ObservationCard from "./ObservationCard";
 import {
   packPosition,
   unpackPosition,
@@ -223,8 +225,17 @@ export default function Wilderness({
   const explored = useRef(
     new Map(journal.state.explored.map((c) => [chunkKey(c), c])),
   );
-  const [selected, setSelected] = useState<WildEncounter | null>(null),
+  const [selected, setSelected] = useState<Pick<
+      WildEncounter,
+      "id" | "kind" | "chunk"
+    > | null>(null),
     [showJournal, setShowJournal] = useState(false);
+  const [journalPage, setJournalPage] = useState(0);
+  const pageCount = Math.max(
+      1,
+      Math.ceil(journal.state.discoveries.length / 12),
+    ),
+    currentPage = Math.min(journalPage, pageCount - 1);
   const report = useCallback(
     (next: Position) => {
       setP(next);
@@ -249,9 +260,9 @@ export default function Wilderness({
     .slice(0, low ? 4 : 8);
   const inspect = useCallback(
     (e: WildEncounter) => {
+      setSelected(e);
       if (Math.hypot(e.x - position.current.x, e.z - position.current.z) > 26)
         return;
-      setSelected(e);
       if (!journal.state.discoveries.includes(e.id))
         journal.update({
           ...journal.state,
@@ -502,20 +513,11 @@ export default function Wilderness({
             </button>
           ))}
         {selected && (
-          <div className="wild-observation">
-            <button
-              className="wild-close"
-              aria-label="关闭观察"
-              onClick={() => setSelected(null)}
-            >
-              ×
-            </button>
-            <h2>{wildlifeNames[selected.kind]}</h2>
-            <p>{wildlifeNotes[selected.kind]}</p>
-            <small>
-              区域 {selected.chunk.x}, {selected.chunk.z} · 已记入手记
-            </small>
-          </div>
+          <ObservationCard
+            id={selected.id}
+            recorded={journal.state.discoveries.includes(selected.id)}
+            onClose={() => setSelected(null)}
+          />
         )}
         {showJournal && (
           <div className="wild-journal">
@@ -529,18 +531,50 @@ export default function Wilderness({
             )}
             <ul>
               {journal.state.discoveries
-                .slice(-12)
+                .slice()
                 .reverse()
+                .slice(currentPage * 12, (currentPage + 1) * 12)
                 .map((id) => {
-                  const [, x, z, , kind] = id.split(":");
+                  const identity = wildIdentity(id);
+                  if (!identity) return null;
                   return (
                     <li key={id}>
-                      {wildlifeNames[kind as keyof typeof wildlifeNames]} · 区域{" "}
-                      {x}, {z}
+                      <button
+                        className="wild-journal-entry"
+                        onClick={() => {
+                          setSelected(identity);
+                          setShowJournal(false);
+                        }}
+                      >
+                        <strong>{wildlifeNames[identity.kind]}</strong>
+                        <span>{identity.number}</span>
+                        <small>
+                          区域 {identity.chunk.x}, {identity.chunk.z} · 查看介绍
+                        </small>
+                      </button>
                     </li>
                   );
                 })}
             </ul>
+            {pageCount > 1 && (
+              <nav className="wild-journal-pages" aria-label="手记分页">
+                <button
+                  disabled={currentPage === 0}
+                  onClick={() => setJournalPage(currentPage - 1)}
+                >
+                  上一页
+                </button>
+                <span>
+                  {currentPage + 1} / {pageCount}
+                </span>
+                <button
+                  disabled={currentPage + 1 >= pageCount}
+                  onClick={() => setJournalPage(currentPage + 1)}
+                >
+                  下一页
+                </button>
+              </nav>
+            )}
           </div>
         )}
       </section>

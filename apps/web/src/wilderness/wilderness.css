@@ -323,3 +323,100 @@
     display: block;
   }
 }
+.wild-card-category {
+  display: block;
+  font-size: 10px;
+  color: #61765c;
+  padding-right: 24px;
+}
+.wild-card-number {
+  padding: 9px;
+  background: #dce7cf;
+  border-radius: 8px;
+  font-size: 10px;
+}
+.wild-card-number strong {
+  display: block;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.wild-observation dl {
+  display: grid;
+  grid-template-columns: 65px 1fr;
+  gap: 4px;
+  font-size: 11px;
+}
+.wild-observation dt {
+  color: #63745d;
+}
+.wild-observation dd {
+  margin: 0;
+}
+.wild-observation h3 {
+  font-size: 12px;
+  margin: 9px 0 0;
+}
+.wild-observation a {
+  display: block;
+  font-size: 10px;
+  color: #39684d;
+}
+.wild-card-caption {
+  display: block;
+  margin-top: 9px;
+  color: #71806a;
+  font-size: 9px;
+}
+.wild-journal ul {
+  list-style: none;
+  padding: 0;
+}
+.wild-journal-entry {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 6px;
+  padding: 8px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wild-journal-entry span {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.wild-journal-entry small {
+  font-size: 9px;
+}
+.wild-journal-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.wild-journal-pages button {
+  padding: 5px;
+  font-size: 10px;
+}
+.wild-journal-pages button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.wild-observation {
+  position: fixed;
+  left: 28px;
+  top: 155px;
+  width: 300px;
+  max-height: calc(100dvh - 260px);
+  overflow-y: auto;
+  z-index: 2;
+  box-shadow: 0 10px 35px #263e3520;
+}
+@media (max-width: 600px) {
+  .wild-observation {
+    left: 12px;
+    top: 125px;
+    width: calc(100vw - 160px);
+    max-height: calc(100dvh - 280px);
+  }
+}
