@@ -1,3 +1,4 @@
+import { CreationLayer, type CreationEditor } from "./creations/CreationModel";
 import { FurnitureLayer, type FurnitureEditor } from "./shop/Furniture";
 import RendererCleanup from "./RendererCleanup";
 import {
@@ -56,6 +57,7 @@ export type Focus = { x: number; z: number; stamp: number } | null;
 type Props = {
   world: WorldSnapshot;
   furnitureEditor?: FurnitureEditor;
+  creationEditor?: CreationEditor;
   tool: Tool;
   focus: Focus;
   cameraReset?: number;
@@ -153,7 +155,7 @@ function roadGeometry() {
   g.computeVertexNormals();
   return g;
 }
-function Ground({ world, tool, onPlace, onSelect, furnitureEditor }: Props) {
+function Ground({ world, tool, onPlace, onSelect, furnitureEditor, creationEditor }: Props) {
   const geometry = useMemo(
       () => terrain(world.environment.season),
       [world.environment.season],
@@ -168,6 +170,7 @@ function Ground({ world, tool, onPlace, onSelect, furnitureEditor }: Props) {
         receiveShadow
         onClick={(e: ThreeEvent<MouseEvent>) => {
           if (e.delta > 5) return;
+          if (creationEditor?.active) { e.stopPropagation(); creationEditor.onPoint(e.point.x, e.point.z); return; }
           if (furnitureEditor?.active) { e.stopPropagation(); furnitureEditor.onPoint(e.point.x, e.point.z); return; }
           if (tool === "explore") {
             if (playerIntent.active) {
@@ -686,6 +689,7 @@ function Scene(props: Props) {
       <WeatherFx weather={weather} low={low} span={150} />
       <Water night={night} />
       <Ground {...props} />
+      <CreationLayer items={props.world.creations} editor={props.creationEditor} />
       <FurnitureLayer items={props.world.furniture} editor={props.furnitureEditor} />
       <Water pond night={night} />
       {/* Wild grass: clumped around the island's trees, scattered over

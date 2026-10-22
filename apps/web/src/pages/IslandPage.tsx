@@ -1,3 +1,4 @@
+import { useCreations } from "../creations/useCreations";
 import { useFurnitureShop } from "../shop/useFurnitureShop";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { cursorStyle, glyphForTool } from "../building/itemGlyphs";
@@ -347,7 +348,9 @@ export default function IslandPage() {
         ? "请先处理右上角的存档冲突，再继续布置"
         : "";
   const shop = useFurnitureShop(world, () => { setTool("explore"); setWalking(false); setPinnedDock(null); setHoverDock(null); });
+  const creations = useCreations(world, () => { shop.cancel(); setTool("explore"); setWalking(false); setPinnedDock(null); setHoverDock(null); });
   const changeTool = (t: Tool) => {
+    creations.cancel();
     shop.cancel();
     if (editReason) return;
     setTool(t);
@@ -371,7 +374,8 @@ export default function IslandPage() {
         >
           <SceneBoundary label="主岛">
             <Island
-              furnitureEditor={shop.editor}
+              creationEditor={creations.editor}
+              furnitureEditor={creations.editor.active ? undefined : shop.editor}
               world={world.snapshot}
               tool={tool}
               focus={focus}
@@ -380,13 +384,13 @@ export default function IslandPage() {
               onPlace={(x, z, kind) => {
                 if (!editReason) world.place(x, z, kind);
               }}
-              onSelect={(id) => { if (!shop.editor.active) select(id); }}
+              onSelect={(id) => { if (!shop.editor.active && !creations.editor.active) select(id); }}
               onAsset={setAsset}
               onNote={() => setNoteOpen(true)}
               walk={walking}
               avatar={avatar}
               onGate={(dest) => {
-                if (shop.editor.active) return;
+                if (shop.editor.active || creations.editor.active) return;
                 const landmark =
                   dest === "island" ? "home" : sceneConfig[dest].landmark;
                 select(landmark);
@@ -396,6 +400,7 @@ export default function IslandPage() {
         </Suspense>
       </div>
       {shop.ui}
+      {creations.ui}
       <div className="edge-fade" />
       <header className="topbar">
         <a
@@ -771,7 +776,8 @@ export default function IslandPage() {
               </nav>
             </div>
             <span className="toolbar-line" />
-            {shop.button}
+            <span onClickCapture={creations.cancel}>{shop.button}</span>
+            {creations.button}
             <BackpackButton tool label="我的发现" />
           </nav>
         </div>

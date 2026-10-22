@@ -1,3 +1,5 @@
+import { creationPlacementError } from "./creations.js";
+export * from "./creations.js";
 import { furniturePlacementError } from "./shop.js";
 export * from "./shop.js";
 export {
@@ -417,6 +419,7 @@ export function createWorld(
   };
 }
 export function validatePlacement(snapshot: WorldSnapshot) {
+  for (const f of snapshot.creations ?? []) { const error = creationPlacementError(snapshot, f); if (error) return error; }
   for (const f of snapshot.furniture ?? []) {
     const error = furniturePlacementError(snapshot, f);
     if (error) return error;

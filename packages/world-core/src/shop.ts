@@ -1,5 +1,6 @@
 import {
   furnitureCatalog,
+  creationSize,
   type FurniturePlacement,
   type WorldSnapshot,
 } from "@island/contracts";
@@ -45,6 +46,11 @@ export function furniturePlacementError(
       Math.abs(other.z - f.z) < size.z + b.z + 0.35
     )
       return "和另一件家具太近啦，请留一点空间。";
+  }
+  for (const other of w.creations ?? []) {
+    const b = creationSize(other);
+    if (Math.abs(other.x - f.x) < size.x + b.x + 0.35 && Math.abs(other.z - f.z) < size.z + b.z + 0.35)
+      return "和造物太近啦，请留一点空间。";
   }
   return null;
 }
