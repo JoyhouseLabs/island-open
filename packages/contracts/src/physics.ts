@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { physicsTerrainSchema } from "./physics-terrain.js";
+import {
+  physicsTerrainSchema,
+  physicsTerrainTileSchema,
+} from "./physics-terrain.js";
 export * from "./physics-terrain.js";
 
 export const PHYSICS_RULES_VERSION = "1.0.0" as const;
@@ -721,3 +724,19 @@ export const physicsServerMessageSchema = z.discriminatedUnion("type", [
     .strict(),
 ]);
 export type PhysicsServerMessage = z.infer<typeof physicsServerMessageSchema>;
+
+export const physicsRegionSchema = z
+  .object({
+    id: z.string().min(1).max(96),
+    origin: vector3Schema,
+    terrain: z.array(physicsTerrainTileSchema).max(4),
+    parts: z
+      .array(
+        objectPartSchema
+          .extend({ material: z.enum(["wood", "stone", "rubber", "ice"]) })
+          .refine((p) => !p.sensor, "区域基础设施不能是感应体"),
+      )
+      .max(256),
+  })
+  .strict();
+export type PhysicsRegion = z.infer<typeof physicsRegionSchema>;

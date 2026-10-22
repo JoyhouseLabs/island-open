@@ -493,3 +493,5 @@ export { FORAGE_STACK, builtinItems } from "./items.js";
 
 export * from "./building.js";
 export * from "./wilderness.js";
+
+export * from "./wilderness-geometry.js";

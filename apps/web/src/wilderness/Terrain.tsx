@@ -1,5 +1,7 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as T from "three";
+import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
+import { terrainGeometry } from "@island/contracts";
 import {
   CAMP,
   CHUNK_SIZE,
@@ -7,6 +9,8 @@ import {
   wildBiome,
   wildHeight,
   wildVertexHeight,
+  wildTerrainTile,
+  wildPropGeometry,
   type WildChunk,
   type WildProp,
 } from "@island/world-core";
@@ -21,6 +25,16 @@ function Props({
   chunk: WildChunk;
   kind: "tree" | "rock";
 }) {
+  const geometry = useMemo(
+    () =>
+      new ConvexGeometry(
+        wildPropGeometry[kind].vertices.map(
+          (v) => new T.Vector3(v.x, v.y, v.z),
+        ),
+      ),
+    [kind],
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
   const trunks = useRef<T.InstancedMesh>(null),
     crowns = useRef<T.InstancedMesh>(null);
   useLayoutEffect(() => {
@@ -28,7 +42,7 @@ function Props({
     items.forEach((p, i) => {
       matrix.position.set(
         p.x - chunk.x * CHUNK_SIZE,
-        wildHeight(seed, p.x, p.z) + (kind === "tree" ? 1.8 : 0.6) * p.scale,
+        wildHeight(seed, p.x, p.z) + wildPropGeometry[kind].offsetY * p.scale,
         p.z - chunk.z * CHUNK_SIZE,
       );
       matrix.scale.setScalar(p.scale);
@@ -48,11 +62,7 @@ function Props({
   return (
     <>
       <instancedMesh ref={trunks} args={[undefined, undefined, items.length]}>
-        {kind === "tree" ? (
-          <cylinderGeometry args={[0.22, 0.4, 3.6, 5]} />
-        ) : (
-          <dodecahedronGeometry args={[1.3, 0]} />
-        )}
+        <primitive object={geometry} attach="geometry" />
         <meshStandardMaterial
           color={kind === "tree" ? "#78604b" : "#929989"}
           roughness={1}
@@ -81,10 +91,9 @@ export default function Terrain({
   detail: boolean;
 }) {
   const data = useMemo(() => {
-    const positions: number[] = [],
-      normals: number[] = [],
-      colors: number[] = [],
-      indices: number[] = [];
+    const mesh = terrainGeometry(wildTerrainTile(seed, chunk));
+    const normals: number[] = [],
+      colors: number[] = [];
     const count = CHUNK_SIZE / TERRAIN_STEP,
       color = new T.Color(),
       normal = new T.Vector3();
@@ -92,11 +101,6 @@ export default function Terrain({
       for (let i = 0; i <= count; i++) {
         const x = chunk.x * CHUNK_SIZE + i * TERRAIN_STEP,
           z = chunk.z * CHUNK_SIZE + j * TERRAIN_STEP;
-        positions.push(
-          i * TERRAIN_STEP,
-          wildVertexHeight(seed, x, z),
-          j * TERRAIN_STEP,
-        );
         // Global derivatives give matching border lighting as well as matching vertices.
         normal
           .set(
@@ -117,19 +121,12 @@ export default function Terrain({
                 : "#a4b77b",
         );
         colors.push(color.r, color.g, color.b);
-        if (i < count && j < count) {
-          const a = j * (count + 1) + i,
-            b = a + 1,
-            c = a + count + 1,
-            d = c + 1;
-          indices.push(a, c, b, b, c, d);
-        }
       }
     return {
-      positions: new Float32Array(positions),
+      positions: mesh.positions,
       normals: new Float32Array(normals),
       colors: new Float32Array(colors),
-      indices: new Uint16Array(indices),
+      indices: mesh.indices,
     };
   }, [seed, chunk]);
   const trees = useMemo(

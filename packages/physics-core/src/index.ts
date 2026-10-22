@@ -698,3 +698,5 @@ export {
 export * from "./scenes.js";
 
 export { officialBehaviorObjects } from "./behaviors.js";
+
+export * from "./regions.js";

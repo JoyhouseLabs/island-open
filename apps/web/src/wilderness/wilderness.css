@@ -438,3 +438,7 @@
   .wild-discovery { top: 100px; max-height: calc(100dvh - 310px); }
   .wild-header > div { max-width: 210px; padding: 10px; }
 }
+.wild-pad .wild-jump { grid-column: 3; grid-row: 3; font-size: 12px; }
+.wild-loading { pointer-events: none; }
+.wild-loading > div { display: grid; gap: 12px; justify-items: center; max-width: 80vw; }
+.wild-loading button { pointer-events: auto; }

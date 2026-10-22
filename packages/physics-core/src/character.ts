@@ -7,6 +7,7 @@ export const characterProfile = Object.freeze({
   halfHeight: 0.55,
   seatedHalfHeight: 0.25,
   speed: 4.2,
+  sprintSpeed: 7.14,
   jumpSpeed: 7.2,
   gravity: -22,
   stepHeight: 0.3,
@@ -15,6 +16,7 @@ export interface CharacterInput {
   x: number;
   z: number;
   jump: boolean;
+  sprint?: boolean;
 }
 export interface CharacterState {
   position: Vector3;
@@ -83,10 +85,11 @@ export class PhysicsCharacter {
     }
     const length = Math.max(1, Math.hypot(input.x, input.z));
     const blend = Math.min(1, dt * 16);
-    this.velocity.x +=
-      ((input.x / length) * characterProfile.speed - this.velocity.x) * blend;
-    this.velocity.z +=
-      ((input.z / length) * characterProfile.speed - this.velocity.z) * blend;
+    const speed = input.sprint
+      ? characterProfile.sprintSpeed
+      : characterProfile.speed;
+    this.velocity.x += ((input.x / length) * speed - this.velocity.x) * blend;
+    this.velocity.z += ((input.z / length) * speed - this.velocity.z) * blend;
     this.coyote = this.grounded ? 0.08 : Math.max(0, this.coyote - dt);
     if (input.jump && !this.jumpHeld && this.coyote > 0) {
       this.velocity.y = characterProfile.jumpSpeed;

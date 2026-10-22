@@ -1,32 +1,25 @@
-import {
-  useEffect,
-  useCallback,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ElementRef,
-  type MutableRefObject,
-} from "react";
+import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-import * as T from "three";
 import {
   CAMP,
   CHUNK_SIZE,
   chunkAt,
   chunkKey,
-  wildBlocked,
   wildHeight,
   wildBiome,
   WildStream,
+  wildCampParts,
   wildEncounters,
   wildIdentity,
   wildRing,
   type WildEncounter,
   type ChunkCoord,
 } from "@island/world-core";
-import { AvatarMesh, type AvatarAnim } from "../player/AvatarModel";
+import PhysicsWalker, {
+  type ExplorePosition,
+  type ExploreInput,
+} from "./PhysicsWalker";
+import { PhysicsPart } from "../physics/PhysicsPart";
 import { loadAvatar, type AvatarConfig } from "../player/avatar";
 import RendererCleanup from "../RendererCleanup";
 import Terrain from "./Terrain";
@@ -38,130 +31,10 @@ import {
   type ExplorationJournal,
 } from "./journal";
 import "./wilderness.css";
-type Position = { x: number; z: number };
-type Input = { keys: Set<string>; touch: string; sprint: boolean };
+type Position = ExplorePosition;
+type Input = ExploreInput;
 const spawn = () => ({ ...CAMP, z: CAMP.z - 8 });
 const names = { forest: "松林", meadow: "开阔草地", rock: "岩石丘陵" };
-function Walker({
-  seed,
-  stream,
-  center,
-  position,
-  input,
-  avatar,
-  report,
-}: {
-  seed: number;
-  stream: WildStream;
-  center: ChunkCoord;
-  position: MutableRefObject<Position>;
-  input: MutableRefObject<Input>;
-  avatar: AvatarConfig;
-  report(p: Position): void;
-}) {
-  const body = useRef<T.Group>(null),
-    controls = useRef<ElementRef<typeof OrbitControls>>(null),
-    lastOrigin = useRef(center);
-  const { camera } = useThree();
-  const anim = useMemo<AvatarAnim>(() => ({ phase: 0, moving: false }), []),
-    timer = useRef(0);
-  useLayoutEffect(() => {
-    const dx = (center.x - lastOrigin.current.x) * CHUNK_SIZE,
-      dz = (center.z - lastOrigin.current.z) * CHUNK_SIZE;
-    camera.position.x -= dx;
-    camera.position.z -= dz;
-    if (controls.current) {
-      controls.current.target.x -= dx;
-      controls.current.target.z -= dz;
-    }
-    const p = position.current;
-    controls.current?.target.set(
-      p.x - center.x * CHUNK_SIZE,
-      wildHeight(seed, p.x, p.z) + 1.4,
-      p.z - center.z * CHUNK_SIZE,
-    );
-    lastOrigin.current = center;
-  }, [center, camera, position, seed]);
-  useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.05),
-      p = position.current,
-      oldX = p.x,
-      oldZ = p.z,
-      oldY = wildHeight(seed, p.x, p.z);
-    const held = (key: string) =>
-      input.current.keys.has(key) || input.current.touch === key;
-    let dx =
-      Number(held("KeyD") || held("ArrowRight")) -
-      Number(held("KeyA") || held("ArrowLeft"));
-    let dz =
-      Number(held("KeyS") || held("ArrowDown")) -
-      Number(held("KeyW") || held("ArrowUp"));
-    const length = Math.hypot(dx, dz);
-    if (length) {
-      const target = controls.current?.target;
-      const angle = target
-        ? Math.atan2(camera.position.x - target.x, camera.position.z - target.z)
-        : 0;
-      const speed =
-        (input.current.sprint || held("ShiftLeft") || held("ShiftRight")
-          ? 15
-          : 8) * dt;
-      const vx =
-          ((dx * Math.cos(angle) + dz * Math.sin(angle)) / length) * speed,
-        vz = ((dz * Math.cos(angle) - dx * Math.sin(angle)) / length) * speed;
-      const allowed = (x: number, z: number) => {
-        // Numeric safety boundary is millions of chunks away from any normal journey.
-        if (Math.hypot(x - CAMP.x, z - CAMP.z - 3) < 3.5) return false;
-        if (Math.abs(x) > 96_000_000 || Math.abs(z) > 96_000_000) return false;
-        const chunk = stream.chunks.get(chunkKey(chunkAt(x, z)));
-        if (!chunk) return false;
-        // Check neighbours too: colliders can extend across a chunk boundary.
-        const c = chunkAt(x, z);
-        for (let a = -1; a <= 1; a++)
-          for (let b = -1; b <= 1; b++) {
-            const n = stream.chunks.get(chunkKey({ x: c.x + a, z: c.z + b }));
-            if (n && wildBlocked(n, x, z)) return false;
-          }
-        return true;
-      };
-      if (allowed(p.x + vx, p.z)) p.x += vx;
-      if (allowed(p.x, p.z + vz)) p.z += vz;
-      if (body.current) body.current.rotation.y = Math.atan2(vx, vz);
-    }
-    const y = wildHeight(seed, p.x, p.z),
-      x = p.x - center.x * CHUNK_SIZE,
-      z = p.z - center.z * CHUNK_SIZE;
-    body.current?.position.set(x, y + 0.04, z);
-    anim.moving = p.x !== oldX || p.z !== oldZ;
-    anim.phase += dt;
-    camera.position.x += p.x - oldX;
-    camera.position.z += p.z - oldZ;
-    camera.position.y += y - oldY;
-    controls.current?.target.set(x, y + 1.4, z);
-    controls.current?.update();
-    timer.current += dt;
-    const c = chunkAt(p.x, p.z);
-    if (timer.current > 0.2 || c.x !== center.x || c.z !== center.z) {
-      report({ ...p });
-      timer.current = 0;
-    }
-  });
-  return (
-    <>
-      <group ref={body}>
-        <AvatarMesh config={avatar} anim={anim} />
-      </group>
-      <OrbitControls
-        ref={controls}
-        makeDefault
-        enablePan={false}
-        minDistance={8}
-        maxDistance={70}
-        maxPolarAngle={Math.PI * 0.47}
-      />
-    </>
-  );
-}
 function Diagnostics() {
   const { gl } = useThree();
   const timer = useRef(0);
@@ -175,26 +48,12 @@ function Diagnostics() {
   return null;
 }
 function Camp({ center }: { center: ChunkCoord }) {
+  const parts = useMemo(() => wildCampParts(), []);
   return (
-    <group
-      position={[
-        CAMP.x - center.x * CHUNK_SIZE,
-        0,
-        CAMP.z - center.z * CHUNK_SIZE,
-      ]}
-    >
-      <mesh position={[0, 2.5, 3]}>
-        <coneGeometry args={[4.5, 5, 4]} />
-        <meshStandardMaterial color="#c88455" />
-      </mesh>
-      <mesh position={[5, 3, 0]}>
-        <cylinderGeometry args={[0.12, 0.12, 6, 6]} />
-        <meshStandardMaterial color="#695647" />
-      </mesh>
-      <mesh position={[6, 5.1, 0]}>
-        <boxGeometry args={[2, 1.2, 0.08]} />
-        <meshStandardMaterial color="#f4d393" />
-      </mesh>
+    <group position={[-center.x * CHUNK_SIZE, 0, -center.z * CHUNK_SIZE]}>
+      {parts.map((part) => (
+        <PhysicsPart key={part.id} part={part} selected={false} />
+      ))}
     </group>
   );
 }
@@ -211,12 +70,26 @@ export default function Wilderness({
   onExit(): void;
   journal: ExplorationJournal;
 }) {
-  const position = useRef(unpackPosition(journal.state)),
-    input = useRef<Input>({ keys: new Set(), touch: "", sprint: false });
-  const [p, setP] = useState(() => unpackPosition(journal.state)),
+  const position = useRef<Position>(unpackPosition(journal.state)),
+    input = useRef<Input>({
+      keys: new Set(),
+      touch: "",
+      sprint: false,
+      jump: false,
+    });
+  const [p, setP] = useState<Position>(() => unpackPosition(journal.state)),
     [epoch, setEpoch] = useState(0),
     [revision, setRevision] = useState(0),
     [running, setRunning] = useState(false);
+  const [physicsStatus, setPhysicsStatus] = useState({
+    ready: false,
+    error: "",
+  });
+  const onPhysicsStatus = useCallback((ready: boolean, error = "") => {
+    setPhysicsStatus((old) =>
+      old.ready === ready && old.error === error ? old : { ready, error },
+    );
+  }, []);
   const center = useMemo(
     () => chunkAt(p.x, p.z),
     [Math.floor(p.x / CHUNK_SIZE), Math.floor(p.z / CHUNK_SIZE)],
@@ -287,6 +160,7 @@ export default function Wilderness({
     if (choice === "cloud" && journal.status === "synced") {
       input.current.keys.clear();
       input.current.touch = "";
+      input.current.jump = false;
       position.current = unpackPosition(journal.state);
       setP(position.current);
       explored.current = new Map(
@@ -321,10 +195,13 @@ export default function Wilderness({
       "ArrowRight",
       "ShiftLeft",
       "ShiftRight",
+      "Space",
     ]);
     const down = (e: KeyboardEvent) => {
       if (
         !codes.has(e.code) ||
+        (e.code === "Space" &&
+          (e.target as HTMLElement)?.closest("button,a")) ||
         e.ctrlKey ||
         e.metaKey ||
         (e.target as HTMLElement)?.matches(
@@ -341,6 +218,7 @@ export default function Wilderness({
     const clear = () => {
       input.current.keys.clear();
       input.current.touch = "";
+      input.current.jump = false;
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -362,6 +240,8 @@ export default function Wilderness({
   const returnCamp = () => {
     input.current.keys.clear();
     input.current.touch = "";
+    input.current.jump = false;
+    setPhysicsStatus({ ready: false, error: "" });
     position.current = spawn();
     report(spawn());
     void journal.flush();
@@ -377,6 +257,8 @@ export default function Wilderness({
       data-testid="wilderness"
       data-chunk={chunkKey(center)}
       data-loaded={stream.chunks.size}
+      data-physics-ready={physicsStatus.ready}
+      data-y={(p.y ?? wildHeight(seed, p.x, p.z)).toFixed(3)}
       data-pending={stream.waiting}
       data-x={p.x.toFixed(1)}
       data-z={p.z.toFixed(1)}
@@ -426,17 +308,17 @@ export default function Wilderness({
               inspect={inspect}
             />
           ))}
-        {ready && (
-          <Walker
-            seed={seed}
-            stream={stream}
-            center={center}
-            position={position}
-            input={input}
-            avatar={avatar ?? loadAvatar()}
-            report={report}
-          />
-        )}
+        <PhysicsWalker
+          seed={seed}
+          stream={stream}
+          center={center}
+          revision={revision}
+          position={position}
+          input={input}
+          avatar={avatar ?? loadAvatar()}
+          report={report}
+          onStatus={onPhysicsStatus}
+        />
       </Canvas>
       <header className="wild-header">
         <div>
@@ -446,37 +328,39 @@ export default function Wilderness({
         </div>
         <button onClick={onExit}>返回恐龙公园</button>
       </header>
-      {showMap && <aside className="wild-map" aria-label="探索地图">
-        <div className="wild-map-grid">
-          {cells.map((c) => (
+      {showMap && (
+        <aside className="wild-map" aria-label="探索地图">
+          <div className="wild-map-grid">
+            {cells.map((c) => (
+              <span
+                key={chunkKey(c)}
+                className={explored.current.has(chunkKey(c)) ? "seen" : ""}
+                title={`区域 ${c.x}, ${c.z}`}
+              >
+                {c.x === center.x && c.z === center.z
+                  ? "●"
+                  : c.x === 0 && c.z === 0
+                    ? "⌂"
+                    : ""}
+              </span>
+            ))}
+          </div>
+          <p>
             <span
-              key={chunkKey(c)}
-              className={explored.current.has(chunkKey(c)) ? "seen" : ""}
-              title={`区域 ${c.x}, ${c.z}`}
+              style={{
+                display: "inline-block",
+                transform: `rotate(${bearing}deg)`,
+              }}
             >
-              {c.x === center.x && c.z === center.z
-                ? "●"
-                : c.x === 0 && c.z === 0
-                  ? "⌂"
-                  : ""}
-            </span>
-          ))}
-        </div>
-        <p>
-          <span
-            style={{
-              display: "inline-block",
-              transform: `rotate(${bearing}deg)`,
-            }}
-          >
-            ↑
-          </span>{" "}
-          营地 {distance} 米
-        </p>
-        <small>北 ↑ · ● 你的位置 · ⌂ 营地</small>
-      </aside>}
+              ↑
+            </span>{" "}
+            营地 {distance} 米
+          </p>
+          <small>北 ↑ · ● 你的位置 · ⌂ 营地</small>
+        </aside>
+      )}
       <footer className="wild-hint">
-        WASD / 方向键行走 · Shift 奔跑 · 拖动画面转向
+        WASD / 方向键行走 · Shift 奔跑 · 空格跳跃 · 拖动画面转向
         <br />
         <span role="status">
           {journal.storageFailed
@@ -494,10 +378,25 @@ export default function Wilderness({
           保存进度
         </button>
       </footer>
-      <nav className="toolbar activity-toolbar wild-activities" aria-label="探索活动">
-        <button aria-expanded={showMap} onClick={() => { setShowMap((v) => !v); if (window.innerWidth < 700) setShowJournal(false); }}>地图</button>
+      <nav
+        className="toolbar activity-toolbar wild-activities"
+        aria-label="探索活动"
+      >
         <button
-          onClick={() => { setShowJournal((v) => !v); setSelected(null); if (window.innerWidth < 700) setShowMap(false); }}
+          aria-expanded={showMap}
+          onClick={() => {
+            setShowMap((v) => !v);
+            if (window.innerWidth < 700) setShowJournal(false);
+          }}
+        >
+          地图
+        </button>
+        <button
+          onClick={() => {
+            setShowJournal((v) => !v);
+            setSelected(null);
+            if (window.innerWidth < 700) setShowMap(false);
+          }}
           aria-expanded={showJournal}
         >
           探索手记 · {journal.state.discoveries.length} 处发现
@@ -619,6 +518,26 @@ export default function Wilderness({
           </button>
         ))}
         <button
+          className="wild-jump"
+          aria-label="跳跃"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            input.current.jump = true;
+          }}
+          onPointerUp={() => {
+            input.current.jump = false;
+          }}
+          onPointerCancel={() => {
+            input.current.jump = false;
+          }}
+          onLostPointerCapture={() => {
+            input.current.jump = false;
+          }}
+        >
+          跳跃
+        </button>
+        <button
           className="wild-run"
           aria-pressed={running}
           onClick={() => {
@@ -629,9 +548,14 @@ export default function Wilderness({
           奔跑
         </button>
       </div>
-      {!ready && (
+      {(!ready || !physicsStatus.ready) && (
         <div className="wild-loading" role="status">
-          正在铺开前方的小径…
+          <div>
+            {physicsStatus.error || "正在铺开前方的小径…"}
+            {physicsStatus.error && (
+              <button onClick={returnCamp}>重新从营地出发</button>
+            )}
+          </div>
         </div>
       )}
     </main>

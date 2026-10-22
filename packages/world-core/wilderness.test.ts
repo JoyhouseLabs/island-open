@@ -7,10 +7,9 @@ import {
   wildHeight,
   wildVertexHeight,
   wildRing,
-  wildBlocked,
   WildStream,
 } from "./src/wilderness";
-describe("wilderness generation v1", () => {
+describe("wilderness generation v2", () => {
   it("is repeatable after eviction and changes with seed", () => {
     const c = { x: -12, z: 83 },
       a = generateWildChunk(717, c);
@@ -41,7 +40,9 @@ describe("wilderness generation v1", () => {
   it("keeps the camp and continuous trail unobstructed", () => {
     for (let z = -500; z < 500; z++)
       expect(
-        wildBlocked(generateWildChunk(717, chunkAt(CAMP.x, z)), CAMP.x, z),
+        generateWildChunk(717, chunkAt(CAMP.x, z)).props.some(
+          (p) => Math.abs(p.x - CAMP.x) < 5,
+        ),
       ).toBe(false);
   });
   it("keeps resident chunks and pending work bounded during long travel and reversal", () => {

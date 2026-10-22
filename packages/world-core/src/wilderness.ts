@@ -119,14 +119,6 @@ export class WildStream {
     return this.pending.length;
   }
 }
-export function wildBlocked(chunk: WildChunk, x: number, z: number) {
-  return chunk.props.some(
-    (p) =>
-      Math.hypot(p.x - x, p.z - z) <
-      (p.kind === "tree" ? 0.5 : 1.3) * p.scale + 0.5,
-  );
-}
-
 export type WildSpecies = "raptor" | "pterosaur" | "peacock" | "nest";
 export type WildEncounter = {
   id: string;

@@ -19,6 +19,12 @@ export function registerTerrain(
   }
   tiles.set(collider.handle, tile);
 }
+export function unregisterTerrain(
+  world: RAPIER.World,
+  collider: RAPIER.Collider,
+) {
+  terrain.get(world)?.delete(collider.handle);
+}
 export function forgetTerrain(world: RAPIER.World) {
   terrain.delete(world);
 }
