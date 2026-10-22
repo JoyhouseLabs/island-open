@@ -7,10 +7,12 @@ export function PhysicsPart({
   part,
   selected,
   ghost,
+  glow,
 }: {
   part: ObjectPart;
   selected: boolean;
   ghost?: string;
+  glow?: string;
 }) {
   const geometry = useMemo(
     () =>
@@ -60,8 +62,8 @@ export function PhysicsPart({
       <meshStandardMaterial
         color={ghost ?? part.color}
         roughness={0.75}
-        emissive={selected ? "#9a5a13" : "#000000"}
-        emissiveIntensity={0.3}
+        emissive={glow ?? (selected ? "#9a5a13" : "#000000")}
+        emissiveIntensity={glow ? 0.8 : 0.3}
         transparent={part.sensor || !!ghost}
         opacity={part.sensor || ghost ? 0.25 : 1}
         depthWrite={!ghost}

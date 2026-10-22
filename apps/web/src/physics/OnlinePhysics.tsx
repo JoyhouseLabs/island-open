@@ -37,6 +37,7 @@ export default function OnlinePhysics() {
   const [conn, setConn] = useState<PhysicsConnection | null>(null),
     [, update] = useState(0),
     [selected, select] = useState<string | null>(null);
+  const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
   useEffect(() => {
@@ -239,6 +240,7 @@ export default function OnlinePhysics() {
         <>
           <section className="physics-viewport">
             <OnlineScene
+              night={night}
               conn={conn}
               keys={keys}
               selected={selected}
@@ -272,6 +274,14 @@ export default function OnlinePhysics() {
             </div>
           </section>
           <section className="physics-controls">
+            <label>
+              <input
+                type="checkbox"
+                checked={night}
+                onChange={(e) => setNight(e.target.checked)}
+              />
+              夜晚预览（仅自己）
+            </label>
             <div>
               <strong data-testid="physics-online-status">
                 {connected

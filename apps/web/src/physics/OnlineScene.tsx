@@ -10,6 +10,7 @@ import type {
   Vector3 as Position,
 } from "@island/contracts";
 import { previewError, type PhysicsDraft } from "./PhysicsEditor";
+import { PhysicsLight } from "./PhysicsLight";
 import { PhysicsPart } from "./PhysicsPart";
 import type { PhysicsConnection } from "./PhysicsConnection";
 
@@ -80,8 +81,18 @@ function Body({
         else select(object.id);
       }}
     >
+      <PhysicsLight parts={definition.parts} light={definition.light} />
       {definition.parts.map((part) => (
-        <PhysicsPart key={part.id} part={part} selected={selected} />
+        <PhysicsPart
+          key={part.id}
+          part={part}
+          selected={selected}
+          glow={
+            definition.light?.partId === part.id
+              ? definition.light.color
+              : undefined
+          }
+        />
       ))}
     </group>
   );
@@ -128,7 +139,9 @@ function Contents({
   select,
   draft,
   placeAt,
+  night,
 }: {
+  night: boolean;
   conn: PhysicsConnection;
   keys: Set<string>;
   selected: string | null;
@@ -276,11 +289,11 @@ function Contents({
   const invalidDraft = previewError(conn, draft);
   return (
     <>
-      <color attach="background" args={["#e5eee5"]} />
-      <ambientLight intensity={1.4} />
+      <color attach="background" args={[night ? "#101c31" : "#e5eee5"]} />
+      <ambientLight intensity={night ? 0.15 : 1.4} />
       <directionalLight
         position={[6, 12, 6]}
-        intensity={2}
+        intensity={night ? 0.15 : 2}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-18}
@@ -363,6 +376,7 @@ function Contents({
   );
 }
 export default function OnlineScene(props: {
+  night: boolean;
   conn: PhysicsConnection;
   keys: Set<string>;
   selected: string | null;

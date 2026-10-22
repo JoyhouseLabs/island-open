@@ -5,6 +5,7 @@ export const physicsBudgets = Object.freeze({
   players: 4,
   creations: 16,
   shopObjects: 100,
+  lights: 4,
   dynamicBodies: 32,
   partsPerObject: 24,
   staticColliders: 4096,
@@ -80,6 +81,24 @@ export const objectPartSchema = z
     sensor: z.boolean().default(false),
   })
   .strict();
+/** One bounded point light, anchored to an actual solid part in object-local coordinates. */
+export const physicsLightSchema = z
+  .object({
+    partId: z.string().min(1).max(48),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    intensity: z.number().finite().min(0.1).max(30),
+    distance: z.number().finite().min(1).max(12),
+  })
+  .strict();
+export type PhysicsLight = z.infer<typeof physicsLightSchema>;
+export function physicsLightError(
+  parts: ObjectPart[],
+  light?: PhysicsLight,
+): string | null {
+  if (light && !parts.some((p) => p.id === light.partId && !p.sensor))
+    return "光源须绑定到作品中的实体部件";
+  return null;
+}
 export const objectDefinitionSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,95}$/),
@@ -89,6 +108,7 @@ export const objectDefinitionSchema = z
     bodyType: z.enum(["fixed", "dynamic", "kinematic"]),
     material: z.enum(["wood", "stone", "rubber", "ice"]),
     parts: z.array(objectPartSchema).min(1).max(physicsBudgets.partsPerObject),
+    light: physicsLightSchema.optional(),
     abilities: z
       .array(
         z.enum([
@@ -106,6 +126,10 @@ export const objectDefinitionSchema = z
   })
   .strict()
   .superRefine((d, ctx) => {
+    const lightError = physicsLightError(d.parts, d.light);
+    if (lightError) ctx.addIssue({ code: "custom", message: lightError });
+    if (!!d.light !== d.abilities.includes("light"))
+      ctx.addIssue({ code: "custom", message: "发光能力须有匹配的光源配置" });
     if (new Set(d.parts.map((p) => p.id)).size !== d.parts.length)
       ctx.addIssue({ code: "custom", message: "部件编号不能重复" });
     if (new Set(d.abilities).size !== d.abilities.length)
@@ -168,7 +192,8 @@ export const physicsSceneSchema = z
     if (new Set(s.objects.map((o) => o.id)).size !== s.objects.length)
       ctx.addIssue({ code: "custom", message: "物体编号重复" });
     let creations = 0,
-      shopObjects = 0;
+      shopObjects = 0,
+      lights = 0;
     let dynamic = 0,
       staticParts = 0;
     for (const o of s.objects) {
@@ -184,6 +209,7 @@ export const physicsSceneSchema = z
         ctx.addIssue({ code: "custom", message: "移动轨迹只适用于运动平台" });
       if (o.contentRef && !d.abilities.includes("content"))
         ctx.addIssue({ code: "custom", message: "该物品不能展示正文" });
+      if (d.light) lights++;
       if (d.source === "creation") creations++;
       if (d.source === "shop") shopObjects++;
       if (d.bodyType === "dynamic") dynamic++;
@@ -194,6 +220,11 @@ export const physicsSceneSchema = z
       shopObjects > physicsBudgets.shopObjects
     )
       ctx.addIssue({ code: "custom", message: "作品或家具超过房间预算" });
+    if (lights > physicsBudgets.lights)
+      ctx.addIssue({
+        code: "custom",
+        message: `每个房间最多 ${physicsBudgets.lights} 个光源`,
+      });
     if (dynamic > physicsBudgets.dynamicBodies)
       ctx.addIssue({ code: "custom", message: "活动物体超过房间预算" });
     if (staticParts > physicsBudgets.staticColliders)

@@ -6,6 +6,7 @@ import {
   physicsCreationBlueprintSchema,
   physicsCreationDraftSchema,
   physicsTableTemplate,
+  physicsLampTemplate,
   savePhysicsCreationSchema,
   type PhysicsCreationBlueprint,
   type PhysicsCreationRecord,
@@ -13,6 +14,7 @@ import {
   type ObjectDefinition,
 } from "@island/contracts";
 import { api, RequestError } from "../api";
+import { PhysicsLight } from "./PhysicsLight";
 import { PhysicsPart } from "./PhysicsPart";
 
 type Draft = {
@@ -50,6 +52,7 @@ export default function PhysicsWorkshop({
     [selected, select] = useState("top"),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+  const [night, setNight] = useState(false);
   const [saved, setSaved] = useState<PhysicsCreationRecord | null>(null);
   const requestKey = `physics-workshop-request:${userId}`;
   const [pending, setPending] = useState<ReturnType<
@@ -98,6 +101,7 @@ export default function PhysicsWorkshop({
         material: saved.definition.material,
         bodyType: saved.definition.bodyType,
         parts: saved.definition.parts,
+        ...(saved.definition.light ? { light: saved.definition.light } : {}),
       });
   function change(patch: Partial<PhysicsCreationBlueprint>) {
     if (!blocked)
@@ -168,6 +172,7 @@ export default function PhysicsWorkshop({
           material: d.material,
           bodyType: d.bodyType as "fixed" | "dynamic",
           parts: d.parts,
+          ...(d.light ? { light: d.light } : {}),
         },
       });
       setMessage(`作品已保存 · 版本 ${record.version}，已有摆件保留原版本`);
@@ -195,6 +200,7 @@ export default function PhysicsWorkshop({
         material: d.material,
         bodyType: d.bodyType as "fixed" | "dynamic",
         parts: d.parts,
+        ...(d.light ? { light: d.light } : {}),
       },
     });
     setSaved(record);
@@ -253,6 +259,21 @@ export default function PhysicsWorkshop({
         <button
           disabled={blocked}
           onClick={() => {
+            setDraft({
+              id: crypto.randomUUID(),
+              version: 0,
+              blueprint: physicsLampTemplate(),
+            });
+            setSaved(null);
+            select("bulb");
+            setNight(true);
+          }}
+        >
+          新建灯
+        </button>
+        <button
+          disabled={blocked}
+          onClick={() => {
             setDraft({ ...draft, id: crypto.randomUUID(), version: 0 });
             setSaved(null);
             setMessage("已复制为新作品草稿");
@@ -264,9 +285,20 @@ export default function PhysicsWorkshop({
       <div className="physics-workshop-body">
         <div className="physics-workshop-preview">
           <Canvas camera={{ position: [7, 6, 7], fov: 45 }} dpr={[1, 1.5]}>
-            <color attach="background" args={["#e5eee5"]} />
-            <ambientLight intensity={1.5} />
-            <directionalLight position={[4, 8, 4]} intensity={2} />
+            <color attach="background" args={[night ? "#101c31" : "#e5eee5"]} />
+            <ambientLight intensity={night ? 0.15 : 1.5} />
+            <directionalLight
+              position={[4, 8, 4]}
+              intensity={night ? 0.15 : 2}
+            />
+            <PhysicsLight
+              parts={draft.blueprint.parts}
+              light={invalid.success ? draft.blueprint.light : undefined}
+            />
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+              <planeGeometry args={[8, 8]} />
+              <meshStandardMaterial color="#829789" />
+            </mesh>
             <gridHelper args={[6, 12, "#6c9279", "#b7c8b8"]} />
             {draft.blueprint.parts.map((p) => (
               <group
@@ -276,7 +308,15 @@ export default function PhysicsWorkshop({
                   select(p.id);
                 }}
               >
-                <PhysicsPart part={p} selected={p.id === part.id} />
+                <PhysicsPart
+                  part={p}
+                  selected={p.id === part.id}
+                  glow={
+                    draft.blueprint.light?.partId === p.id
+                      ? draft.blueprint.light.color
+                      : undefined
+                  }
+                />
               </group>
             ))}
             <OrbitControls
@@ -288,6 +328,126 @@ export default function PhysicsWorkshop({
         </div>
         <div className="physics-workshop-fields">
           <p>组合最多 24 个部件，作品范围 6 × 6 × 6。保存版本可重复摆放。</p>
+          <fieldset disabled={blocked}>
+            <legend>灯光</legend>
+            <label>
+              <input
+                type="checkbox"
+                checked={!!draft.blueprint.light}
+                onChange={(e) =>
+                  change({
+                    light: e.target.checked
+                      ? {
+                          partId: part.id,
+                          color: "#ffe4a3",
+                          intensity: 20,
+                          distance: 10,
+                        }
+                      : undefined,
+                  })
+                }
+              />
+              让作品发光
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={night}
+                onChange={(e) => setNight(e.target.checked)}
+              />
+              夜晚预览
+            </label>
+            {draft.blueprint.light && (
+              <div className="physics-editor-row">
+                <label>
+                  发光部件
+                  <select
+                    aria-label="发光部件"
+                    value={draft.blueprint.light.partId}
+                    onChange={(e) =>
+                      change({
+                        light: {
+                          ...draft.blueprint.light!,
+                          partId: e.target.value,
+                        },
+                      })
+                    }
+                  >
+                    {draft.blueprint.parts.map((p, i) => (
+                      <option key={p.id} value={p.id}>
+                        {i + 1} ·{" "}
+                        {
+                          {
+                            box: "方块",
+                            ball: "球",
+                            cylinder: "圆柱",
+                            capsule: "胶囊",
+                            convex: "凸体",
+                          }[p.shape.kind]
+                        }
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  光色
+                  <input
+                    aria-label="光色"
+                    type="color"
+                    value={draft.blueprint.light.color}
+                    onChange={(e) =>
+                      change({
+                        light: {
+                          ...draft.blueprint.light!,
+                          color: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  亮度
+                  <input
+                    aria-label="灯光亮度"
+                    type="number"
+                    min="0.1"
+                    max="30"
+                    step="0.5"
+                    value={draft.blueprint.light.intensity}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (Number.isFinite(value))
+                        change({
+                          light: {
+                            ...draft.blueprint.light!,
+                            intensity: value,
+                          },
+                        });
+                    }}
+                  />
+                </label>
+                <label>
+                  照亮范围
+                  <input
+                    aria-label="灯光范围"
+                    type="number"
+                    min="1"
+                    max="12"
+                    step="0.5"
+                    value={draft.blueprint.light.distance}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (Number.isFinite(value))
+                        change({
+                          light: { ...draft.blueprint.light!, distance: value },
+                        });
+                    }}
+                  />
+                </label>
+                <p>每件作品一个光源，每个房间最多四件发光物品。</p>
+              </div>
+            )}
+          </fieldset>
           <div className="physics-editor-row">
             {items.map((r) => (
               <button key={r.id} disabled={blocked} onClick={() => open(r)}>
@@ -375,6 +535,9 @@ export default function PhysicsWorkshop({
               onClick={() =>
                 change({
                   parts: draft.blueprint.parts.filter((p) => p.id !== part.id),
+                  ...(draft.blueprint.light?.partId === part.id
+                    ? { light: undefined }
+                    : {}),
                 })
               }
             >

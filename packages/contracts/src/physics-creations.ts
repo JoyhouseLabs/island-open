@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   objectPartSchema,
+  physicsLightSchema,
+  physicsLightError,
   identityQuaternion,
   type ObjectPart,
   type Vector3,
@@ -62,9 +64,12 @@ export const physicsCreationBlueprintSchema = z
     material: z.enum(["wood", "stone", "rubber", "ice"]),
     bodyType: z.enum(["fixed", "dynamic"]),
     parts: z.array(objectPartSchema).min(1).max(24),
+    light: physicsLightSchema.optional(),
   })
   .strict()
   .superRefine((b, ctx) => {
+    const lightError = physicsLightError(b.parts, b.light);
+    if (lightError) ctx.addIssue({ code: "custom", message: lightError });
     if (new Set(b.parts.map((p) => p.id)).size !== b.parts.length)
       ctx.addIssue({ code: "custom", message: "部件编号不能重复" });
     if (
@@ -114,6 +119,12 @@ export const physicsCreationDraftSchema = z
         material: z.enum(["wood", "stone", "rubber", "ice"]),
         bodyType: z.enum(["fixed", "dynamic"]),
         parts: z.array(objectPartSchema).min(1).max(24),
+        light: physicsLightSchema
+          .extend({
+            intensity: z.number().finite(),
+            distance: z.number().finite(),
+          })
+          .optional(),
       })
       .strict(),
   })
@@ -163,4 +174,48 @@ export interface PhysicsAssetCatalog {
     worldId: string | null;
     physicsSceneId: string | null;
   }[];
+}
+
+/** Derive capabilities on the server and in bundle validation from the same blueprint. */
+export function physicsCreationAbilities(
+  b: Pick<PhysicsCreationBlueprint, "bodyType" | "light">,
+): ObjectDefinition["abilities"] {
+  return [
+    ...(b.bodyType === "dynamic" ? ["grabbable" as const] : []),
+    ...(b.light ? ["light" as const] : []),
+  ];
+}
+export function physicsLampTemplate(): PhysicsCreationBlueprint {
+  return {
+    name: "我的暖光灯",
+    material: "wood",
+    bodyType: "fixed",
+    parts: [
+      {
+        id: "base",
+        position: { x: 0, y: 0.125, z: 0 },
+        rotation: identityQuaternion,
+        shape: { kind: "cylinder", radius: 0.5, halfHeight: 0.125 },
+        color: "#795e49",
+        sensor: false,
+      },
+      {
+        id: "stem",
+        position: { x: 0, y: 1, z: 0 },
+        rotation: identityQuaternion,
+        shape: { kind: "cylinder", radius: 0.08, halfHeight: 0.875 },
+        color: "#ae885c",
+        sensor: false,
+      },
+      {
+        id: "bulb",
+        position: { x: 0, y: 2.15, z: 0 },
+        rotation: identityQuaternion,
+        shape: { kind: "ball", radius: 0.35 },
+        color: "#ffe4a3",
+        sensor: false,
+      },
+    ],
+    light: { partId: "bulb", color: "#ffe4a3", intensity: 20, distance: 10 },
+  };
 }

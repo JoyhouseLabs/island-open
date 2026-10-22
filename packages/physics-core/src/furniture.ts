@@ -153,6 +153,16 @@ export function shopPhysicsDefinition(itemId: FurnitureId): ObjectDefinition {
     bodyType: "fixed",
     material: "wood",
     parts,
-    abilities: [],
+    abilities: d.shape === "lamp" ? ["light"] : [],
+    ...(d.shape === "lamp"
+      ? {
+          light: {
+            partId: "globe",
+            color: "#ffe6af",
+            intensity: 20,
+            distance: 10,
+          },
+        }
+      : {}),
   });
 }
