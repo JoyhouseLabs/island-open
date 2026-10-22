@@ -4,10 +4,19 @@ import {
   type PhysicsScene,
   type PhysicsSceneTemplateRef,
 } from "@island/contracts";
+import { createIslandPhysicsScene } from "@island/world-core";
 import { createPlayground } from "./playground.js";
 
-/** Registered, versioned scene identities. Real island/subscene terrain is added during M6. */
+/** Registered, versioned scene identities. Each template owns its canonical infrastructure. */
 export const physicsSceneDefinitions = [
+  {
+    key: "island",
+    id: "core:island",
+    version: 1,
+    name: "主岛",
+    description: "沿山路、聚落与花园探索的新主岛",
+    environment: { sky: "#d9e8e8", ambient: 1.3, sun: 2 },
+  },
   {
     key: "playground",
     id: "core:playground",
@@ -41,6 +50,7 @@ export function createPhysicsScene(
   if (!d) throw new Error("这个场景尚未开放");
   let scene: PhysicsScene;
   if (d.key === "playground") scene = createPlayground();
+  else if (d.key === "island") scene = createIslandPhysicsScene();
   else
     scene = physicsSceneSchema.parse({
       schemaVersion: 4,

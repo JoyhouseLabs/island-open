@@ -83,6 +83,9 @@ importers:
         version: 4.6.7
   packages/physics-core:
     dependencies:
+      '@island/world-core':
+        specifier: workspace:*
+        version: link:../world-core
       '@island/contracts':
         specifier: workspace:*
         version: link:../contracts

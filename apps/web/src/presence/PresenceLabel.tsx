@@ -9,12 +9,14 @@ export default function PresenceLabel({
   stamp,
   self = false,
   position = [0, 0, 0],
+  maxDistance = Infinity,
 }: {
   name?: string;
   phrase?: string;
   stamp?: number;
   self?: boolean;
   position?: [number, number, number];
+  maxDistance?: number;
 }) {
   const gl = useThree((s) => s.gl);
   const anchor = useRef<Group>(null);
@@ -58,8 +60,10 @@ export default function PresenceLabel({
     const node = element.current;
     if (!node || !anchor.current) return;
     camera.updateMatrixWorld();
-    anchor.current.getWorldPosition(point).project(camera);
-    const visible = point.z >= -1 && point.z <= 1;
+    anchor.current.getWorldPosition(point);
+    const nearby = point.distanceTo(camera.position) <= maxDistance;
+    point.project(camera);
+    const visible = nearby && point.z >= -1 && point.z <= 1;
     node.style.display = visible ? "block" : "none";
     if (visible)
       node.style.transform = `translate3d(${((point.x + 1) * size.width) / 2}px,${((1 - point.y) * size.height) / 2}px,0) translate(-50%,-50%)`;

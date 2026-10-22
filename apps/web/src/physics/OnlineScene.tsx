@@ -1,3 +1,5 @@
+import { islandGroundColor } from "@island/world-core";
+import IslandAmbience from "./IslandAmbience";
 import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -44,7 +46,7 @@ function Body({
     q = useMemo(() => new Quaternion(), []),
     position = useMemo(() => new Vector3(), []);
   useFrame(() => {
-    if (!mesh.current) return;
+    if (!mesh.current || definition.bodyType === "fixed") return;
     const sample = conn.buffer.sample(performance.now());
     if (!sample) return;
     const end = bodyIndex(sample.after).get(object.id);
@@ -74,6 +76,13 @@ function Body({
   return (
     <group
       ref={mesh}
+      position={[object.position.x, object.position.y, object.position.z]}
+      quaternion={[
+        object.rotation.x,
+        object.rotation.y,
+        object.rotation.z,
+        object.rotation.w,
+      ]}
       onClick={(event) => {
         event.stopPropagation();
         if (placeAt)
@@ -369,10 +378,16 @@ function Contents({
         shadow-camera-top={16}
         shadow-camera-bottom={-16}
       />
+      {scene.template.id === "core:island" && (
+        <IslandAmbience scene={scene} night={night} />
+      )}
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
           tile={tile}
+          vertexColor={
+            scene.template.id === "core:island" ? islandGroundColor : undefined
+          }
           placeAt={draft ? placeAt : undefined}
         />
       ))}
@@ -444,7 +459,7 @@ function Contents({
         makeDefault
         target={target}
         minDistance={5}
-        maxDistance={35}
+        maxDistance={scene.template.id === "core:island" ? 400 : 35}
         maxPolarAngle={Math.PI * 0.48}
       />
     </>

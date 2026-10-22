@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@island/contracts": "workspace:*",
-    "@dimforge/rapier3d-compat": "0.19.2"
+    "@dimforge/rapier3d-compat": "0.19.2",
+    "@island/world-core": "workspace:*"
   }
 }
