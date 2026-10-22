@@ -170,3 +170,12 @@
     padding: 8px;
   }
 }
+
+.physics-lobby { display: block; min-height: 100dvh; height: auto; }
+.physics-login { max-width: 640px; padding: 24px; margin: 24px auto; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.physics-login button, .physics-login input { font: inherit; padding: 10px 16px; border: 1px solid #bccaba; border-radius: 10px; }
+.physics-login a { color: #294336; }
+.physics-login h2, .physics-login p { margin: 0; }
+.physics-share label { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px 8px 0; }
+.physics-share input[readonly] { width: min(65vw, 460px); padding: 8px; }
+.physics-error { color: #8f3c2e; padding: 12px; margin: 0; }

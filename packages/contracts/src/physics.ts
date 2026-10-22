@@ -272,9 +272,19 @@ export const physicsPlayerStateSchema = characterStateSchema.extend({
   held: z.string().uuid().nullable(),
   yaw: z.number().finite(),
   canInteract: z.boolean(),
+  dropPreview: z
+    .object({
+      valid: z.boolean(),
+      position: vector3Schema,
+      rotation: quaternionSchema,
+      reason: z.string(),
+    })
+    .strict()
+    .nullable(),
 });
 export const physicsFrameSchema = z
   .object({
+    baseSequence: z.number().int().min(-1),
     epoch: z.string().uuid(),
     sequence: z.number().int().nonnegative(),
     tick: z.number().int().nonnegative(),
@@ -286,3 +296,69 @@ export const physicsFrameSchema = z
   .strict();
 export type PhysicsPlayerState = z.infer<typeof physicsPlayerStateSchema>;
 export type PhysicsFrame = z.infer<typeof physicsFrameSchema>;
+
+export const createPhysicsWorldSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string().trim().min(1).max(60),
+  })
+  .strict();
+export const physicsSharingSchema = z
+  .object({
+    expectedRevision: z.number().int().positive(),
+    sharing: z.enum(["private", "link"]),
+    interactive: z.boolean(),
+  })
+  .strict()
+  .refine(
+    (value) => value.sharing === "link" || !value.interactive,
+    "私有世界不能开放互动",
+  );
+export const physicsClientMessageSchema = z.discriminatedUnion("type", [
+  z
+    .object({ type: z.literal("command"), command: physicsRoomCommandSchema })
+    .strict(),
+  z.object({ type: z.literal("sync") }).strict(),
+  z.object({ type: z.literal("save"), requestId: z.string().uuid() }).strict(),
+]);
+export const physicsServerMessageSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("welcome"),
+      you: z.string().uuid(),
+      worldId: z.string().uuid(),
+      scene: physicsSceneSchema,
+      frame: physicsFrameSchema,
+      canEdit: z.boolean(),
+      checkpointRevision: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z.object({ type: z.literal("frame"), frame: physicsFrameSchema }).strict(),
+  z
+    .object({
+      type: z.literal("receipt"),
+      commandId: z.string().uuid(),
+      ok: z.boolean(),
+      message: z.string(),
+      tick: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("saved"),
+      requestId: z.string().uuid().optional(),
+      revision: z.number().int().nonnegative(),
+      tick: z.number().int().nonnegative(),
+      savedAt: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("error"),
+      code: z.string(),
+      message: z.string(),
+      requestId: z.string().uuid().optional(),
+    })
+    .strict(),
+]);
+export type PhysicsServerMessage = z.infer<typeof physicsServerMessageSchema>;

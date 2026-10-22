@@ -20,6 +20,7 @@ const BookReaderPage = lazy(() => import("./pages/BookReaderPage"));
 const StudioPage = lazy(() => import("./pages/StudioPage"));
 const VisitIslandPage = lazy(() => import("./pages/VisitIslandPage"));
 const VisitScenePage = lazy(() => import("./pages/VisitScenePage"));
+const OnlinePhysics = lazy(() => import("./physics/OnlinePhysics"));
 const PhysicsPlayground = lazy(() => import("./physics/PhysicsPlayground"));
 
 class PageBoundary extends Component<
@@ -94,6 +95,7 @@ export default function App() {
     document.title = location.pathname.startsWith("/visit/")
       ? "朋友的家园 · 心灵家园"
       : location.pathname.startsWith("/learn") ? "学习中心 · 心灵家园"
+      : location.pathname.startsWith("/physics/online") ? "在线物理世界 · 心灵家园"
       : (pageTitles[location.pathname.replace(/\/+$/, "")] ??
         "页面未找到 · 心灵家园");
     // A fresh mount means the last reload (if any) succeeded.
@@ -106,7 +108,7 @@ export default function App() {
   return (
     <PageBoundary path={location.pathname}>
       {/* One chat panel for every mode: host or visitor, any scene. */}
-      {!location.pathname.startsWith("/learn") && location.pathname !== "/physics" && location.pathname.replace(/\/+$/, "") !== paths.wilderness && <Suspense fallback={null}><GameChrome /></Suspense>}
+      {!location.pathname.startsWith("/learn") && !location.pathname.startsWith("/physics") && location.pathname.replace(/\/+$/, "") !== paths.wilderness && <Suspense fallback={null}><GameChrome /></Suspense>}
       <Suspense
         fallback={
           <div className="scene-loading" role="status">
@@ -117,6 +119,8 @@ export default function App() {
       >
         <Routes>
           <Route path="/physics" element={<PhysicsPlayground />} />
+          <Route path="/physics/online" element={<OnlinePhysics />} />
+          <Route path="/physics/online/:worldId" element={<OnlinePhysics />} />
           <Route path="/" element={<Navigate to={paths.island} replace />} />
           <Route element={<LearningLayout />}>
             <Route path="/learn/programs" element={<TrainingCenter />} />

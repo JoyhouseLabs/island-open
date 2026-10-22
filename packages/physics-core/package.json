@@ -12,6 +12,10 @@
     "./room": {
       "types": "./dist/room.d.ts",
       "default": "./dist/room.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
     }
   },
   "scripts": {

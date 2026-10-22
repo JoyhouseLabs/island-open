@@ -47,6 +47,7 @@ export class PhysicsRoom {
   private players = new Map<string, Player>();
   private sentBodies = new Map<string, string>();
   private sequence = 0;
+  private lastDeltaSequence = -1;
   private constructor(
     readonly runtime: PhysicsRuntime,
     readonly epoch: string,
@@ -238,6 +239,7 @@ export class PhysicsRoom {
       held,
       yaw: player.input.yaw,
       canInteract: player.canInteract,
+      dropPreview: player.grab.previewDrop(),
     };
   }
   frame(full = false): PhysicsFrame {
@@ -267,9 +269,13 @@ export class PhysicsRoom {
       if (!full) this.sentBodies.set(state.id, signature);
       return full || changed;
     });
+    const sequence = this.sequence++,
+      baseSequence = this.lastDeltaSequence;
+    if (!full) this.lastDeltaSequence = sequence;
     return {
+      baseSequence,
       epoch: this.epoch,
-      sequence: this.sequence++,
+      sequence,
       tick: this.runtime.tick,
       layoutRevision: this.layoutRevision,
       full,
