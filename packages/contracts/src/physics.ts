@@ -115,6 +115,12 @@ export const objectDefinitionSchema = z
     if (d.bodyType === "dynamic" && d.parts.every((p) => p.sensor))
       ctx.addIssue({ code: "custom", message: "活动物体需要实体碰撞" });
   });
+export const physicsContentRefSchema = z
+  .object({
+    id: z.string().uuid(),
+    version: z.number().int().min(1).max(100),
+  })
+  .strict();
 export const objectInstanceSchema = z
   .object({
     id: z.string().uuid(),
@@ -122,6 +128,7 @@ export const objectInstanceSchema = z
     definitionVersion: z.number().int().positive(),
     position: vector3Schema,
     rotation: quaternionSchema,
+    contentRef: physicsContentRefSchema.optional(),
     motion: z
       .object({
         offset: localVector,
@@ -175,6 +182,8 @@ export const physicsSceneSchema = z
         (d.bodyType !== "kinematic" || !d.abilities.includes("platform"))
       )
         ctx.addIssue({ code: "custom", message: "移动轨迹只适用于运动平台" });
+      if (o.contentRef && !d.abilities.includes("content"))
+        ctx.addIssue({ code: "custom", message: "该物品不能展示正文" });
       if (d.source === "creation") creations++;
       if (d.source === "shop") shopObjects++;
       if (d.bodyType === "dynamic") dynamic++;
@@ -337,6 +346,13 @@ export const physicsLayoutOperationSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("remove"), objectId: z.string().uuid() }).strict(),
+  z
+    .object({
+      type: z.literal("content"),
+      objectId: z.string().uuid(),
+      contentRef: physicsContentRefSchema.nullable(),
+    })
+    .strict(),
 ]);
 export const physicsLayoutEditSchema = z
   .object({

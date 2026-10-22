@@ -238,3 +238,5 @@ export * from "./exploration.js";
 
 export * from "./training.js";
 export * from "./physics-creations.js";
+
+export * from "./physics-content.js";

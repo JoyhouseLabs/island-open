@@ -70,7 +70,7 @@ export class PhysicsRoom {
     const scene = editedPhysicsScene(this.runtime.scene, operation, definition);
     const changedId =
       operation.type === "place" ? operation.object.id : operation.objectId;
-    if (operation.type !== "remove") {
+    if (operation.type !== "remove" && operation.type !== "content") {
       if (
         [...this.players.keys()].some(
           (id) => this.playerState(id).held === changedId,

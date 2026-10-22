@@ -149,7 +149,7 @@ function Contents({
     const down = (event: KeyboardEvent) => {
       if (
         (event.target as HTMLElement)?.closest(
-          "input,textarea,select,button,a",
+          "input,textarea,select,button,a,dialog",
         ) ||
         conn.status !== "connected" ||
         conn.editing

@@ -1,3 +1,4 @@
+import PhysicsContent from "./PhysicsContent";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import type { AuthConfig, User } from "@island/contracts";
@@ -285,6 +286,15 @@ export default function OnlinePhysics() {
                 clearKeys={() => keys.clear()}
               />
             )}
+            <PhysicsContent
+              key={`${user.id}:${conn.sceneId}`}
+              conn={conn}
+              selected={selected}
+              userId={user.id}
+              owner={!!world?.owner}
+              token={token}
+              clearKeys={() => keys.clear()}
+            />
             <label className="physics-select">
               观察物品
               <select
@@ -301,7 +311,9 @@ export default function OnlinePhysics() {
                         .scene!.definitions.find(
                           (d) => d.id === object.definitionId,
                         )
-                        ?.abilities.includes("grabbable"),
+                        ?.abilities.some(
+                          (a) => a === "grabbable" || a === "content",
+                        ),
                   )
                   .map((object) => (
                     <option key={object.id} value={object.id}>

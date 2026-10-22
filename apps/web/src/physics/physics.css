@@ -351,3 +351,74 @@ dialog.physics-workshop .physics-actions {
     margin: 0 0 8px;
   }
 }
+
+.physics-content-dialog {
+  width: min(960px, calc(100vw - 24px));
+  max-height: 90dvh;
+  box-sizing: border-box;
+  padding: 20px;
+  border: 1px solid #bccaba;
+  border-radius: 16px;
+  color: #294336;
+  background: #f6f4ea;
+  overflow: auto;
+}
+.physics-content-dialog::backdrop {
+  background: #15291eb0;
+}
+.physics-content-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.physics-content-dialog section {
+  min-width: 0;
+}
+.physics-content-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+.physics-content-dialog input,
+.physics-content-dialog textarea {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  padding: 8px;
+}
+.physics-content-dialog button {
+  min-height: 44px;
+  max-width: 100%;
+  margin: 4px 0;
+  white-space: normal;
+}
+.physics-text-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  text-align: left;
+}
+.physics-text-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 180px;
+  overflow: auto;
+}
+@media (max-width: 600px) {
+  .physics-content-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .physics-content-dialog {
+    padding: 12px;
+  }
+}
+
+.physics-content-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f6f4ea;
+  padding: 4px 0;
+  box-shadow: 0 -20px #f6f4ea;
+}
