@@ -7,6 +7,7 @@ import {
   physicsCreationDraftSchema,
   physicsTableTemplate,
   physicsLampTemplate,
+  physicsChairTemplate,
   savePhysicsCreationSchema,
   type PhysicsCreationBlueprint,
   type PhysicsCreationRecord,
@@ -102,6 +103,7 @@ export default function PhysicsWorkshop({
         bodyType: saved.definition.bodyType,
         parts: saved.definition.parts,
         ...(saved.definition.light ? { light: saved.definition.light } : {}),
+        ...(saved.definition.seat ? { seat: saved.definition.seat } : {}),
       });
   function change(patch: Partial<PhysicsCreationBlueprint>) {
     if (!blocked)
@@ -173,6 +175,7 @@ export default function PhysicsWorkshop({
           bodyType: d.bodyType as "fixed" | "dynamic",
           parts: d.parts,
           ...(d.light ? { light: d.light } : {}),
+          ...(d.seat ? { seat: d.seat } : {}),
         },
       });
       setMessage(`作品已保存 · 版本 ${record.version}，已有摆件保留原版本`);
@@ -201,6 +204,7 @@ export default function PhysicsWorkshop({
         bodyType: d.bodyType as "fixed" | "dynamic",
         parts: d.parts,
         ...(d.light ? { light: d.light } : {}),
+        ...(d.seat ? { seat: d.seat } : {}),
       },
     });
     setSaved(record);
@@ -274,6 +278,21 @@ export default function PhysicsWorkshop({
         <button
           disabled={blocked}
           onClick={() => {
+            setDraft({
+              id: crypto.randomUUID(),
+              version: 0,
+              blueprint: physicsChairTemplate(),
+            });
+            setSaved(null);
+            select("seat");
+            setNight(false);
+          }}
+        >
+          新建椅子
+        </button>
+        <button
+          disabled={blocked}
+          onClick={() => {
             setDraft({ ...draft, id: crypto.randomUUID(), version: 0 });
             setSaved(null);
             setMessage("已复制为新作品草稿");
@@ -319,6 +338,48 @@ export default function PhysicsWorkshop({
                 />
               </group>
             ))}
+            {draft.blueprint.seat &&
+              (() => {
+                const p = draft.blueprint.parts.find(
+                  (p) => p.id === draft.blueprint.seat!.partId,
+                );
+                if (
+                  !p ||
+                  (p.shape.kind !== "box" && p.shape.kind !== "cylinder")
+                )
+                  return null;
+                const top =
+                  p.shape.kind === "box"
+                    ? p.shape.halfExtents.y
+                    : p.shape.halfHeight;
+                return (
+                  <group
+                    position={[
+                      p.position.x,
+                      p.position.y + top + 0.02,
+                      p.position.z,
+                    ]}
+                    rotation={[
+                      0,
+                      draft.blueprint.seat.yaw +
+                        2 * Math.atan2(p.rotation.y, p.rotation.w),
+                      0,
+                    ]}
+                  >
+                    <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                      <ringGeometry args={[0.18, 0.23, 24]} />
+                      <meshBasicMaterial color="#4aabdb" />
+                    </mesh>
+                    <mesh
+                      position={[0, 0.02, 0.3]}
+                      rotation={[Math.PI / 2, 0, 0]}
+                    >
+                      <coneGeometry args={[0.07, 0.17, 3]} />
+                      <meshBasicMaterial color="#4aabdb" />
+                    </mesh>
+                  </group>
+                );
+              })()}
             <OrbitControls
               target={[0, 1.5, 0]}
               minDistance={3}
@@ -328,6 +389,76 @@ export default function PhysicsWorkshop({
         </div>
         <div className="physics-workshop-fields">
           <p>组合最多 24 个部件，作品范围 6 × 6 × 6。保存版本可重复摆放。</p>
+          <fieldset disabled={blocked}>
+            <legend>座面</legend>
+            <label>
+              <input
+                type="checkbox"
+                checked={!!draft.blueprint.seat}
+                onChange={(e) =>
+                  change({
+                    seat: e.target.checked
+                      ? { partId: part.id, yaw: 0 }
+                      : undefined,
+                  })
+                }
+              />
+              可以坐下
+            </label>
+            {draft.blueprint.seat && (
+              <div className="physics-editor-row">
+                <label>
+                  座面部件
+                  <select
+                    aria-label="座面部件"
+                    value={draft.blueprint.seat.partId}
+                    onChange={(e) =>
+                      change({
+                        seat: {
+                          ...draft.blueprint.seat!,
+                          partId: e.target.value,
+                        },
+                      })
+                    }
+                  >
+                    {draft.blueprint.parts.map((p, i) => (
+                      <option key={p.id} value={p.id}>
+                        {i + 1} ·{" "}
+                        {
+                          {
+                            box: "方块",
+                            ball: "球",
+                            cylinder: "圆柱",
+                            capsule: "胶囊",
+                            convex: "凸体",
+                          }[p.shape.kind]
+                        }
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  onClick={() =>
+                    change({
+                      seat: {
+                        ...draft.blueprint.seat!,
+                        yaw: Math.atan2(
+                          Math.sin(draft.blueprint.seat!.yaw + Math.PI / 2),
+                          Math.cos(draft.blueprint.seat!.yaw + Math.PI / 2),
+                        ),
+                      },
+                    })
+                  }
+                >
+                  转动坐向 90°
+                </button>
+                <p>
+                  固定家具的水平顶面，宽、深至少 0.7 米。每件一个座位，坐向{" "}
+                  {Math.round((draft.blueprint.seat.yaw * 180) / Math.PI)}°。
+                </p>
+              </div>
+            )}
+          </fieldset>
           <fieldset disabled={blocked}>
             <legend>灯光</legend>
             <label>
@@ -535,6 +666,9 @@ export default function PhysicsWorkshop({
               onClick={() =>
                 change({
                   parts: draft.blueprint.parts.filter((p) => p.id !== part.id),
+                  ...(draft.blueprint.seat?.partId === part.id
+                    ? { seat: undefined }
+                    : {}),
                   ...(draft.blueprint.light?.partId === part.id
                     ? { light: undefined }
                     : {}),

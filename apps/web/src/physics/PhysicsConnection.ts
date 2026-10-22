@@ -228,6 +228,8 @@ export class PhysicsConnection {
             drop: "已放下",
             toss: "已轻抛",
             push: "已轻推",
+            sit: "已坐下",
+            stand: "已起身",
           };
           if (!message.ok) this.visiblePending = null;
           this.message = message.ok
@@ -322,7 +324,9 @@ export class PhysicsConnection {
       const pending = this.visiblePending;
       if (
         (pending.type === "grab" && player.held === pending.objectId) ||
-        (["drop", "toss"].includes(pending.type) && player.held === null)
+        (["drop", "toss"].includes(pending.type) && player.held === null) ||
+        (pending.type === "sit" && player.seatId === pending.objectId) ||
+        (pending.type === "stand" && player.seatId === null)
       ) {
         this.lastVisibleActionMs = performance.now() - pending.at;
         this.visiblePending = null;
@@ -333,10 +337,17 @@ export class PhysicsConnection {
   input(command: PhysicsRoomCommand) {
     if (this.status === "connected") this.send({ type: "command", command });
   }
-  action(type: "grab" | "drop" | "push" | "toss", objectId: string | null) {
-    if (this.status !== "connected" || this.pending || !this.me?.canInteract)
+  action(
+    type: "grab" | "drop" | "push" | "toss" | "sit" | "stand",
+    objectId: string | null,
+  ) {
+    if (
+      this.status !== "connected" ||
+      this.pending ||
+      (!this.me?.canInteract && type !== "stand")
+    )
       return;
-    if ((type === "grab" || type === "push") && !objectId) {
+    if ((type === "grab" || type === "push" || type === "sit") && !objectId) {
       this.message = "先点选一个物品";
       this.changed();
       return;
@@ -347,7 +358,7 @@ export class PhysicsConnection {
       commandId: crypto.randomUUID(),
     };
     const command: PhysicsRoomCommand =
-      type === "grab" || type === "push"
+      type === "grab" || type === "push" || type === "sit"
         ? { ...base, type, objectId: objectId! }
         : { ...base, type };
     this.actionStarted = performance.now();

@@ -99,6 +99,33 @@ export function physicsLightError(
     return "光源须绑定到作品中的实体部件";
   return null;
 }
+export const physicsSeatSchema = z
+  .object({
+    partId: z.string().min(1).max(48),
+    yaw: z.number().finite().min(-Math.PI).max(Math.PI),
+  })
+  .strict();
+export type PhysicsSeat = z.infer<typeof physicsSeatSchema>;
+export function physicsSeatError(
+  parts: ObjectPart[],
+  bodyType: string,
+  seat?: PhysicsSeat,
+): string | null {
+  if (!seat) return null;
+  if (bodyType !== "fixed") return "座面只能设置在固定家具上";
+  const p = parts.find((p) => p.id === seat.partId && !p.sensor);
+  if (!p || Math.abs(p.rotation.x) > 1e-5 || Math.abs(p.rotation.z) > 1e-5)
+    return "座面须绑定水平的实体方块或圆柱";
+  const shape = p.shape;
+  if (!(
+    (shape.kind === "box" &&
+      shape.halfExtents.x >= 0.35 &&
+      shape.halfExtents.z >= 0.35) ||
+    (shape.kind === "cylinder" && shape.radius >= 0.35)
+  ))
+    return "座面须是宽、深至少 0.7 米的方块或圆柱顶面";
+  return null;
+}
 export const objectDefinitionSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,95}$/),
@@ -109,6 +136,7 @@ export const objectDefinitionSchema = z
     material: z.enum(["wood", "stone", "rubber", "ice"]),
     parts: z.array(objectPartSchema).min(1).max(physicsBudgets.partsPerObject),
     light: physicsLightSchema.optional(),
+    seat: physicsSeatSchema.optional(),
     abilities: z
       .array(
         z.enum([
@@ -126,6 +154,10 @@ export const objectDefinitionSchema = z
   })
   .strict()
   .superRefine((d, ctx) => {
+    const seatError = physicsSeatError(d.parts, d.bodyType, d.seat);
+    if (seatError) ctx.addIssue({ code: "custom", message: seatError });
+    if (!!d.seat !== d.abilities.includes("seat"))
+      ctx.addIssue({ code: "custom", message: "座面能力须有匹配配置" });
     const lightError = physicsLightError(d.parts, d.light);
     if (lightError) ctx.addIssue({ code: "custom", message: lightError });
     if (!!d.light !== d.abilities.includes("light"))
@@ -268,6 +300,7 @@ export const characterStateSchema = z
     grounded: z.boolean(),
     jumpHeld: z.boolean(),
     coyote: z.number().finite().min(0).max(0.1),
+    seated: z.boolean(),
   })
   .strict();
 const roomCommandFields = {
@@ -283,6 +316,21 @@ export const physicsRoomCommandSchema = z.discriminatedUnion("type", [
       z: z.number().finite().min(-1).max(1),
       jump: z.boolean(),
       yaw: z.number().finite().min(-Math.PI).max(Math.PI),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("sit"),
+      ...roomCommandFields,
+      commandId: z.string().uuid(),
+      objectId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("stand"),
+      ...roomCommandFields,
+      commandId: z.string().uuid(),
     })
     .strict(),
   z
@@ -321,6 +369,7 @@ export const physicsPlayerStateSchema = characterStateSchema.extend({
   id: z.string().min(1).max(96),
   ackInput: z.number().int().min(-1),
   held: z.string().uuid().nullable(),
+  seatId: z.string().uuid().nullable(),
   yaw: z.number().finite(),
   canInteract: z.boolean(),
   dropPreview: z

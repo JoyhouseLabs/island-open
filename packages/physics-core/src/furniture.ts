@@ -153,7 +153,15 @@ export function shopPhysicsDefinition(itemId: FurnitureId): ObjectDefinition {
     bodyType: "fixed",
     material: "wood",
     parts,
-    abilities: d.shape === "lamp" ? ["light"] : [],
+    abilities:
+      d.shape === "lamp"
+        ? ["light"]
+        : ["chair", "sofa", "stool"].includes(d.shape)
+          ? ["seat"]
+          : [],
+    ...(["chair", "sofa", "stool"].includes(d.shape)
+      ? { seat: { partId: d.shape === "sofa" ? "cushion" : "seat", yaw: 0 } }
+      : {}),
     ...(d.shape === "lamp"
       ? {
           light: {

@@ -270,7 +270,7 @@ export default function OnlinePhysics() {
             <div className="physics-hint">
               {conn.editing
                 ? "布置中 · 点击场景定位 · 确认后保存"
-                : "方向键/按钮移动 · 点选物品 · E 拿起或放下"}
+                : "方向键/按钮移动 · E 搬动或坐下 · F 坐下/起身"}
             </div>
           </section>
           <section className="physics-controls">
@@ -336,7 +336,10 @@ export default function OnlinePhysics() {
                           (d) => d.id === object.definitionId,
                         )
                         ?.abilities.some(
-                          (a) => a === "grabbable" || a === "content",
+                          (a) =>
+                            a === "grabbable" ||
+                            a === "content" ||
+                            a === "seat",
                         ),
                   )
                   .map((object) => (
@@ -352,7 +355,27 @@ export default function OnlinePhysics() {
             </label>
             <div className="physics-actions">
               <button
-                disabled={!canInteract || conn.pending || !!conn.me?.held}
+                disabled={
+                  !connected ||
+                  conn.pending ||
+                  conn.editing ||
+                  (!conn.me?.seatId && (!canInteract || !!conn.me?.held))
+                }
+                onClick={() =>
+                  conn.action(conn.me?.seatId ? "stand" : "sit", selected)
+                }
+              >
+                {conn.me?.seatId ? "起身" : "坐下"}
+              </button>
+              {conn.me?.seatId && <span>正在坐着 · 起身后可移动</span>}
+
+              <button
+                disabled={
+                  !canInteract ||
+                  conn.pending ||
+                  !!conn.me?.held ||
+                  !!conn.me?.seatId
+                }
                 onClick={() => conn.action("push", selected)}
               >
                 轻推一下
@@ -360,6 +383,7 @@ export default function OnlinePhysics() {
               <button
                 disabled={
                   !canInteract ||
+                  !!conn.me?.seatId ||
                   conn.pending ||
                   (!!conn.me?.held && !conn.me.dropPreview?.valid)
                 }
@@ -398,7 +422,7 @@ export default function OnlinePhysics() {
               ].map(([label, key]) => (
                 <button
                   key={key}
-                  disabled={!connected || conn.editing}
+                  disabled={!connected || conn.editing || !!conn.me?.seatId}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.currentTarget.setPointerCapture(e.pointerId);

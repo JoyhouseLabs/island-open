@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   objectPartSchema,
   physicsLightSchema,
+  physicsSeatSchema,
+  physicsSeatError,
   physicsLightError,
   identityQuaternion,
   type ObjectPart,
@@ -65,9 +67,12 @@ export const physicsCreationBlueprintSchema = z
     bodyType: z.enum(["fixed", "dynamic"]),
     parts: z.array(objectPartSchema).min(1).max(24),
     light: physicsLightSchema.optional(),
+    seat: physicsSeatSchema.optional(),
   })
   .strict()
   .superRefine((b, ctx) => {
+    const seatError = physicsSeatError(b.parts, b.bodyType, b.seat);
+    if (seatError) ctx.addIssue({ code: "custom", message: seatError });
     const lightError = physicsLightError(b.parts, b.light);
     if (lightError) ctx.addIssue({ code: "custom", message: lightError });
     if (new Set(b.parts.map((p) => p.id)).size !== b.parts.length)
@@ -119,6 +124,7 @@ export const physicsCreationDraftSchema = z
         material: z.enum(["wood", "stone", "rubber", "ice"]),
         bodyType: z.enum(["fixed", "dynamic"]),
         parts: z.array(objectPartSchema).min(1).max(24),
+        seat: physicsSeatSchema.optional(),
         light: physicsLightSchema
           .extend({
             intensity: z.number().finite(),
@@ -178,10 +184,11 @@ export interface PhysicsAssetCatalog {
 
 /** Derive capabilities on the server and in bundle validation from the same blueprint. */
 export function physicsCreationAbilities(
-  b: Pick<PhysicsCreationBlueprint, "bodyType" | "light">,
+  b: Pick<PhysicsCreationBlueprint, "bodyType" | "light" | "seat">,
 ): ObjectDefinition["abilities"] {
   return [
     ...(b.bodyType === "dynamic" ? ["grabbable" as const] : []),
+    ...(b.seat ? ["seat" as const] : []),
     ...(b.light ? ["light" as const] : []),
   ];
 }
@@ -217,5 +224,39 @@ export function physicsLampTemplate(): PhysicsCreationBlueprint {
       },
     ],
     light: { partId: "bulb", color: "#ffe4a3", intensity: 20, distance: 10 },
+  };
+}
+
+export function physicsChairTemplate(): PhysicsCreationBlueprint {
+  const part = (
+    id: string,
+    x: number,
+    y: number,
+    z: number,
+    hx: number,
+    hy: number,
+    hz: number,
+  ): ObjectPart => ({
+    id,
+    position: { x, y, z },
+    rotation: identityQuaternion,
+    color: "#bb8958",
+    sensor: false,
+    shape: { kind: "box", halfExtents: { x: hx, y: hy, z: hz } },
+  });
+  return {
+    name: "我的椅子",
+    material: "wood",
+    bodyType: "fixed",
+    seat: { partId: "seat", yaw: 0 },
+    parts: [
+      part("seat", 0, 0.8, 0, 0.55, 0.1, 0.55),
+      part("back", 0, 1.35, -0.5, 0.55, 0.45, 0.08),
+      ...[-0.4, 0.4].flatMap((x) =>
+        [-0.4, 0.4].map((z) =>
+          part(`leg-${x}-${z}`, x, 0.35, z, 0.08, 0.35, 0.08),
+        ),
+      ),
+    ],
   };
 }

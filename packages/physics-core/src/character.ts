@@ -5,6 +5,7 @@ import { collisionGroups } from "./groups.js";
 export const characterProfile = Object.freeze({
   radius: 0.3,
   halfHeight: 0.55,
+  seatedHalfHeight: 0.25,
   speed: 4.2,
   jumpSpeed: 7.2,
   gravity: -22,
@@ -21,6 +22,7 @@ export interface CharacterState {
   grounded: boolean;
   jumpHeld: boolean;
   coyote: number;
+  seated: boolean;
 }
 
 /** Input is in world axes. The caller advances the world once after all actors. */
@@ -33,6 +35,7 @@ export class PhysicsCharacter {
   private coyote = 0;
   private disposed = false;
   grounded = false;
+  seated = false;
   constructor(
     private world: RAPIER.World,
     spawn: Vector3,
@@ -74,6 +77,10 @@ export class PhysicsCharacter {
       dt > 1 / 30
     )
       throw new Error("无效角色输入");
+    if (this.seated) {
+      this.body.setNextKinematicTranslation(this.body.translation());
+      return;
+    }
     const length = Math.max(1, Math.hypot(input.x, input.z));
     const blend = Math.min(1, dt * 16);
     this.velocity.x +=
@@ -127,6 +134,17 @@ export class PhysicsCharacter {
     );
     this.controller.setApplyImpulsesToDynamicBodies(enabled);
   }
+  setSeated(value: boolean) {
+    if (this.seated === value) return;
+    this.seated = value;
+    this.collider.setShape(
+      new RAPIER.Capsule(
+        value ? characterProfile.seatedHalfHeight : characterProfile.halfHeight,
+        characterProfile.radius,
+      ),
+    );
+    this.teleport(this.position());
+  }
   snapshot(): CharacterState {
     return {
       position: this.position(),
@@ -134,9 +152,11 @@ export class PhysicsCharacter {
       grounded: this.grounded,
       jumpHeld: this.jumpHeld,
       coyote: this.coyote,
+      seated: this.seated,
     };
   }
   reconcile(state: CharacterState) {
+    this.setSeated(state.seated);
     this.teleport(state.position);
     this.velocity = { ...state.velocity };
     this.grounded = state.grounded;

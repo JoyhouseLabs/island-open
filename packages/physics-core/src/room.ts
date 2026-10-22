@@ -13,6 +13,7 @@ import {
 import { editedPhysicsScene } from "./editing.js";
 import { PhysicsRuntime } from "./index.js";
 import { PhysicsCharacter } from "./character.js";
+import { sitCharacter, standCharacter, type SeatClaim } from "./seats.js";
 import { PhysicsGrab } from "./grab.js";
 
 export interface CommandReceipt {
@@ -25,6 +26,7 @@ interface Player {
   character: PhysicsCharacter;
   grab: PhysicsGrab;
   canInteract: boolean;
+  seat: SeatClaim | null;
   input: Extract<PhysicsRoomCommand, { type: "input" }>;
   inputTick: number;
   ackInput: number;
@@ -71,6 +73,14 @@ export class PhysicsRoom {
     const scene = editedPhysicsScene(this.runtime.scene, operation, definition);
     const changedId =
       operation.type === "place" ? operation.object.id : operation.objectId;
+    if (
+      operation.type !== "content" &&
+      [...this.players.values()].some((p) => p.seat?.objectId === changedId)
+    )
+      throw new PhysicsRoomError(
+        "EDIT_CONFLICT",
+        "有人坐在这件家具上，请先起身",
+      );
     if (operation.type !== "remove" && operation.type !== "content") {
       if (
         [...this.players.keys()].some(
@@ -116,6 +126,11 @@ export class PhysicsRoom {
       throw new PhysicsRoomError("EDIT_CONFLICT", "另一项布置正在提交");
     if (expectedRevision !== this.layoutRevision)
       throw new PhysicsRoomError("STALE_LAYOUT", "布局已更新，请重新导入");
+    if ([...this.players.values()].some((p) => p.seat))
+      throw new PhysicsRoomError(
+        "EDIT_CONFLICT",
+        "请先让所有人起身，再替换世界",
+      );
     this.prepared = { id, scene, changedId: "" };
     let candidate: PhysicsRuntime | undefined;
     try {
@@ -232,6 +247,7 @@ export class PhysicsRoom {
       character,
       grab: new PhysicsGrab(this.runtime.world, character),
       canInteract,
+      seat: null,
       input: {
         type: "input",
         sequence: -1,
@@ -257,7 +273,17 @@ export class PhysicsRoom {
     const player = this.player(id);
     player.canInteract = canInteract;
     player.character.setCanPush(canInteract);
-    if (!canInteract) player.grab.release();
+    if (!canInteract) {
+      player.grab.release();
+      if (player.seat) {
+        try {
+          standCharacter(this.runtime, player.character, player.seat);
+          player.seat = null;
+        } catch {
+          /* Preserve the safe seated pose until an exit clears or the connection closes. */
+        }
+      }
+    }
   }
   private player(id: string) {
     const player = this.players.get(id);
@@ -280,7 +306,7 @@ export class PhysicsRoom {
       player.inputTick = this.runtime.tick;
       return null;
     }
-    if (!player.canInteract)
+    if (!player.canInteract && command.type !== "stand")
       throw new PhysicsRoomError("FORBIDDEN", "岛主尚未开放物品互动");
     const fingerprint = JSON.stringify(command),
       cached = player.receipts.get(command.commandId);
@@ -302,7 +328,26 @@ export class PhysicsRoom {
       tick: this.runtime.tick,
     };
     try {
-      if (command.type === "grab" || command.type === "push") {
+      if (player.seat && command.type !== "stand")
+        throw new Error("请先起身再操作物品");
+      if (command.type === "sit") {
+        if (player.grab.body) throw new Error("请先放下手里的物品");
+        if (
+          [...this.players.values()].some(
+            (p) => p.seat?.objectId === command.objectId,
+          )
+        )
+          throw new Error("这个座位已经有人了");
+        player.seat = sitCharacter(
+          this.runtime,
+          player.character,
+          command.objectId,
+        );
+      } else if (command.type === "stand") {
+        if (!player.seat) throw new Error("你已经站起来了");
+        standCharacter(this.runtime, player.character, player.seat);
+        player.seat = null;
+      } else if (command.type === "grab" || command.type === "push") {
         const object = this.runtime.scene.objects.find(
           (o) => o.id === command.objectId,
         );
@@ -380,7 +425,8 @@ export class PhysicsRoom {
       ...player.character.snapshot(),
       ackInput: player.ackInput,
       held,
-      yaw: player.input.yaw,
+      yaw: player.seat?.yaw ?? player.input.yaw,
+      seatId: player.seat?.objectId ?? null,
       canInteract: player.canInteract,
       dropPreview: player.grab.previewDrop(),
     };
