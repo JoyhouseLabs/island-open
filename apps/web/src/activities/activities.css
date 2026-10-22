@@ -1,0 +1,100 @@
+.activity-notice {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  background: #fff8e8;
+  color: #294336;
+  border: 1px solid #adc0a7;
+  padding: 12px;
+  border-radius: 12px;
+  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
+}
+.activity-notice button {
+  min-height: 44px;
+  margin-left: 10px;
+}
+.books-page button,
+.book-reader .small-button,
+.studio-page button,
+.books-head a {
+  min-height: 44px;
+}
+.studio-page .studio-message {
+  color: #294336;
+}
+.note-editor,
+.studio-prompt {
+  font-size: 16px;
+}
+@media (max-width: 699px) {
+  .book-reader {
+    height: 100dvh;
+  }
+  .book-reader .reader-head {
+    display: grid;
+    grid-template-columns: 66px minmax(0, 1fr);
+    gap: 10px 14px;
+  }
+  .book-reader .reader-title {
+    min-width: 0;
+  }
+  .book-reader .reader-buddies {
+    grid-column: 1 / -1;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .book-reader .reader-buddies small {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .book-reader .reader-body {
+    display: block;
+    overflow-y: auto;
+  }
+  .book-reader .book-stand {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 10px;
+    min-height: 0;
+  }
+  .book-reader .book-spread {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    animation: none;
+  }
+  .book-reader .book-spread::after {
+    display: none;
+  }
+  .book-reader .book-page {
+    padding: 20px 20px 36px;
+    min-height: 260px;
+  }
+  .book-reader .book-spine {
+    width: auto;
+    height: 2px;
+  }
+  .book-reader .page-turn {
+    grid-row: 2;
+    width: 44px;
+    height: 44px;
+  }
+  .book-reader .page-turn.left {
+    grid-column: 1;
+  }
+  .book-reader .page-turn.right {
+    grid-column: 3;
+  }
+  .book-reader .reader-side {
+    width: auto;
+    margin-top: 18px;
+  }
+  .book-reader .pdf-page {
+    max-width: 100%;
+    height: auto !important;
+  }
+}

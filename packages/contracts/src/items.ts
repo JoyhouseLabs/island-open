@@ -40,10 +40,7 @@ export const inventoryStateSchema = z
       )
       .max(40),
     owned: z.record(z.string().max(40), z.literal(true)),
-    collected: z.record(
-      z.string().max(40),
-      z.number().int().min(1).max(9999),
-    ),
+    collected: z.record(z.string().max(40), z.number().int().min(1).max(9999)),
   })
   .strict();
 export type InventoryState = z.infer<typeof inventoryStateSchema>;
@@ -61,14 +58,19 @@ export const inventoryActionSchema = z.discriminatedUnion("op", [
         .optional(),
     })
     .strict(),
-  z.object({ op: z.literal("collect"), itemId: z.string().min(1).max(40) }).strict(),
-  z.object({ op: z.literal("buy"), itemId: z.string().min(1).max(40) }).strict(),
+  z
+    .object({ op: z.literal("collect"), itemId: z.string().min(1).max(40) })
+    .strict(),
+  z
+    .object({ op: z.literal("buy"), itemId: z.string().min(1).max(40) })
+    .strict(),
 ]);
 export type InventoryAction = z.infer<typeof inventoryActionSchema>;
 
 export const inventoryActSchema = z
   .object({
     idempotencyKey: z.string().uuid(),
+    accountId: z.string().uuid().optional(),
     action: inventoryActionSchema,
   })
   .strict();

@@ -12,7 +12,7 @@ export async function postNote(bookId: string, page: number, text: string) {
   });
 }
 export async function deleteNote(noteId: string) {
-  return api<{ ok: boolean }>(`/books/notes/${noteId}`, { method: "DELETE" });
+  return api<{ ok: boolean }>(`/books/notes/${noteId}`, { method: "DELETE", body: "{}" });
 }
 export async function fetchReaders(bookId: string) {
   const data = await api<{ readers: BookReader[] }>(

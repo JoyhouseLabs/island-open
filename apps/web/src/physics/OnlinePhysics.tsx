@@ -297,7 +297,7 @@ export default function OnlinePhysics({
     keys.clear();
     setReading(mode);
   }
-  async function exploreWilderness() {
+  async function visitActivity(path: string) {
     if (
       !world?.owner ||
       !conn?.scene ||
@@ -313,14 +313,19 @@ export default function OnlinePhysics({
     keys.clear();
     try {
       await conn.saveBeforeLeave();
-      if (generation === switchGeneration.current)
-        go(`/dinosaur/explore?world=${encodeURIComponent(world.id)}`);
+      if (generation === switchGeneration.current) go(path);
     } catch (e) {
       if (generation === switchGeneration.current)
         setError((e as Error).message);
     } finally {
       if (generation === switchGeneration.current) setBusy(false);
     }
+  }
+  function exploreWilderness() {
+    if (world)
+      return visitActivity(
+        `/dinosaur/explore?world=${encodeURIComponent(world.id)}`,
+      );
   }
   async function visitLearning() {
     if (
@@ -674,6 +679,45 @@ export default function OnlinePhysics({
                 <small>
                   选中植物后可预览生长。周围空间足够时，确认进入下一阶段；成熟后仍可移动或收起。
                 </small>
+              </section>
+            )}
+            {world?.owner && (
+              <section
+                className="physics-library-activities"
+                aria-label="阅读与创作"
+              >
+                <button
+                  disabled={
+                    busy ||
+                    !connected ||
+                    !!conn.editing ||
+                    !!conn.editPending ||
+                    !!conn.pending
+                  }
+                  onClick={() =>
+                    void visitActivity(
+                      `/books?${new URLSearchParams({ world: world.id, scene: sceneKey })}`,
+                    )
+                  }
+                >
+                  共读书架
+                </button>
+                <button
+                  disabled={
+                    busy ||
+                    !connected ||
+                    !!conn.editing ||
+                    !!conn.editPending ||
+                    !!conn.pending
+                  }
+                  onClick={() =>
+                    void visitActivity(
+                      `/studio?${new URLSearchParams({ world: world.id, scene: sceneKey })}`,
+                    )
+                  }
+                >
+                  AI 工坊
+                </button>
               </section>
             )}
             {conn.scene.template.id === "core:library" && (

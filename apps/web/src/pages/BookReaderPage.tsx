@@ -12,8 +12,9 @@ import type { Book, BookNote, BookReader } from "@island/contracts";
 import { books as builtinBooks } from "@island/contracts";
 import { useContentFeed } from "../contentStore";
 import { contentAssetBytes } from "../api";
-import { useHomeSession } from "../HomeSession";
-import { emitGrowth } from "../progress/store";
+import { useActivity } from "../activities/context";
+import { useSavedDraft } from "../activities/useSavedDraft";
+
 import { loadPdf, PdfPage } from "../reading/PdfPages";
 import {
   deleteNote,
@@ -31,21 +32,25 @@ type PdfBook = Awaited<ReturnType<typeof loadPdf>> | null;
  * page's own text (chapter or extracted PDF), shared notes beside it, a
  * 共读伙伴 strip, and an AI companion that explains the open page.
  */
-export default function BookReaderPage() {
+function Reader() {
   const { bookId = "" } = useParams();
-  const { world } = useHomeSession();
+  const activity = useActivity();
+  const emitGrowth = activity.record;
   const [book, setBook] = useState<Book | null>(null);
   const [pdf, setPdf] = useState<PdfBook>(null);
   const [spread, setSpread] = useState(0); // spread index (2 pages each)
   const [flipping, setFlipping] = useState<"fwd" | "back" | null>(null);
   const [notes, setNotes] = useState<BookNote[]>([]);
-  const [noteCursor,setNoteCursor]=useState<string|null>(null);
+  const [noteCursor, setNoteCursor] = useState<string | null>(null);
   const [readers, setReaders] = useState<BookReader[]>([]);
-  const [draft, setDraft] = useState("");
+
   const [explain, setExplain] = useState<string>("");
   const [explainBusy, setExplainBusy] = useState(false);
   const [speaking, setSpeaking] = useState<"page" | "explain" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrl = useRef<string | null>(null);
+  const speechAbort = useRef<AbortController | null>(null);
+  const flipTimers = useRef<number[]>([]);
   const explainAbort = useRef<AbortController | null>(null);
   const progressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,19 +71,40 @@ export default function BookReaderPage() {
     setSpread(0);
     if (!book?.pdf) return;
     let alive = true;
+    let loadedBook: PdfBook = null;
     void contentAssetBytes(book.pdf)
       .then((bytes) => loadPdf(bytes))
-      .then((loaded) => alive && setPdf(loaded))
+      .then((loaded) => {
+        if (alive) {
+          loadedBook = loaded;
+          setPdf(loaded);
+        } else void loaded.doc.loadingTask.destroy();
+      })
       .catch(() => {});
     return () => {
       alive = false;
+      void loadedBook?.doc.loadingTask.destroy();
     };
   }, [book?.pdf, bookId]);
 
-  const pageCount = book ? (book.pdf ? (pdf?.doc.numPages ?? 0) : book.chapters.length) : 0;
+  const pageCount = book
+    ? book.pdf
+      ? (pdf?.doc.numPages ?? 0)
+      : book.chapters.length
+    : 0;
   const spreadCount = Math.max(1, Math.ceil(pageCount / 2));
   const leftPage = spread * 2 + 1;
   const rightPage = Math.min(pageCount, spread * 2 + 2);
+  const [draft, setDraft, draftError] = useSavedDraft(
+    `island-reading-note-v1:${activity.user.id}:${bookId}:${leftPage}`,
+    "",
+    (value) => {
+      if (typeof value !== "string" || value.length > 500)
+        throw new Error("invalid note draft");
+      return value;
+    },
+  );
+  const [submitting, setSubmitting] = useState(false);
 
   const chapterText = useCallback(
     (page: number) => {
@@ -95,7 +121,8 @@ export default function BookReaderPage() {
         fetchNotes(bookId),
         fetchReaders(bookId),
       ]);
-      setNotes(n.notes);setNoteCursor(n.nextCursor);
+      setNotes(n.notes);
+      setNoteCursor(n.nextCursor);
       setReaders(r);
     } catch {
       /* offline: keep what we have */
@@ -106,8 +133,10 @@ export default function BookReaderPage() {
   }, [book, refresh]);
 
   useEffect(() => {
+    if (book) emitGrowth({ type: "book.opened", detail: book.id });
+  }, [book?.id]);
+  useEffect(() => {
     if (!book || pageCount === 0) return;
-    emitGrowth({ type: "book.opened", detail: book.id });
     if (progressTimer.current) clearTimeout(progressTimer.current);
     progressTimer.current = setTimeout(() => {
       void saveProgress(bookId, leftPage).catch(() => {});
@@ -118,18 +147,30 @@ export default function BookReaderPage() {
   }, [book, bookId, leftPage, pageCount]);
 
   const turn = (dir: 1 | -1) => {
-    if (flipping) return;
+    if (flipping || submitting) return;
     const next = spread + dir;
     if (next < 0 || next >= spreadCount) return;
     setFlipping(dir === 1 ? "fwd" : "back");
-    window.setTimeout(() => {
-      setSpread(next);
-      emitGrowth({ type: "book.page_read", detail: bookId });
-      window.setTimeout(() => setFlipping(null), 320);
-    }, 260);
+    flipTimers.current.push(
+      window.setTimeout(() => {
+        setSpread(next);
+        if (matchMedia("(max-width: 699px)").matches)
+          document.querySelector(".reader-body")?.scrollTo({ top: 0 });
+        emitGrowth({ type: "book.page_read", detail: bookId });
+        flipTimers.current.push(
+          window.setTimeout(() => setFlipping(null), 320),
+        );
+      }, 260),
+    );
   };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if (
+        (e.target as HTMLElement)?.closest(
+          "input,textarea,select,[contenteditable]",
+        )
+      )
+        return;
       if (e.key === "ArrowRight") turn(1);
       else if (e.key === "ArrowLeft") turn(-1);
     };
@@ -139,14 +180,17 @@ export default function BookReaderPage() {
 
   const submitNote = async () => {
     const text = draft.trim();
-    if (!text || !book) return;
+    if (!text || !book || submitting) return;
+    setSubmitting(true);
     try {
       await postNote(bookId, leftPage, text);
       setDraft("");
       emitGrowth({ type: "note.written" });
       await refresh();
     } catch {
-      world.notify("笔记尚未保存，输入已保留，请稍后重试。");
+      activity.notify("笔记尚未保存，输入已保留，请稍后重试。");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -162,8 +206,12 @@ export default function BookReaderPage() {
       setSpeaking(null);
       return;
     }
+    speechAbort.current?.abort();
+    const abort = new AbortController();
+    speechAbort.current = abort;
     try {
       const response = await fetch(`/api/books/${bookId}/speak`, {
+        signal: abort.signal,
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -175,12 +223,15 @@ export default function BookReaderPage() {
         return;
       }
       const blob = await response.blob();
+      if (abort.signal.aborted) return;
       audioRef.current?.pause();
-      const audio = new Audio(URL.createObjectURL(blob));
+      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
+      audioUrl.current = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl.current);
       audio.onended = () => setSpeaking(null);
       audioRef.current = audio;
       setSpeaking(what);
-      void audio.play();
+      await audio.play();
     } catch {
       setSpeaking(null);
     }
@@ -196,6 +247,9 @@ export default function BookReaderPage() {
   useEffect(
     () => () => {
       audioRef.current?.pause();
+      speechAbort.current?.abort();
+      if (audioUrl.current) URL.revokeObjectURL(audioUrl.current);
+      for (const timer of flipTimers.current) clearTimeout(timer);
     },
     [],
   );
@@ -220,13 +274,13 @@ export default function BookReaderPage() {
   };
   useEffect(() => () => explainAbort.current?.abort(), []);
 
-  const myId = world.user?.id;
+  const myId = activity.user.id;
   if (book === null && !builtinBooks.some((b) => b.id === bookId))
     return (
       <main className="app book-reader">
         <div className="scene-loading">
           <h1>这本书不在架上</h1>
-          <Link to="/books" className="small-button">
+          <Link to={activity.href("/books")} className="small-button">
             回书架
           </Link>
         </div>
@@ -236,13 +290,16 @@ export default function BookReaderPage() {
   return (
     <main className="app book-reader">
       <header className="reader-head">
-        <Link to="/books" className="small-button">
+        <Link to={activity.href("/books")} className="small-button">
           <ChevronLeft size={14} /> 书架
         </Link>
         <div className="reader-title">
           <strong>{book?.title ?? "…"}</strong>
           <small>
-            {book?.author} · {pageCount > 0 ? `第 ${leftPage}${rightPage > leftPage ? `–${rightPage}` : ""} 页 / 共 ${pageCount} 页` : "正在打开"}
+            {book?.author} ·{" "}
+            {pageCount > 0
+              ? `第 ${leftPage}${rightPage > leftPage ? `–${rightPage}` : ""} 页 / 共 ${pageCount} 页`
+              : "正在打开"}
           </small>
         </div>
         <div className="reader-buddies" title="共读伙伴">
@@ -264,12 +321,14 @@ export default function BookReaderPage() {
           <button
             className="page-turn left"
             onClick={() => turn(-1)}
-            disabled={spread === 0}
+            disabled={spread === 0 || submitting}
             aria-label="上一页"
           >
             <ChevronLeft size={20} />
           </button>
-          <div className={`book-spread${flipping ? ` flipping-${flipping}` : ""}`}>
+          <div
+            className={`book-spread${flipping ? ` flipping-${flipping}` : ""}`}
+          >
             <div className="book-page left-page">
               {book?.pdf ? (
                 pdf ? (
@@ -295,13 +354,15 @@ export default function BookReaderPage() {
               ) : (
                 <ChapterLeaf book={book} page={rightPage} side="right" />
               )}
-              {rightPage > leftPage && <span className="folio">{rightPage}</span>}
+              {rightPage > leftPage && (
+                <span className="folio">{rightPage}</span>
+              )}
             </div>
           </div>
           <button
             className="page-turn right"
             onClick={() => turn(1)}
-            disabled={spread + 1 >= spreadCount}
+            disabled={spread + 1 >= spreadCount || submitting}
             aria-label="下一页"
           >
             <ChevronRight size={20} />
@@ -335,7 +396,9 @@ export default function BookReaderPage() {
                   onClick={speakExplain}
                   disabled={explainBusy}
                   title={speaking === "explain" ? "停止朗读讲解" : "朗读讲解"}
-                  aria-label={speaking === "explain" ? "停止朗读讲解" : "朗读讲解"}
+                  aria-label={
+                    speaking === "explain" ? "停止朗读讲解" : "朗读讲解"
+                  }
                 >
                   <Volume2 size={13} />
                 </button>
@@ -346,12 +409,11 @@ export default function BookReaderPage() {
 
           <div className="notes-card">
             <h3>共读笔记</h3>
-            <p className="notes-hint">
-              写在这里的笔记，读这本书的人都能看到。
-            </p>
+            <p className="notes-hint">写在这里的笔记，读这本书的人都能看到。</p>
             <textarea
               className="note-editor"
               value={draft}
+              disabled={submitting}
               placeholder={`第 ${leftPage} 页的想法…`}
               maxLength={500}
               onChange={(e) => setDraft(e.target.value)}
@@ -360,12 +422,13 @@ export default function BookReaderPage() {
                   void submitNote();
               }}
             />
+            {draftError && <p role="alert">{draftError}</p>}
             <div className="note-actions">
               <small>⌘/Ctrl + 回车</small>
               <button
                 className="small-button"
                 onClick={() => void submitNote()}
-                disabled={!draft.trim()}
+                disabled={!draft.trim() || submitting}
               >
                 贴进书页
               </button>
@@ -379,7 +442,10 @@ export default function BookReaderPage() {
                   <div className="note-meta">
                     <strong>{note.author.name.replace("旅人 · ", "")}</strong>
                     <small>
-                      {note.locationKind==='legacy'?'旧版定位':`版本 ${note.bookVersion??1}`} · 第 {note.page} 页 ·{" "}
+                      {note.locationKind === "legacy"
+                        ? "旧版定位"
+                        : `版本 ${note.bookVersion ?? 1}`}{" "}
+                      · 第 {note.page} 页 ·{" "}
                       {new Date(note.createdAt).toLocaleDateString("zh-CN", {
                         month: "numeric",
                         day: "numeric",
@@ -390,7 +456,11 @@ export default function BookReaderPage() {
                         className="note-delete"
                         aria-label="删除笔记"
                         onClick={() => {
-                          void deleteNote(note.id).then(refresh);
+                          void deleteNote(note.id)
+                            .then(refresh)
+                            .catch(() =>
+                              activity.notify("删除未成功，请稍后重试。"),
+                            );
                         }}
                       >
                         <Trash2 size={12} />
@@ -400,7 +470,30 @@ export default function BookReaderPage() {
                   <p>{note.text}</p>
                 </li>
               ))}
-              {noteCursor&&<li><button className="small-button" onClick={()=>{void fetchNotes(bookId,noteCursor).then(r=>{setNotes(n=>[...n,...r.notes.filter(x=>!n.some(y=>y.id===x.id))]);setNoteCursor(r.nextCursor);}).catch(()=>world.notify("读取失败，已有笔记仍保留。"));}}>更早的共读笔记</button></li>}
+              {noteCursor && (
+                <li>
+                  <button
+                    className="small-button"
+                    onClick={() => {
+                      void fetchNotes(bookId, noteCursor)
+                        .then((r) => {
+                          setNotes((n) => [
+                            ...n,
+                            ...r.notes.filter(
+                              (x) => !n.some((y) => y.id === x.id),
+                            ),
+                          ]);
+                          setNoteCursor(r.nextCursor);
+                        })
+                        .catch(() =>
+                          activity.notify("读取失败，已有笔记仍保留。"),
+                        );
+                    }}
+                  >
+                    更早的共读笔记
+                  </button>
+                </li>
+              )}
               {notes.length === 0 && (
                 <li className="empty">还没有笔记，你来写第一条吧。</li>
               )}
@@ -435,13 +528,27 @@ function ChapterLeaf({
         ))}
       </div>
       {media?.type === "image" && (
-        <img className="chapter-media" src={media.url} alt={media.caption ?? ""} />
+        <img
+          className="chapter-media"
+          src={media.url}
+          alt={media.caption ?? ""}
+        />
       )}
       {media?.type === "video" && (
-        <a className="chapter-media" href={media.url} target="_blank" rel="noreferrer">
+        <a
+          className="chapter-media"
+          href={media.url}
+          target="_blank"
+          rel="noreferrer"
+        >
           ▶ {media.caption ?? "相关视频"}
         </a>
       )}
     </>
   );
+}
+
+export default function BookReaderPage() {
+  const { bookId } = useParams();
+  return <Reader key={bookId} />;
 }

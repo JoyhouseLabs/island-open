@@ -18,6 +18,7 @@ import {
 } from "react-router";
 import { subSceneIds } from "@island/contracts";
 import { pageTitles, paths } from "./routes";
+const ActivitySession = lazy(() => import("./activities/ActivitySession"));
 const HomeSession = lazy(() => import("./HomeSession"));
 const VisitSession = lazy(() => import("./VisitSession"));
 const GameChrome = lazy(() => import("./GameChrome"));
@@ -100,7 +101,11 @@ export default function App() {
   const location = useLocation();
   const [physical, setPhysical] = useState<boolean | null>(null);
   const [runtimeError, setRuntimeError] = useState("");
+  const activityPath = /^\/(?:books(?:\/[^/]+)?|studio)\/?$/.test(
+    location.pathname,
+  );
   const worldPath =
+    activityPath ||
     physicalRoutes.some(
       (key) => location.pathname.replace(/\/+$/, "") === `/${key}`,
     ) ||
@@ -161,7 +166,8 @@ export default function App() {
   return (
     <PageBoundary path={location.pathname}>
       {/* Legacy overlays remain on routes whose activities still await migration. */}
-      {!(physical && worldPath) &&
+      {!activityPath &&
+        !(physical && worldPath) &&
         !location.pathname.startsWith("/learn") &&
         !location.pathname.startsWith("/physics") &&
         location.pathname.replace(/\/+$/, "") !== paths.wilderness && (
@@ -243,6 +249,8 @@ export default function App() {
           </Route>
           <Route element={<HomeSession />}>
             <Route path="/place/:sceneId" element={<PlacePage />} />
+          </Route>
+          <Route element={<ActivitySession physical={physical === true} />}>
             <Route path="/books" element={<BooksPage />} />
             <Route path="/books/:bookId" element={<BookReaderPage />} />
             <Route path="/studio" element={<StudioPage />} />

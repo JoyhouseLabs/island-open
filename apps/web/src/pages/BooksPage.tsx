@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { BookOpen, FileText } from "lucide-react";
 import { books as builtinBooks, type Book } from "@island/contracts";
 import { useContentFeed } from "../contentStore";
-import { useHomeSession } from "../HomeSession";
+import { useActivity } from "../activities/context";
 
 /**
  * This island's bookshelf: built-in classics plus the books installed for
@@ -11,7 +11,7 @@ import { useHomeSession } from "../HomeSession";
  */
 export default function BooksPage() {
   const navigate = useNavigate();
-  const { world } = useHomeSession();
+  const activity = useActivity();
   const installed = useContentFeed()?.books;
   const [shelf, setShelf] = useState<Book[]>(builtinBooks);
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function BooksPage() {
   return (
     <main className="app books-page">
       <header className="books-head">
-        <Link to="/library" className="small-button">
+        <Link to={activity.library} className="small-button">
           回书屋
         </Link>
         <div>
@@ -30,8 +30,8 @@ export default function BooksPage() {
             选一本书，慢慢翻。你写的笔记，读同一本书的人都能看到——像一起坐在灯下读书。
           </p>
         </div>
-        <Link to={world.user ? "/island" : "/library"} className="small-button">
-          回我的岛
+        <Link to={activity.returnTo} className="small-button">
+          返回家园
         </Link>
       </header>
       <div className="books-grid">
@@ -39,12 +39,16 @@ export default function BooksPage() {
           <button
             key={book.id}
             className="book-card"
-            onClick={() => navigate(`/books/${book.id}`)}
+            onClick={() =>
+              navigate(activity.href(`/books/${encodeURIComponent(book.id)}`))
+            }
           >
             <div className={`book-spine-preview${book.pdf ? " pdf" : ""}`}>
               {book.pdf ? <FileText size={22} /> : <BookOpen size={22} />}
               <span>
-                {book.chapters.length > 0 ? `${book.chapters.length} 页` : "PDF"}
+                {book.chapters.length > 0
+                  ? `${book.chapters.length} 页`
+                  : "PDF"}
               </span>
             </div>
             <strong>{book.title}</strong>
