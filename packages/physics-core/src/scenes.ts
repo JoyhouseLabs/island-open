@@ -101,7 +101,8 @@ export function createPhysicsScene(
     d.key === "pond" ||
     d.key === "lab" ||
     d.key === "beach" ||
-    d.key === "starlight"
+    d.key === "starlight" ||
+    d.key === "mountain"
   )
     scene = createThemePhysicsScene(d.key);
   else if (d.key === "library") scene = createLibraryPhysicsScene();

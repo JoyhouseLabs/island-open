@@ -1,3 +1,4 @@
+import { mountainPlantingError } from "./physics-mountain.js";
 import {
   homeFeatures,
   meadowFeatures,
@@ -355,6 +356,7 @@ export function physicsPlantingError(
       return "苗床里只种花";
   }
   const key = scene.template.id;
+  if (key === "core:mountain") return mountainPlantingError(x, z, tree);
   if (
     key === "core:home" &&
     (Math.hypot(x, z) < 7.5 ||

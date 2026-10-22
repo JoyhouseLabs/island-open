@@ -316,6 +316,7 @@ export const physicsSceneKeys = [
   "lab",
   "beach",
   "starlight",
+  "mountain",
 ] as const;
 export const physicsSceneKeySchema = z.enum(physicsSceneKeys);
 export const physicsSceneTemplateRefSchema = z

@@ -443,7 +443,9 @@ export default function OnlinePhysics() {
                 <small>
                   {conn.scene.template.id === "core:lab"
                     ? "靠近并选中样品瓶，试试拿起、放下和轻抛；也可以沿踏步走上实验台。"
-                    : "用方向键或按钮探索，选中座位后可以坐下休息；在布置家园中继续创作。"}
+                    : conn.scene.template.id === "core:mountain"
+                      ? "沿浅色小径上山，从观景台北侧的栏杆开口登台；山脚有长椅可休息。"
+                      : "用方向键或按钮探索，选中座位后可以坐下休息；在布置家园中继续创作。"}
                 </small>
               </section>
             )}

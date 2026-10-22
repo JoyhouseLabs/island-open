@@ -20,6 +20,11 @@ import { random } from "./random.js";
 import { PhysicsSceneBuilder } from "./physics-scene-builder.js";
 import { box, cylinder, hull } from "./physics-primitives.js";
 import { physicsPlants } from "./physics-plants.js";
+import {
+  createMountainPhysicsScene,
+  mountainTerrainHeight,
+  mountainGroundColor,
+} from "./physics-mountain.js";
 
 export const physicalThemeSpecs = [
   {
@@ -91,6 +96,16 @@ export const physicalThemeSpecs = [
     ground: "#74768e",
     sky: "#202d47",
     description: "穿过石拱门，探索立石和星辉石盆",
+  },
+  {
+    key: "mountain",
+    name: "听风山",
+    width: 88,
+    depth: 76,
+    gate: 32,
+    ground: "#a9bc8b",
+    sky: "#d5e1dc",
+    description: "沿真实坡面登上山顶，在观景台听风远眺",
   },
 ] as const;
 export type PhysicalThemeKey = (typeof physicalThemeSpecs)[number]["key"];
@@ -220,12 +235,14 @@ export function themeTerrainHeight(
   x: number,
   z: number,
 ) {
+  if (key === "mountain") return mountainTerrainHeight(x, z);
   if (key !== "pond") return 0;
   const r = Math.hypot(x / pondShape.rx, (z - pondShape.z) / pondShape.rz),
     t = Math.max(0, Math.min(1, (r - 0.6) / 0.4));
   return rounded(-1.5 * (1 - t * t * (3 - 2 * t)));
 }
 export function themeGroundColor(key: PhysicalThemeKey, x: number, z: number) {
+  if (key === "mountain") return mountainGroundColor(x, z);
   const spec = physicalThemeSpecs.find((s) => s.key === key)!;
   if (key === "forest" && pathDistance({ x, z }, forestTrail) < 2.4)
     return "#b4b29d";
@@ -802,6 +819,7 @@ function starlight(b: PhysicsSceneBuilder) {
   seat(b, "seat-right", 5, 4);
 }
 export function createThemePhysicsScene(key: PhysicalThemeKey) {
+  if (key === "mountain") return createMountainPhysicsScene();
   const index = physicalThemeSpecs.findIndex((s) => s.key === key),
     spec = physicalThemeSpecs[index]!;
   const b = new PhysicsSceneBuilder(key, `4${String(index).padStart(7, "0")}`);

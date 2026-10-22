@@ -485,7 +485,13 @@ function Contents({
         makeDefault
         target={target}
         minDistance={5}
-        maxDistance={scene.template.id === "core:island" ? 400 : 35}
+        maxDistance={
+          scene.template.id === "core:island"
+            ? 400
+            : scene.template.id === "core:mountain"
+              ? 140
+              : 35
+        }
         maxPolarAngle={Math.PI * 0.48}
       />
     </>
