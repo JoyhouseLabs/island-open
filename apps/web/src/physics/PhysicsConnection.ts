@@ -96,6 +96,15 @@ export class PhysicsConnection {
   private actionTimer: ReturnType<typeof setInterval> | undefined;
   private pendingCommand: PhysicsRoomCommand | null = null;
   private saveId: string | null = null;
+  private saveWaiters = new Set<{
+    resolve: () => void;
+    reject: (e: Error) => void;
+  }>();
+  private finishSave(error?: string) {
+    for (const waiter of this.saveWaiters)
+      error ? waiter.reject(new Error(error)) : waiter.resolve();
+    this.saveWaiters.clear();
+  }
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
   constructor(
     readonly sceneId: string,
@@ -242,6 +251,7 @@ export class PhysicsConnection {
         if (message.requestId === this.saveId) {
           this.saveId = null;
           clearTimeout(this.saveTimer);
+          this.finishSave();
         }
         this.saved = `已保存 ${new Date(message.savedAt).toLocaleTimeString()} · ${message.revision}`;
         this.changed();
@@ -257,6 +267,7 @@ export class PhysicsConnection {
           this.saveId = null;
           clearTimeout(this.saveTimer);
           this.saved = "保存未成功，请重试";
+          this.finishSave(message.message);
         }
         this.clearPending();
         this.changed();
@@ -273,6 +284,7 @@ export class PhysicsConnection {
       this.clearPending();
       if (this.saveId) {
         this.saved = "保存结果未确认，重连后核对";
+        this.finishSave(this.saved);
         this.saveId = null;
         clearTimeout(this.saveTimer);
       }
@@ -396,7 +408,15 @@ export class PhysicsConnection {
     this.send({ type: "sync", layoutRevision: this.layoutRevision });
   }
   save() {
-    if (this.status !== "connected" || !this.canEdit || this.saveId) return;
+    void this.saveBeforeLeave().catch(() => {});
+  }
+  saveBeforeLeave(): Promise<void> {
+    if (this.status !== "connected" || !this.canEdit)
+      return Promise.reject(new Error("请先连接世界再保存"));
+    const completion = new Promise<void>((resolve, reject) =>
+      this.saveWaiters.add({ resolve, reject }),
+    );
+    if (this.saveId) return completion;
     this.saveId = crypto.randomUUID();
     this.saved = "正在保存…";
     this.send({ type: "save", requestId: this.saveId });
@@ -404,11 +424,14 @@ export class PhysicsConnection {
     this.saveTimer = setTimeout(() => {
       this.saveId = null;
       this.saved = "保存结果未确认，请重试";
+      this.finishSave(this.saved);
       this.changed();
     }, 10000);
+    return completion;
   }
   dispose() {
     this.disposed = true;
+    this.finishSave("连接已关闭，保存结果未确认");
     clearTimeout(this.retry);
     clearTimeout(this.saveTimer);
     clearTimeout(this.editTimer);

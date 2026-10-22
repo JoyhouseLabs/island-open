@@ -435,3 +435,24 @@ dialog.physics-workshop .physics-actions {
   opacity: 0.5;
   cursor: default;
 }
+
+.physics-has-scenes {
+  grid-template-rows: auto auto minmax(220px, 1fr) auto;
+}
+.physics-scene-nav {
+  margin: 0;
+  padding: 0 16px 12px;
+  align-items: center;
+}
+.physics-scene-nav span {
+  font-size: 12px;
+}
+.physics-scene-nav button:first-child {
+  background: #fff;
+  color: #294336;
+}
+.physics-scene-nav button[aria-current="page"] {
+  background: #496d52;
+  color: #fff;
+  opacity: 1;
+}

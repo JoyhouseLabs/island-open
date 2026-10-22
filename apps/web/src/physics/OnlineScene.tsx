@@ -10,6 +10,7 @@ import type {
   Vector3 as Position,
 } from "@island/contracts";
 import { previewError, type PhysicsDraft } from "./PhysicsEditor";
+import { sceneDefinition } from "@island/physics-core";
 import { PhysicsLight } from "./PhysicsLight";
 import { PhysicsPart } from "./PhysicsPart";
 import type { PhysicsConnection } from "./PhysicsConnection";
@@ -171,8 +172,10 @@ function Contents({
   draft,
   placeAt,
   night,
+  paused,
 }: {
   night: boolean;
+  paused: boolean;
   conn: PhysicsConnection;
   keys: Set<string>;
   selected: string | null;
@@ -187,6 +190,7 @@ function Contents({
   const facing = useRef(0),
     previous = useRef<Vector3 | null>(null);
   const scene = conn.scene!;
+  const environment = sceneDefinition(scene.template).environment;
   const target = useMemo(
     () => new Vector3(scene.spawn.x, scene.spawn.y, scene.spawn.z - 2.5),
     [scene],
@@ -205,7 +209,8 @@ function Contents({
         ) ||
         (key === " " && target?.closest("button,a")) ||
         conn.status !== "connected" ||
-        conn.editing
+        conn.editing ||
+        paused
       )
         return;
       if (
@@ -285,7 +290,7 @@ function Contents({
       window.removeEventListener("blur", clear);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [conn, keys, selected]);
+  }, [conn, keys, selected, paused]);
   useFrame((_, delta) => {
     if (!conn.prediction || conn.status !== "connected" || document.hidden)
       return;
@@ -307,9 +312,9 @@ function Contents({
     conn.prediction.advance(
       delta,
       {
-        x: conn.editing ? 0 : direction.x,
-        z: conn.editing ? 0 : direction.z,
-        jump: !conn.editing && keys.has(" "),
+        x: conn.editing || paused ? 0 : direction.x,
+        z: conn.editing || paused ? 0 : direction.z,
+        jump: !conn.editing && !paused && keys.has(" "),
         yaw: facing.current,
         layoutRevision: conn.buffer.latest!.layoutRevision,
       },
@@ -340,11 +345,11 @@ function Contents({
   const invalidDraft = previewError(conn, draft);
   return (
     <>
-      <color attach="background" args={[night ? "#101c31" : "#e5eee5"]} />
-      <ambientLight intensity={night ? 0.15 : 1.4} />
+      <color attach="background" args={[night ? "#101c31" : environment.sky]} />
+      <ambientLight intensity={night ? 0.15 : environment.ambient} />
       <directionalLight
         position={[6, 12, 6]}
-        intensity={night ? 0.15 : 2}
+        intensity={night ? 0.15 : environment.sun}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-18}
@@ -428,6 +433,7 @@ function Contents({
 }
 export default function OnlineScene(props: {
   night: boolean;
+  paused: boolean;
   conn: PhysicsConnection;
   keys: Set<string>;
   selected: string | null;

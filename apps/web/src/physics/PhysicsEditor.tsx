@@ -142,9 +142,7 @@ export default function PhysicsEditor({
     });
   }
   const selectedObject = conn.scene?.objects.find((o) => o.id === selected);
-  const editable =
-    selectedObject &&
-    !["core:floor", "core:platform"].includes(selectedObject.definitionId);
+  const editable = selectedObject && !selectedObject.infrastructureKey;
   const invalid = previewError(conn, draft);
   const blocked = conn.editBusy || !!conn.editPending;
   function start() {

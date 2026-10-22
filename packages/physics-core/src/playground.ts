@@ -64,7 +64,7 @@ export function createPlayground(): PhysicsScene {
       "stone",
     ),
     definition("core:ramp", "斜坡", [
-      box("slope", { x: 7, y: 0.35, z: 3 }, zero, "#d5ba85"),
+      box("slope", { x: 7, y: 0.2, z: 3 }, zero, "#d5ba85"),
     ]),
     definition("core:table", "木桌", [
       box("top", { x: 3, y: 0.25, z: 2 }, { x: 0, y: 1.5, z: 0 }, "#c18d57"),
@@ -125,6 +125,7 @@ export function createPlayground(): PhysicsScene {
     schemaVersion: 4,
     physicsVersion: PHYSICS_RULES_VERSION,
     id: "physics-playground",
+    template: { id: "core:playground", version: 1 },
     name: "物理游乐场",
     definitions,
     spawn: { x: 0, y: 1, z: 7 },
@@ -132,13 +133,14 @@ export function createPlayground(): PhysicsScene {
     objects: [
       {
         id: playgroundIds.floor,
+        infrastructureKey: "ground",
         definitionId: "core:floor",
         position: { x: 0, y: -0.5, z: 0 },
       },
       {
         id: playgroundIds.ramp,
         definitionId: "core:ramp",
-        position: { x: -4, y: 1.1, z: -2 },
+        position: { x: -4, y: 1.3, z: -2 },
         rotation: {
           x: 0,
           y: 0,
@@ -168,6 +170,7 @@ export function createPlayground(): PhysicsScene {
       },
       {
         id: playgroundIds.platform,
+        infrastructureKey: "lift",
         definitionId: "core:platform",
         position: { x: -4, y: 0.25, z: 4 },
         motion: { offset: { x: 0, y: 2, z: 0 }, periodTicks: 600 },

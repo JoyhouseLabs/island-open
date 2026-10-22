@@ -1,5 +1,4 @@
 import { BlockChunks, isConstructionBlock } from "./block-chunks.js";
-import { createPlayground } from "./playground.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PhysicsCharacter } from "./character.js";
 import { collisionGroups } from "./groups.js";
@@ -476,30 +475,19 @@ export class PhysicsRuntime {
   }
   /** Whole-layout import: check new geometry and every live capsule before atomic replacement. */
   validateReplacement() {
-    const template = createPlayground();
     for (const object of this.scene.objects) {
+      if (object.infrastructureKey) continue;
       const definition = this.scene.definitions.find(
         (d) =>
           d.id === object.definitionId &&
           d.version === object.definitionVersion,
       )!;
       const state = this.state(object.id);
-      // The authored ground and embedded ramp intentionally intersect. Only their exact template poses are exempt.
-      const base = template.objects.find(
-        (o) =>
-          o.definitionId === object.definitionId &&
-          ["core:floor", "core:ramp"].includes(o.definitionId),
+      this.validatePlacement(
+        { ...object, position: state.position, rotation: state.rotation },
+        definition,
+        object.id,
       );
-      const samePose =
-        base &&
-        JSON.stringify(base.position) === JSON.stringify(object.position) &&
-        JSON.stringify(base.rotation) === JSON.stringify(object.rotation);
-      if (!samePose)
-        this.validatePlacement(
-          { ...object, position: state.position, rotation: state.rotation },
-          definition,
-          object.id,
-        );
     }
     this.world.propagateModifiedBodyPositionsToColliders();
     const shapes = [...this.bodies.values()]
@@ -624,3 +612,5 @@ export {
   blockChunkKey,
   snapBlockPosition,
 } from "./block-chunks.js";
+
+export * from "./scenes.js";

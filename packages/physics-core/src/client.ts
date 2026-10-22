@@ -91,8 +91,18 @@ export class PhysicsPrediction {
     const old = this.runtime.scene;
     if (
       scene.id !== old.id ||
-      JSON.stringify([scene.spawn, scene.bounds, scene.physicsVersion]) !==
-        JSON.stringify([old.spawn, old.bounds, old.physicsVersion])
+      JSON.stringify([
+        scene.spawn,
+        scene.bounds,
+        scene.physicsVersion,
+        scene.template,
+      ]) !==
+        JSON.stringify([
+          old.spawn,
+          old.bounds,
+          old.physicsVersion,
+          old.template,
+        ])
     )
       return false;
     const oldObjects = new Map(old.objects.map((o) => [o.id, o])),

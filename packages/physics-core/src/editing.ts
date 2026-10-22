@@ -9,8 +9,12 @@ import { createPlayground } from "./playground.js";
 
 /** Official definitions available for new placements. Infrastructure stays immutable. */
 export function officialPhysicsObjects(): ObjectDefinition[] {
-  const definitions = createPlayground().definitions.filter(
-    (d) => !["core:floor", "core:platform"].includes(d.id),
+  const scene = createPlayground();
+  const infrastructure = new Set(
+    scene.objects.filter((o) => o.infrastructureKey).map((o) => o.definitionId),
+  );
+  const definitions = scene.definitions.filter(
+    (d) => !infrastructure.has(d.id),
   );
   const box = definitions.find((d) => d.id === "core:box")!;
   return [
@@ -128,6 +132,7 @@ export function editedPhysicsScene(
       definition.version !== object.definitionVersion
     )
       throw new Error("找不到物品定义版本");
+    if (object.infrastructureKey) throw new Error("不能自行添加场景基础设施");
     if (object.motion) throw new Error("不能自行配置运动轨迹");
     const existing = next.definitions.find(
       (d) => d.id === definition.id && d.version === definition.version,
@@ -139,8 +144,7 @@ export function editedPhysicsScene(
   } else {
     const object = next.objects.find((o) => o.id === operation.objectId);
     if (!object) throw new Error("物品已被收起");
-    if (["core:floor", "core:platform"].includes(object.definitionId))
-      throw new Error("场景基础设施暂不能编辑");
+    if (object.infrastructureKey) throw new Error("场景基础设施暂不能编辑");
     if (operation.type === "remove")
       next.objects = next.objects.filter((o) => o.id !== object.id);
     else if (operation.type === "content") {

@@ -1,7 +1,7 @@
 import { snapBlockPosition } from "@island/physics-core";
 import PhysicsTransfer from "./PhysicsTransfer";
 import PhysicsContent from "./PhysicsContent";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import type { AuthConfig, User } from "@island/contracts";
 import { api, RequestError } from "../api";
@@ -18,13 +18,18 @@ interface World {
   interactive: boolean;
   accessRevision: number;
   shareToken?: string | null;
-  scenes: Array<{ id: string; key: string; revision: number }>;
+  scenes: Array<{ id: string; key: string; name: string; revision: number }>;
 }
 export default function OnlinePhysics() {
   const { worldId } = useParams(),
     location = useLocation(),
     navigate = useNavigate();
-  const token = new URLSearchParams(location.search).get("t");
+  const params = new URLSearchParams(location.search);
+  const token = params.get("t");
+  const sceneKey = params.get("scene") ?? "playground";
+  const [sceneChoices, setSceneChoices] = useState<
+    Array<{ key: string; name: string; description: string }>
+  >([]);
   const [ready, setReady] = useState(false),
     [enabled, setEnabled] = useState(false),
     [auth, setAuth] = useState<AuthConfig | null>(null),
@@ -43,7 +48,10 @@ export default function OnlinePhysics() {
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      api<{ enabled: boolean }>("/physics/config"),
+      api<{
+        enabled: boolean;
+        scenes: Array<{ key: string; name: string; description: string }>;
+      }>("/physics/config"),
       api<AuthConfig>("/auth/config"),
       api<User>("/auth/me").catch((e) => {
         if (e instanceof RequestError && e.status === 401) return null;
@@ -53,6 +61,7 @@ export default function OnlinePhysics() {
       .then(([caps, config, account]) => {
         if (!cancelled) {
           setEnabled(caps.enabled);
+          setSceneChoices(caps.scenes);
           setAuth(config);
           setUser(account);
         }
@@ -92,8 +101,19 @@ export default function OnlinePhysics() {
       cancelled = true;
     };
   }, [user, enabled, worldId, token]);
-  const sceneId = world?.scenes[0]?.id;
+  const switchGeneration = useRef(0);
   useEffect(() => {
+    setBusy(false);
+    return () => {
+      switchGeneration.current++;
+    };
+  }, [location.key]);
+  const sceneId = world?.scenes.find((s) => s.key === sceneKey)?.id;
+  useEffect(() => {
+    setDraft(null);
+    select(null);
+    setNight(false);
+    keys.clear();
     if (!sceneId || !user) {
       setConn(null);
       return;
@@ -109,6 +129,35 @@ export default function OnlinePhysics() {
       connection.dispose();
     };
   }, [sceneId, token, user?.id, keys]);
+  async function switchScene(key: string) {
+    if (!world || busy || conn?.editing || conn?.editPending || conn?.pending)
+      return;
+    const generation = ++switchGeneration.current;
+    setBusy(true);
+    setError("");
+    keys.clear();
+    try {
+      if (world.owner && conn?.scene) await conn.saveBeforeLeave();
+      if (generation !== switchGeneration.current) return;
+      if (!world.scenes.some((s) => s.key === key)) {
+        if (!world.owner) throw new Error("岛主尚未开辟这个场景");
+        const opened = await api<World>(
+          `/physics/worlds/${world.id}/scenes/${encodeURIComponent(key)}`,
+          { method: "POST", body: JSON.stringify({}) },
+        );
+        if (generation !== switchGeneration.current) return;
+        setWorld(opened);
+      }
+      const next = new URLSearchParams(location.search);
+      next.set("scene", key);
+      navigate({ pathname: location.pathname, search: next.toString() });
+    } catch (e) {
+      if (generation === switchGeneration.current)
+        setError((e as Error).message);
+    } finally {
+      if (generation === switchGeneration.current) setBusy(false);
+    }
+  }
   async function login(development: boolean) {
     setBusy(true);
     setError("");
@@ -169,22 +218,52 @@ export default function OnlinePhysics() {
     }
   }
   const shareUrl = world?.shareToken
-    ? `${window.location.origin}/physics/online/${world.id}?t=${world.shareToken}`
+    ? `${window.location.origin}/physics/online/${world.id}?t=${world.shareToken}&scene=${encodeURIComponent(sceneKey)}`
     : "";
   const connected = conn?.status === "connected",
     canInteract = connected && !conn?.editing && !!conn?.me?.canInteract;
   return (
     <main
-      className={`physics-playground ${conn?.scene ? "" : "physics-lobby"}`}
+      className={`physics-playground ${world ? "physics-has-scenes" : ""} ${conn?.scene ? "" : "physics-lobby"}`}
     >
       <header className="physics-header">
         <Link to="/physics/online">← 我的世界</Link>
         <div>
           <h1>{world?.name ?? "在线物理世界"}</h1>
-          <p>一起布置、搬动和探索</p>
+          <p>{conn?.scene?.name ?? "一起布置、搬动和探索"}</p>
         </div>
         <Link to="/physics">本地试验</Link>
       </header>
+      {world && (
+        <nav
+          className="physics-actions physics-scene-nav"
+          aria-label="切换场景"
+        >
+          {sceneChoices
+            .filter(
+              (s) => world.owner || world.scenes.some((v) => v.key === s.key),
+            )
+            .map((s) => (
+              <button
+                key={s.key}
+                aria-current={s.key === sceneKey ? "page" : undefined}
+                disabled={
+                  busy ||
+                  (s.key === sceneKey && !!sceneId) ||
+                  !!conn?.editing ||
+                  !!conn?.editPending ||
+                  !!conn?.pending
+                }
+                title={s.description}
+                onClick={() => void switchScene(s.key)}
+              >
+                {s.name}
+                {world.scenes.some((v) => v.key === s.key) ? "" : " · 开辟"}
+              </button>
+            ))}
+          {conn?.editing && <span>完成布置后可切换场景</span>}
+        </nav>
+      )}
       {!ready ? (
         <p role="status">正在读取账号…</p>
       ) : !enabled ? (
@@ -240,6 +319,7 @@ export default function OnlinePhysics() {
         <>
           <section className="physics-viewport">
             <OnlineScene
+              paused={busy}
               night={night}
               conn={conn}
               keys={keys}
@@ -273,7 +353,7 @@ export default function OnlinePhysics() {
                 : "方向键/按钮移动 · E 搬动或坐下 · F 坐下/起身"}
             </div>
           </section>
-          <section className="physics-controls">
+          <section className="physics-controls" inert={busy}>
             <label>
               <input
                 type="checkbox"
@@ -500,7 +580,13 @@ export default function OnlinePhysics() {
           <button onClick={() => setUser(null)}>重新登录</button>
         </section>
       ) : (
-        <p role="status">{error ? "无法进入世界" : "正在连接世界…"}</p>
+        <p role="status">
+          {error
+            ? "无法进入世界"
+            : world && !sceneId
+              ? "这个场景尚未开辟或未开放，请选择上方场景"
+              : "正在连接世界…"}
+        </p>
       )}
       {error && (
         <p role="alert" className="physics-error">

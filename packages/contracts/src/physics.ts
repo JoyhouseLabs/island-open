@@ -185,6 +185,10 @@ export const objectInstanceSchema = z
     position: vector3Schema,
     rotation: quaternionSchema,
     contentRef: physicsContentRefSchema.optional(),
+    infrastructureKey: z
+      .string()
+      .regex(/^[a-z][a-z0-9-]{0,47}$/)
+      .optional(),
     motion: z
       .object({
         offset: localVector,
@@ -194,12 +198,24 @@ export const objectInstanceSchema = z
       .optional(),
   })
   .strict();
+export const physicsSceneKeys = ["playground", "building-yard"] as const;
+export const physicsSceneKeySchema = z.enum(physicsSceneKeys);
+export const physicsSceneTemplateRefSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,95}$/),
+    version: z.number().int().positive(),
+  })
+  .strict();
+export type PhysicsSceneTemplateRef = z.infer<
+  typeof physicsSceneTemplateRefSchema
+>;
 export const physicsSceneSchema = z
   .object({
     schemaVersion: z.literal(4),
     physicsVersion: z.literal(PHYSICS_RULES_VERSION),
     id: z.string().min(1).max(96),
     name: z.string().min(1).max(60),
+    template: physicsSceneTemplateRefSchema,
     definitions: z.array(objectDefinitionSchema).max(512),
     objects: z.array(objectInstanceSchema).max(4096),
     spawn: vector3Schema,
@@ -223,6 +239,11 @@ export const physicsSceneSchema = z
       ctx.addIssue({ code: "custom", message: "定义版本重复" });
     if (new Set(s.objects.map((o) => o.id)).size !== s.objects.length)
       ctx.addIssue({ code: "custom", message: "物体编号重复" });
+    const infrastructureKeys = s.objects.flatMap((o) =>
+      o.infrastructureKey ? [o.infrastructureKey] : [],
+    );
+    if (new Set(infrastructureKeys).size !== infrastructureKeys.length)
+      ctx.addIssue({ code: "custom", message: "场景基础设施标识不能重复" });
     let creations = 0,
       shopObjects = 0,
       lights = 0;
@@ -239,6 +260,8 @@ export const physicsSceneSchema = z
         (d.bodyType !== "kinematic" || !d.abilities.includes("platform"))
       )
         ctx.addIssue({ code: "custom", message: "移动轨迹只适用于运动平台" });
+      if (o.infrastructureKey && d.source !== "official")
+        ctx.addIssue({ code: "custom", message: "基础设施必须由场景模板提供" });
       if (o.contentRef && !d.abilities.includes("content"))
         ctx.addIssue({ code: "custom", message: "该物品不能展示正文" });
       if (d.light) lights++;
