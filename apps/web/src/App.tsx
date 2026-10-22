@@ -8,6 +8,7 @@ import GatePrompt, {
   SceneTransitionVeil,
 } from "./player/SceneTransition";
 import { pageTitles, paths } from "./routes";
+const WildernessPage = lazy(() => import("./pages/WildernessPage"));
 const IslandPage = lazy(() => import("./pages/IslandPage"));
 const SubScenePage = lazy(() => import("./pages/SubScenePage"));
 const PlacePage = lazy(() => import("./pages/PlacePage"));
@@ -100,9 +101,7 @@ export default function App() {
   return (
     <PageBoundary path={location.pathname}>
       {/* One chat panel for every mode: host or visitor, any scene. */}
-      <PlayerChat />
-      <GatePrompt />
-      <SceneTransitionVeil />
+      {location.pathname !== paths.wilderness && <><PlayerChat /><GatePrompt /><SceneTransitionVeil /></>}
       <Suspense
         fallback={
           <div className="scene-loading" role="status">
@@ -115,6 +114,7 @@ export default function App() {
           <Route path="/" element={<Navigate to={paths.island} replace />} />
           <Route element={<HomeSession />}>
             <Route path={paths.island} element={<IslandPage />} />
+            <Route path={paths.wilderness} element={<WildernessPage />} />
             {subSceneIds.map((scene) => (
               <Route
                 key={scene}

@@ -1,0 +1,128 @@
+/** Independent from editable world snapshots. Bump this version if generation changes. */
+export const WILDERNESS_VERSION = 1;
+export const CHUNK_SIZE = 96;
+export const TERRAIN_STEP = 6;
+export const CAMP = { x: 48, z: 48 };
+export type ChunkCoord = { x: number; z: number };
+export type WildProp = {
+  x: number;
+  z: number;
+  scale: number;
+  kind: "tree" | "rock";
+};
+export type WildChunk = ChunkCoord & { key: string; props: WildProp[] };
+export const chunkKey = ({ x, z }: ChunkCoord) => `${x},${z}`;
+export const chunkAt = (x: number, z: number): ChunkCoord => ({
+  x: Math.floor(x / CHUNK_SIZE),
+  z: Math.floor(z / CHUNK_SIZE),
+});
+function hash(seed: number, x: number, z: number) {
+  let n = Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ seed;
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+}
+const smooth = (t: number) => t * t * (3 - 2 * t);
+function noise(seed: number, x: number, z: number, size: number) {
+  const ix = Math.floor(x / size),
+    iz = Math.floor(z / size),
+    u = smooth(x / size - ix),
+    v = smooth(z / size - iz);
+  const a = hash(seed, ix, iz),
+    b = hash(seed, ix + 1, iz),
+    c = hash(seed, ix, iz + 1),
+    d = hash(seed, ix + 1, iz + 1);
+  return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
+}
+export function wildBiome(seed: number, x: number, z: number) {
+  const n = noise(seed ^ 891, x, z, 180);
+  return n < 0.34 ? "rock" : n > 0.56 ? "forest" : "meadow";
+}
+export function wildVertexHeight(seed: number, x: number, z: number) {
+  const campFade = smooth(
+    Math.max(0, Math.min(1, (Math.hypot(x - CAMP.x, z - CAMP.z) - 12) / 24)),
+  );
+  return (
+    campFade * (noise(seed, x, z, 192) * 11 + noise(seed ^ 331, x, z, 48) * 3)
+  );
+}
+/** Matches the rendered triangles, including negative coordinates and chunk edges. */
+export function wildHeight(seed: number, x: number, z: number) {
+  const gx = Math.floor(x / TERRAIN_STEP) * TERRAIN_STEP,
+    gz = Math.floor(z / TERRAIN_STEP) * TERRAIN_STEP;
+  const u = (x - gx) / TERRAIN_STEP,
+    v = (z - gz) / TERRAIN_STEP;
+  const a = wildVertexHeight(seed, gx, gz),
+    b = wildVertexHeight(seed, gx + TERRAIN_STEP, gz),
+    c = wildVertexHeight(seed, gx, gz + TERRAIN_STEP),
+    d = wildVertexHeight(seed, gx + TERRAIN_STEP, gz + TERRAIN_STEP);
+  return u + v <= 1
+    ? a + (b - a) * u + (c - a) * v
+    : d + (c - d) * (1 - u) + (b - d) * (1 - v);
+}
+export function generateWildChunk(seed: number, coord: ChunkCoord): WildChunk {
+  const props: WildProp[] = [];
+  // World-aligned cells guarantee stable identity and spacing across chunk borders.
+  for (let i = 0; i < 12; i++)
+    for (let j = 0; j < 12; j++) {
+      const gx = coord.x * 12 + i,
+        gz = coord.z * 12 + j;
+      const x = gx * 8 + 2 + hash(seed ^ 12, gx, gz) * 4,
+        z = gz * 8 + 2 + hash(seed ^ 23, gx, gz) * 4;
+      const biome = wildBiome(seed, x, z);
+      // A clear camp and a continuous north/south exploration trail.
+      if (Math.hypot(x - CAMP.x, z - CAMP.z) < 18 || Math.abs(x - CAMP.x) < 5)
+        continue;
+      if (
+        hash(seed ^ 34, gx, gz) >
+        (biome === "forest" ? 0.7 : biome === "rock" ? 0.25 : 0.12)
+      )
+        continue;
+      props.push({
+        x,
+        z,
+        scale: 0.8 + hash(seed ^ 45, gx, gz) * 1.2,
+        kind: biome === "rock" ? "rock" : "tree",
+      });
+    }
+  return { ...coord, key: chunkKey(coord), props };
+}
+export function wildRing(center: ChunkCoord, radius = 2): ChunkCoord[] {
+  const result: ChunkCoord[] = [];
+  for (let x = -radius; x <= radius; x++)
+    for (let z = -radius; z <= radius; z++)
+      result.push({ x: center.x + x, z: center.z + z });
+  return result.sort(
+    (a, b) =>
+      Math.hypot(a.x - center.x, a.z - center.z) -
+      Math.hypot(b.x - center.x, b.z - center.z),
+  );
+}
+/** Retains only the desired window. One generation per tick bounds main-thread work. */
+export class WildStream {
+  readonly chunks = new Map<string, WildChunk>();
+  private pending: ChunkCoord[] = [];
+  focus(center: ChunkCoord) {
+    const ring = wildRing(center),
+      wanted = new Set(ring.map(chunkKey));
+    for (const key of this.chunks.keys())
+      if (!wanted.has(key)) this.chunks.delete(key);
+    this.pending = ring.filter((c) => !this.chunks.has(chunkKey(c)));
+  }
+  tick(seed: number) {
+    const coord = this.pending.shift();
+    if (!coord) return false;
+    const chunk = generateWildChunk(seed, coord);
+    this.chunks.set(chunk.key, chunk);
+    return true;
+  }
+  get waiting() {
+    return this.pending.length;
+  }
+}
+export function wildBlocked(chunk: WildChunk, x: number, z: number) {
+  return chunk.props.some(
+    (p) =>
+      Math.hypot(p.x - x, p.z - z) <
+      (p.kind === "tree" ? 0.5 : 1.3) * p.scale + 0.5,
+  );
+}

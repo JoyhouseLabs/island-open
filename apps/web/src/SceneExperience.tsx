@@ -180,7 +180,7 @@ export default function SceneExperience({
         conflict: `${config.short}版本待处理`,
         loading: "正在加载",
       }[room.status];
-  const exit = async () => {
+  const exit = async (destination?: string) => {
     if (leaving) return;
     setLeaving(true);
     if (
@@ -189,7 +189,8 @@ export default function SceneExperience({
       (room.status === "dirty" || room.status === "offline")
     )
       await room.save();
-    onExit();
+    if (destination) void navigate(destination);
+    else onExit();
   };
   const seasonNames: Record<Season, string> = {
     spring: "春",
@@ -249,6 +250,7 @@ export default function SceneExperience({
               reset={reset}
               onPlace={room.place}
               onExit={() => void exit()}
+              onExplore={scene === "dinosaur" ? () => void exit(paths.wilderness) : undefined}
               walk={walking}
               avatar={avatar}
               onGate={(dest) => void navigate(paths[dest])}

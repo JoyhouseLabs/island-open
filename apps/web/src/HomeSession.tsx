@@ -68,6 +68,7 @@ export default function HomeSession() {
     growth.bind(world.user?.id ?? null);
   }, [world.user?.id]);
   useEffect(() => {
+    if (scene === "wilderness") { presence.disconnect(); return; }
     if (!recordId || !avatar || !userName) return;
     presence.connect({
       worldId: recordId,

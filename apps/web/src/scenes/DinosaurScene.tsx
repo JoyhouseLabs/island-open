@@ -22,6 +22,7 @@ import {
   weatherWind,
   type SceneProps,
 } from "./shared";
+import "../wilderness/wilderness.css";
 import { Pterosaur, Raptor, Peacock } from "./DinosaurAnimals";
 
 const fieldSpread: [number, number] = [166, 136];
@@ -342,6 +343,10 @@ function Park(
         ))}
         <Box position={[0, 6, 0]} scale={[9.5, 1.6, 1]} color="#55775c" />
       </group>
+      {props.onExplore && <group position={[0, 0, -45]} onClick={exitClick(tool, props.onExplore)}>
+        {[-4, 4].map(x => <Box key={x} position={[x, 2.8, 0]} scale={[.6, 5.6, .6]} color="#8b7858" />)}
+        <Box position={[0, 5.6, 0]} scale={[9, 1.1, .7]} color="#66835a" />
+      </group>}
       <Collectibles scene="dinosaur" seed={world.seed} />
       {props.walk && props.avatar && props.onGate && (
         <PlayerRig
@@ -420,6 +425,7 @@ export default function DinosaurScene(props: SceneProps) {
         ))}
       </div>
       <aside className="dino-guide" aria-label="恐龙公园导览">
+        {props.onExplore && <button className="dino-explore" onClick={props.onExplore}>北部出口 · 探索外围 ↗</button>}
         <button
           className="dino-guide-toggle"
           aria-expanded={open}

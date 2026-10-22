@@ -31,6 +31,8 @@ export type SceneProps = {
   reset: number;
   onPlace: (x: number, z: number, kind: "tree" | "flower" | "bench") => void;
   onExit: () => void;
+  /** Owner-side procedural exploration, outside editable room snapshots. */
+  onExplore?: () => void;
   /** Avatar walking: when set with `avatar`, a resident walks this room. */
   walk?: boolean;
   avatar?: AvatarConfig | null;
