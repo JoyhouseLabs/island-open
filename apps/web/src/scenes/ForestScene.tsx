@@ -201,7 +201,7 @@ function FoxPatrol({ onNotice }: { onNotice?: () => void }) {
       }
     }
     // Being talked to, or simply met: stand still, face the player.
-    const talking = dialogue.open?.speaker.id === "fox";
+    const talking = dialogue.talkingWith("fox");
     const met = playerAgent();
     const meeting =
       !talking &&

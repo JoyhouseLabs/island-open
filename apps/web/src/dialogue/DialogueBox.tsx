@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Volume2, VolumeX, X } from "lucide-react";
+import { speak, stopSpeaking } from "../tutor/speech";
 import { dialogue, useDialogue } from "./store";
+import { setVoicePref, useVoicePrefs } from "./voicePrefs";
 
 const speakerColors: Record<string, string> = {
   panda: "#f2f0e8",
@@ -11,14 +13,21 @@ const speakerColors: Record<string, string> = {
   player: "#8fa3b0",
 };
 
-/** Game-style bottom dialogue: typewriter text, then choices. */
+/** Game-style bottom dialogue: typewriter text, then choices. With
+ *  「对话字幕也朗读」on, each finished line is also read aloud for
+ *  children who cannot read the subtitles yet. */
 export default function DialogueBox() {
   const open = useDialogue();
+  const prefs = useVoicePrefs();
   const [shown, setShown] = useState(0);
   const timer = useRef<number | undefined>(undefined);
+  // The line currently being spoken, so it is read once, not per tick.
+  const spoken = useRef<string | null>(null);
 
   useEffect(() => {
     setShown(0);
+    spoken.current = null;
+    stopSpeaking();
     if (!open) return;
     const text = open.node.text;
     window.clearInterval(timer.current);
@@ -33,6 +42,23 @@ export default function DialogueBox() {
     }, 26);
     return () => window.clearInterval(timer.current);
   }, [open]);
+
+  useEffect(
+    () => () => {
+      window.clearInterval(timer.current);
+      stopSpeaking();
+    },
+    [],
+  );
+
+  // Read the line aloud once the typewriter (or a space-skip) finishes.
+  useEffect(() => {
+    if (!open || !prefs.scriptTts) return;
+    const full = open.node.text;
+    if (shown < full.length || spoken.current === full) return;
+    spoken.current = full;
+    void speak(full);
+  }, [shown, open, prefs.scriptTts]);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -82,6 +108,17 @@ export default function DialogueBox() {
             </div>
           )}
         </div>
+        <button
+          className="dialogue-voice"
+          aria-label={prefs.scriptTts ? "关闭朗读" : "打开朗读"}
+          title={prefs.scriptTts ? "关闭朗读" : "打开朗读"}
+          onClick={() => {
+            setVoicePref("scriptTts", !prefs.scriptTts);
+            stopSpeaking();
+          }}
+        >
+          {prefs.scriptTts ? <Volume2 size={15} /> : <VolumeX size={15} />}
+        </button>
         <button
           className="dialogue-close"
           aria-label="结束对话"

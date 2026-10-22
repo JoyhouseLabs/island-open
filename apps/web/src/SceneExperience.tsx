@@ -1,3 +1,4 @@
+import LearningInvitation from "./learning/LearningInvitation";
 import DeviceLabels, { type DeviceScreenPoint } from "./building/DeviceLabels";
 import {
   cursorStyle,
@@ -348,6 +349,7 @@ export default function SceneExperience({
         </p>
         <span>{config.noteHint}</span>
       </aside>
+      {scene === "library" && <LearningInvitation parent={parent} room={room} />}
       <div className="view-controls">
         <button
           className={`circle-button ${walking ? "active" : ""}`}

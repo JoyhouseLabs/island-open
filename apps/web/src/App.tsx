@@ -1,13 +1,13 @@
 import { Component, lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router";
 import { subSceneIds } from "@island/contracts";
-import HomeSession from "./HomeSession";
-import VisitSession from "./VisitSession";
-import PlayerChat from "./dialogue/PlayerChat";
-import GatePrompt, {
-  SceneTransitionVeil,
-} from "./player/SceneTransition";
 import { pageTitles, paths } from "./routes";
+const HomeSession = lazy(() => import("./HomeSession"));
+const VisitSession = lazy(() => import("./VisitSession"));
+const GameChrome = lazy(() => import("./GameChrome"));
+const LearningLayout = lazy(() => import("./learning/LearningLayout"));
+const LearningHome = lazy(() => import("./learning/LearningHome"));
+const LearningPlayer = lazy(() => import("./learning/LearningPlayer"));
 const WildernessPage = lazy(() => import("./pages/WildernessPage"));
 const IslandPage = lazy(() => import("./pages/IslandPage"));
 const SubScenePage = lazy(() => import("./pages/SubScenePage"));
@@ -89,6 +89,7 @@ export default function App() {
   useEffect(() => {
     document.title = location.pathname.startsWith("/visit/")
       ? "朋友的家园 · 心灵家园"
+      : location.pathname.startsWith("/learn") ? "学习中心 · 心灵家园"
       : (pageTitles[location.pathname.replace(/\/+$/, "")] ??
         "页面未找到 · 心灵家园");
     // A fresh mount means the last reload (if any) succeeded.
@@ -101,7 +102,7 @@ export default function App() {
   return (
     <PageBoundary path={location.pathname}>
       {/* One chat panel for every mode: host or visitor, any scene. */}
-      {location.pathname.replace(/\/+$/, "") !== paths.wilderness && <><PlayerChat /><GatePrompt /><SceneTransitionVeil /></>}
+      {!location.pathname.startsWith("/learn") && location.pathname.replace(/\/+$/, "") !== paths.wilderness && <Suspense fallback={null}><GameChrome /></Suspense>}
       <Suspense
         fallback={
           <div className="scene-loading" role="status">
@@ -112,6 +113,11 @@ export default function App() {
       >
         <Routes>
           <Route path="/" element={<Navigate to={paths.island} replace />} />
+          <Route element={<LearningLayout />}>
+            <Route path="/learn" element={<LearningHome />} />
+            <Route path="/learn/lessons/:lessonId" element={<LearningHome />} />
+            <Route path="/learn/sessions/:sessionId" element={<LearningPlayer />} />
+          </Route>
           <Route element={<HomeSession />}>
             <Route path={paths.island} element={<IslandPage />} />
             <Route path={paths.wilderness} element={<WildernessPage />} />

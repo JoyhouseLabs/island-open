@@ -427,7 +427,7 @@ function Fox({ onAsset }: { onAsset: Props["onAsset"] }) {
     foxPet.emoteAge.current += dt;
     // Petting, talking, or simply meeting: the fox stops, faces you and
     // looks around — walking up to it is enough, no chasing required.
-    const talking = dialogue.open?.speaker.id === "fox";
+    const talking = dialogue.talkingWith("fox");
     const petting = clock.elapsedTime < petUntil.current;
     const met = playerAgent();
     const meeting =

@@ -216,6 +216,9 @@ export type TutorSpeechRequest = z.infer<typeof tutorSpeechRequestSchema>;
 export interface TutorStatus {
   chat: boolean;
   speech: boolean;
+  /** Voice dictation available (ASR key configured). */
+  asr: boolean;
   model: string | null;
 }
+export * from "./learning.js";
 export * from "./exploration.js";

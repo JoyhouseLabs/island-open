@@ -118,6 +118,38 @@ describe("animalConfigSchema", () => {
     expect(at("place-不合法")).toBe(false);
     expect(at("nowhere")).toBe(false);
   });
+  it("keeps an optional persona model and drops blank ones", () => {
+    const withModel = animalConfigSchema.parse({
+      ...base,
+      persona: {
+        temperament: "温和",
+        speechStyle: "",
+        likes: "",
+        model: "deepseek-flash",
+      },
+    });
+    expect(withModel.persona?.model).toBe("deepseek-flash");
+    const blank = animalConfigSchema.parse({
+      ...base,
+      persona: { temperament: "温和", speechStyle: "", likes: "", model: "  " },
+    });
+    // A blank model must vanish so the stored/published JSON (admin saves
+    // JSON.stringify(parsed)) never carries the key: old strict clients
+    // parse the animal without knowing it.
+    expect(blank.persona?.model).toBeUndefined();
+    expect(JSON.stringify(blank.persona)).not.toContain('"model"');
+    expect(
+      animalConfigSchema.safeParse({
+        ...base,
+        persona: {
+          temperament: "温和",
+          speechStyle: "",
+          likes: "",
+          model: "x".repeat(101),
+        },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("placeSchema", () => {

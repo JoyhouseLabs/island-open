@@ -163,7 +163,7 @@ export function Animal({
 
     // While this animal is the one being talked to, it stands still,
     // faces the player and listens; the walk resumes afterwards.
-    if (dialogue.open?.speaker.id === id) {
+    if (dialogue.talkingWith(id)) {
       s.target = null;
       s.meetWith = null;
       s.followUntil = -1;

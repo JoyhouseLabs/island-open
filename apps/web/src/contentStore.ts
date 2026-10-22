@@ -159,7 +159,7 @@ let intelligence: Promise<IntelligenceStatus> | null = null;
 /** Whether the backend LLM is configured (cached; failures read as off). */
 export function intelligenceStatus(): Promise<IntelligenceStatus> {
   return (intelligence ??= api<IntelligenceStatus>("/intelligence/status").catch(
-    () => ({ tutor: false, npc: false, speech: false, model: null }),
+    () => ({ tutor: false, npc: false, speech: false, asr: false, model: null }),
   ));
 }
 

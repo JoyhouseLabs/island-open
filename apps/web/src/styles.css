@@ -3416,3 +3416,112 @@ a.place {
   .dino-guide section p { font-size: 12px; line-height: 1.7; }
 }
 .dino-guide .dino-walking-hint { display: block; }
+
+/* Voice dialogue: mic buttons, recording pulse and the prefs checkboxes. */
+.npc-chat header button.on,
+.tutor-voice-controls button.on {
+  color: #527c63;
+}
+.npc-chat form .npc-mic {
+  background: #fffef8;
+  color: #527c63;
+  border: 1px solid #ddd5bd;
+}
+.npc-chat form .npc-mic.dictating,
+.tutor-compose .tutor-mic.dictating {
+  background: #c05b52;
+  border-color: #c05b52;
+  color: #fff;
+}
+.npc-chat form .npc-mic.dictating {
+  border: 1px solid #c05b52;
+}
+.tutor-compose .tutor-mic {
+  border: 1px solid #d9e1cc;
+  background: #fffdf6;
+  color: #527c63;
+  border-radius: 9px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.tutor-compose .tutor-mic:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.tutor-voice-controls {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-self: flex-start;
+}
+.tutor-voice-controls button {
+  border: none;
+  background: none;
+  color: #75816e;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+.mic-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  animation: mic-pulse 1s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.7); }
+}
+.voice-prefs-panel {
+  position: absolute;
+  top: 44px;
+  right: 12px;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #e4ddc6;
+  border-radius: 12px;
+  background: #f7f4e6;
+  box-shadow: 0 6px 18px #5c665044;
+  font-size: 12px;
+  color: #434f3d;
+}
+.voice-prefs-panel label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.voice-prefs-panel input {
+  accent-color: #527c63;
+  width: 15px;
+  height: 15px;
+}
+.dialogue-voice {
+  position: absolute;
+  top: 9px;
+  right: 34px;
+  color: #8b957f;
+  cursor: pointer;
+}
+@media (max-width: 699px) {
+  .voice-prefs-panel {
+    top: 40px;
+    right: 8px;
+    font-size: 12.5px;
+  }
+  .npc-chat form .npc-mic,
+  .tutor-compose .tutor-mic {
+    width: 42px;
+    height: 42px;
+  }
+}

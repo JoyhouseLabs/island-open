@@ -1,7 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Sparkles } from "lucide-react";
+import {
+  Mic,
+  Send,
+  SlidersHorizontal,
+  Sparkles,
+  Square,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import type { TutorChatRequest, TutorStatus } from "@island/contracts";
 import { fetchTutorStatus, streamTutorChat } from "./chatClient";
+import { isSpeaking, speak, stopSpeaking } from "./speech";
+import {
+  dictationSupported,
+  startDictation,
+  transcribe,
+  type DictationSession,
+} from "./asr";
+import {
+  getVoicePrefs,
+  setVoicePref,
+  useVoicePrefs,
+} from "../dialogue/voicePrefs";
+import { VoicePrefsPanel } from "../dialogue/VoicePrefsPanel";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -18,7 +39,9 @@ const SAVED_MESSAGES = 30;
  * The docked half of 小墨老师: a lesson-scoped chat pane. Quick actions
  * and free questions both stream through /api/tutor/chat with the chapter
  * (and current line) as context. History is owned by the parent and
- * persisted per chapter.
+ * persisted per chapter. With a configured ASR backend the child can talk
+ * instead of typing: recognized text sends itself, and the reply is read
+ * aloud (再听我说) for fully hands-free reading help.
  */
 export function TutorChat({
   bookId,
@@ -37,18 +60,31 @@ export function TutorChat({
   onHistory: (next: ChatMessage[]) => void;
   ask?: AskCommand;
 }) {
-  const [status, setStatus] = useState<TutorStatus | null>(null),
+  const prefs = useVoicePrefs(),
+    [status, setStatus] = useState<TutorStatus | null>(null),
     [messages, setMessages] = useState<ChatItem[]>(history),
     [input, setInput] = useState(""),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [showPrefs, setShowPrefs] = useState(false),
+    [mic, setMic] = useState<"idle" | "recording" | "recognizing">("idle");
   const logRef = useRef<HTMLDivElement>(null),
     abortRef = useRef<AbortController | null>(null),
     lastNonce = useRef(0);
+  const micSession = useRef<DictationSession | null>(null);
+  const micAbort = useRef<AbortController | null>(null);
+  // Latest-state mirrors so the TTS onEnd and the 30s auto-stop reach the
+  // freshest handlers instead of stale render closures.
+  const inputRef = useRef("");
+  inputRef.current = input;
+  const micRef = useRef(mic);
+  micRef.current = mic;
+  const openMicRef = useRef<() => void>(() => {});
+  const stopMicRef = useRef<() => void>(() => {});
   useEffect(() => {
     fetchTutorStatus()
       .then(setStatus)
-      .catch(() => setStatus({ chat: false, speech: false, model: null }));
+      .catch(() => setStatus({ chat: false, speech: false, asr: false, model: null }));
   }, []);
   // A chapter switch loads that chapter's saved conversation.
   useEffect(() => {
@@ -62,9 +98,13 @@ export function TutorChat({
   useEffect(
     () => () => {
       abortRef.current?.abort();
+      micSession.current?.cancel();
+      micAbort.current?.abort();
+      stopSpeaking();
     },
     [],
   );
+  const micAvailable = !!status?.asr && dictationSupported();
   const currentLine = lineIndex == null ? null : (lines[lineIndex] ?? null);
   const send = (question: string) => {
     const trimmed = question.trim().slice(0, 400);
@@ -118,6 +158,16 @@ export function TutorChat({
             );
             return next;
           });
+          const p = getVoicePrefs();
+          if (acc && p.autoTts && !isSpeaking())
+            void speak(acc.slice(0, 300), {
+              onEnd: () => {
+                const q = getVoicePrefs();
+                // Hands-free: when the reply is read out, the mic reopens —
+                // unless the child is already typing something.
+                if (q.autoListen && !inputRef.current) openMicRef.current();
+              },
+            });
         },
         error: (code, message) => {
           setBusy(false);
@@ -144,6 +194,68 @@ export function TutorChat({
       send(ask.text);
     }
   }); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cancelMic = () => {
+    micSession.current?.cancel();
+    micSession.current = null;
+    micAbort.current?.abort();
+    micAbort.current = null;
+    setMic("idle");
+  };
+  const openMic = () => {
+    if (micRef.current !== "idle" || busy) return;
+    setError("");
+    // The tail of a read-aloud must not leak into the recording.
+    stopSpeaking();
+    startDictation()
+      .then((session) => {
+        micSession.current = session;
+        setMic("recording");
+        session.onAutoStop = () => stopMicRef.current();
+      })
+      .catch((e: unknown) => {
+        setError(
+          e instanceof DOMException && e.name === "NotAllowedError"
+            ? "麦克风没有打开，请让爸爸妈妈在浏览器里允许麦克风。"
+            : "没有找到麦克风，试试用 Chrome 或 Safari。",
+        );
+      });
+  };
+  const stopMic = () => {
+    const session = micSession.current;
+    if (micRef.current !== "recording" || !session) return;
+    micSession.current = null;
+    setMic("recognizing");
+    void (async () => {
+      try {
+        const blob = await session.stop();
+        if (!blob) {
+          // A stray tap, not speech — not worth an error.
+          setMic("idle");
+          return;
+        }
+        const abort = new AbortController();
+        micAbort.current = abort;
+        const text = await transcribe(blob, abort.signal);
+        micAbort.current = null;
+        setMic("idle");
+        const trimmed = text.trim();
+        if (!trimmed) {
+          setError("没听清，再说一次试试。");
+          return;
+        }
+        if (getVoicePrefs().autoSend) send(trimmed);
+        else setInput(trimmed);
+      } catch {
+        micAbort.current = null;
+        setMic("idle");
+        setError("没听清，再说一次试试。");
+      }
+    })();
+  };
+  openMicRef.current = openMic;
+  stopMicRef.current = stopMic;
+
   const quick = [
     currentLine
       ? { label: "讲解这一句", text: `请讲解这一句：「${currentLine}」` }
@@ -165,7 +277,28 @@ export function TutorChat({
             {status?.chat ? "陪你读这一课" : "今天不在书屋里"}
           </small>
         </div>
+        <div className="tutor-voice-controls">
+          <button
+            aria-label="语音设置"
+            title="语音设置"
+            className={showPrefs ? "on" : undefined}
+            onClick={() => setShowPrefs((v) => !v)}
+          >
+            <SlidersHorizontal size={14} />
+          </button>
+          <button
+            aria-label={prefs.autoTts ? "关闭语音" : "打开语音"}
+            title={prefs.autoTts ? "关闭语音" : "打开语音"}
+            onClick={() => {
+              setVoicePref("autoTts", !prefs.autoTts);
+              stopSpeaking();
+            }}
+          >
+            {prefs.autoTts ? <Volume2 size={14} /> : <VolumeX size={14} />}
+          </button>
+        </div>
       </div>
+      {showPrefs && <VoicePrefsPanel />}
       {!bookId || !chapterId ? (
         <p className="tutor-note">先从书架上选一本书，老师就来陪你读。</p>
       ) : status && !status.chat ? (
@@ -207,10 +340,40 @@ export function TutorChat({
               send(input);
             }}
           >
+            {micAvailable &&
+              (mic === "recording" ? (
+                <button
+                  type="button"
+                  className="tutor-mic dictating"
+                  aria-label="停止说话"
+                  title="停止说话"
+                  onClick={stopMic}
+                >
+                  <span className="mic-dot" />
+                  <Square size={11} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="tutor-mic"
+                  aria-label={mic === "recognizing" ? "正在想…" : "开始说话"}
+                  title={mic === "recognizing" ? "正在想…" : "点一下开始说话"}
+                  disabled={mic === "recognizing" || busy}
+                  onClick={openMic}
+                >
+                  <Mic size={15} />
+                </button>
+              ))}
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="问老师这一课的任何问题…"
+              placeholder={
+                mic === "recording"
+                  ? "正在听你说……"
+                  : mic === "recognizing"
+                    ? "正在想你说的话……"
+                    : "问老师这一课的任何问题…"
+              }
               maxLength={400}
               disabled={busy}
               aria-label="问小墨老师"

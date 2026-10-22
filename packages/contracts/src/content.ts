@@ -60,6 +60,14 @@ export const animalPersonaSchema = z
     temperament: z.string().trim().max(200).default(""),
     speechStyle: z.string().trim().max(200).default(""),
     likes: z.string().trim().max(200).default(""),
+    /** Per-speaker model name on the same provider; blank falls back to
+     *  the global LLM_MODEL. Empty strings are dropped here so published
+     *  definitions never carry the key and old strict clients keep
+     *  parsing the animal. */
+    model: z.preprocess(
+      (v) => (typeof v === "string" && !v.trim() ? undefined : v),
+      z.string().trim().max(100).optional(),
+    ),
   })
   .strict();
 export const animalConfigSchema = z
@@ -189,6 +197,8 @@ export interface IntelligenceStatus {
   tutor: boolean;
   npc: boolean;
   speech: boolean;
+  /** Voice dictation available (ASR key configured). */
+  asr: boolean;
   model: string | null;
 }
 

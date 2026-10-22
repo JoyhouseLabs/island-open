@@ -7,9 +7,10 @@ import type { AnimalConfig } from "@island/contracts";
 import { contentAssetBytes } from "../api";
 import { specFor } from "../places/specs";
 import { playVoice } from "./voices";
-import { dropAgent, reportAgent } from "./registry";
+import { dropAgent, playerAgent, reportAgent } from "./registry";
 import { Emote } from "./Emote";
 import { emitGrowth } from "../progress/store";
+import { dialogue } from "../dialogue/store";
 
 type GlbModel = { scene: T.Group; mixer: T.AnimationMixer };
 
@@ -73,7 +74,8 @@ export function useGlbModel(assetId: string | undefined) {
 
 /**
  * An admin-configured animal with a custom GLB: a gentle wander around its
- * placement point, registered for talk prompts just like built-in residents.
+ * placement point, registered for talk prompts just like built-in residents;
+ * it stands still while being talked to.
  */
 export function CustomAnimal({
   id,
@@ -125,13 +127,26 @@ export function CustomAnimal({
     const s = st.current,
       dt = Math.min(rawDt, 0.05);
     emoteAge.current += dt;
-    if (clock.elapsedTime > s.voiceAt) {
+    // While talked to, stand still and face the player; wander resumes later.
+    const talking = dialogue.talkingWith(id);
+    if (talking) s.voiceAt = Math.max(s.voiceAt, clock.elapsedTime + 1.5);
+    else if (clock.elapsedTime > s.voiceAt) {
       s.voiceAt = clock.elapsedTime + 8 + rng() * 8;
       playVoice("custom", s.x, s.z);
     }
     if (model.model) model.model.mixer.update(dt);
     s.until -= dt;
-    if (!s.target && s.until <= 0) {
+    if (talking) {
+      s.target = null;
+      const p = playerAgent();
+      if (p) {
+        const want = Math.atan2(p.x - s.x, p.z - s.z);
+        let d = want - s.yaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        s.yaw += d * Math.min(1, dt * 6);
+      }
+    } else if (!s.target && s.until <= 0) {
       const a = rng() * Math.PI * 2,
         r = rng() * config.placement.wander;
       const next = {

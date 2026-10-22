@@ -1,3 +1,4 @@
+import { learningTravel } from "./learning/travel";
 import {
   createContext,
   useContext,
@@ -90,6 +91,7 @@ export default function HomeSession() {
     else void world.reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldEvent?.at]);
+  learningTravel.worldId = world.record?.id ?? null;
   return (
     <Context.Provider
       value={{

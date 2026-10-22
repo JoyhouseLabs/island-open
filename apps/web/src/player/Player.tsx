@@ -1,3 +1,4 @@
+import { learningTravel } from "../learning/travel";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as T from "three";
@@ -182,6 +183,21 @@ export function PlayerRig({
     [],
   );
   const intro = useRef({ start: -1, from: 0 });
+  useEffect(() => {
+    const back = learningTravel.pending;
+    if (back?.scene === scene && back.worldId === learningTravel.worldId) {
+      if (back.position) {
+        const p = safeBody({ x: back.position.x, y: spec.height(back.position.x, back.position.z), z: back.position.z }, cells, boxes);
+        pos.current.set(p.x, p.y, p.z);
+        yaw.current = back.position.yaw;
+        fpYaw.current = yaw.current;
+        controls?.target.set(p.x, p.y + 1.3, p.z);
+      }
+      learningTravel.pending = null;
+    }
+    return () => { if (learningTravel.current?.scene === scene) learningTravel.current = null; };
+  }, [scene]);
+
   useEffect(() => {
     const p = safeBody(pos.current, cells, boxes);
     pos.current.set(p.x, p.y, p.z);
@@ -570,6 +586,7 @@ export function PlayerRig({
       ? "sit"
       : (pose.current?.kind ?? undefined);
     group.current.position.copy(pos.current);
+    learningTravel.current = { scene, x: pos.current.x, z: pos.current.z, yaw: yaw.current };
     group.current.rotation.y = yaw.current;
     reportAgent("player", {
       kind: "player",

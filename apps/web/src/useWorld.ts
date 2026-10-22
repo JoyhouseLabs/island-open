@@ -847,6 +847,10 @@ export function useWorld(scope?: SceneScope) {
     }
   };
   return {
+    preserveDraft: async () => {
+      const c = current.current;
+      await persist(c.snapshot, c.record, c.user, c.status !== "synced");
+    },
     ready,
     unsupported,
     unknownSnapshot: unsupportedRaw.current ?? undefined,

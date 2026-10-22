@@ -10,7 +10,10 @@ type OpenDialogue = {
   /** Reply text when the player just picked a choice (two-step reveal). */
   pending: string | null;
 };
-type NpcChat = SpeakerPersona;
+type NpcChat = SpeakerPersona & {
+  /** Registry agent id of the speaker, so animals keep facing them. */
+  speakerId: string;
+};
 /** Quick-phrase chat with another player (visitor agents). */
 type PlayerChatState = { id: string; name: string } | null;
 
@@ -76,6 +79,7 @@ class DialogueStore {
         this.npc = {
           ...persona,
           name: this.open.speaker.name ?? persona.name,
+          speakerId: this.open.speaker.id,
         };
         this.open = null;
         this.bump();
@@ -103,6 +107,12 @@ class DialogueStore {
       pending: null,
     };
     this.bump();
+  }
+
+  /** Is the player in any kind of conversation with one agent — script
+   *  dialogue or the deep chat that follows? Animals freeze while true. */
+  talkingWith(id: string) {
+    return this.open?.speaker.id === id || this.npc?.speakerId === id;
   }
 
   close() {
