@@ -126,6 +126,44 @@ export function physicsSeatError(
     return "座面须是宽、深至少 0.7 米的方块或圆柱顶面";
   return null;
 }
+export const physicsBehaviorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("switch"), version: z.literal(1) }).strict(),
+  z
+    .object({
+      kind: z.literal("pressure"),
+      version: z.literal(1),
+      partId: z.string().min(1).max(48),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("door"),
+      version: z.literal(1),
+      travel: z.number().finite().min(0.5).max(4),
+      speed: z.number().finite().min(0.2).max(2),
+    })
+    .strict(),
+]);
+export const physicsBehaviorLinkSchema = z
+  .object({
+    id: z.string().uuid(),
+    from: z
+      .object({ objectId: z.string().uuid(), port: z.literal("signal") })
+      .strict(),
+    to: z
+      .object({ objectId: z.string().uuid(), port: z.enum(["open", "on"]) })
+      .strict(),
+  })
+  .strict();
+export type PhysicsBehaviorLink = z.infer<typeof physicsBehaviorLinkSchema>;
+export const physicsBehaviorStateSchema = z
+  .object({ id: z.string().uuid(), active: z.boolean(), blocked: z.boolean() })
+  .strict();
+export type PhysicsBehaviorState = z.infer<typeof physicsBehaviorStateSchema>;
+export const physicsSwitchStateSchema = z
+  .object({ id: z.string().uuid(), on: z.boolean() })
+  .strict();
+export type PhysicsSwitchState = z.infer<typeof physicsSwitchStateSchema>;
 export const objectDefinitionSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,95}$/),
@@ -137,6 +175,7 @@ export const objectDefinitionSchema = z
     parts: z.array(objectPartSchema).min(1).max(physicsBudgets.partsPerObject),
     light: physicsLightSchema.optional(),
     seat: physicsSeatSchema.optional(),
+    behavior: physicsBehaviorSchema.optional(),
     abilities: z
       .array(
         z.enum([
@@ -154,6 +193,44 @@ export const objectDefinitionSchema = z
   })
   .strict()
   .superRefine((d, ctx) => {
+    for (const kind of ["switch", "pressure", "door"] as const)
+      if ((d.behavior?.kind === kind) !== d.abilities.includes(kind))
+        ctx.addIssue({
+          code: "custom",
+          message: "机关能力须有匹配的版本化配置",
+        });
+    if (d.behavior) {
+      if (d.source !== "official")
+        ctx.addIssue({ code: "custom", message: "当前机关部件由官方定义提供" });
+      if (d.light || d.seat)
+        ctx.addIssue({
+          code: "custom",
+          message: "单件机关不能同时设置灯光或座面",
+        });
+      if (d.behavior.kind === "door") {
+        if (
+          d.bodyType !== "kinematic" ||
+          d.parts.length !== 1 ||
+          d.parts[0]?.shape.kind !== "box" ||
+          d.parts[0]?.sensor
+        )
+          ctx.addIssue({
+            code: "custom",
+            message: "升降门须是单个运动学实体方块",
+          });
+      } else if (d.bodyType !== "fixed")
+        ctx.addIssue({ code: "custom", message: "开关和压力板必须固定" });
+      if (
+        d.behavior.kind === "pressure" &&
+        !d.parts.some(
+          (p) =>
+            p.id === (d.behavior as { partId: string }).partId &&
+            p.sensor &&
+            p.shape.kind === "box",
+        )
+      )
+        ctx.addIssue({ code: "custom", message: "压力板须引用方块感应部件" });
+    }
     const seatError = physicsSeatError(d.parts, d.bodyType, d.seat);
     if (seatError) ctx.addIssue({ code: "custom", message: seatError });
     if (!!d.seat !== d.abilities.includes("seat"))
@@ -218,6 +295,10 @@ export const physicsSceneSchema = z
     template: physicsSceneTemplateRefSchema,
     definitions: z.array(objectDefinitionSchema).max(512),
     objects: z.array(objectInstanceSchema).max(4096),
+    links: z
+      .array(physicsBehaviorLinkSchema)
+      .max(physicsBudgets.behaviorLinks)
+      .default([]),
     spawn: vector3Schema,
     bounds: z.object({ min: vector3Schema, max: vector3Schema }).strict(),
   })
@@ -244,6 +325,39 @@ export const physicsSceneSchema = z
     );
     if (new Set(infrastructureKeys).size !== infrastructureKeys.length)
       ctx.addIssue({ code: "custom", message: "场景基础设施标识不能重复" });
+    const nodes = new Map(
+      s.objects.flatMap((o) => {
+        const d = definitions.get(`${o.definitionId}@${o.definitionVersion}`);
+        return d?.behavior || d?.light ? [[o.id, d] as const] : [];
+      }),
+    );
+    if (nodes.size > physicsBudgets.behaviorNodes)
+      ctx.addIssue({ code: "custom", message: "机关节点超过房间预算" });
+    if (
+      new Set(s.links.map((l) => l.id)).size !== s.links.length ||
+      new Set(
+        s.links.map((l) => `${l.from.objectId}:${l.to.objectId}:${l.to.port}`),
+      ).size !== s.links.length
+    )
+      ctx.addIssue({ code: "custom", message: "机关连接编号或端点不能重复" });
+    for (const link of s.links) {
+      const from = nodes.get(link.from.objectId),
+        to = nodes.get(link.to.objectId);
+      if (
+        !(
+          from?.behavior?.kind === "switch" ||
+          from?.behavior?.kind === "pressure"
+        ) ||
+        !(link.to.port === "open"
+          ? to?.behavior?.kind === "door"
+          : to?.light) ||
+        link.from.objectId === link.to.objectId
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "只能将开关或压力板的信号连接到门或灯",
+        });
+    }
     let creations = 0,
       shopObjects = 0,
       lights = 0;
@@ -264,6 +378,16 @@ export const physicsSceneSchema = z
         ctx.addIssue({ code: "custom", message: "基础设施必须由场景模板提供" });
       if (o.contentRef && !d.abilities.includes("content"))
         ctx.addIssue({ code: "custom", message: "该物品不能展示正文" });
+      if (
+        d.behavior &&
+        (o.motion ||
+          Math.abs(o.rotation.x) > 1e-5 ||
+          Math.abs(o.rotation.z) > 1e-5)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "机关须竖直摆放且不能另配运动轨迹",
+        });
       if (d.light) lights++;
       if (d.source === "creation") creations++;
       if (d.source === "shop") shopObjects++;
@@ -301,10 +425,16 @@ export const physicsCheckpointSchema = z
     revision: z.number().int().nonnegative(),
     tick: z.number().int().nonnegative(),
     states: z.array(bodyStateSchema).max(4096),
+    switches: z
+      .array(physicsSwitchStateSchema)
+      .max(physicsBudgets.behaviorNodes)
+      .default([]),
   })
   .strict()
   .refine(
-    (s) => new Set(s.states.map((o) => o.id)).size === s.states.length,
+    (s) =>
+      new Set(s.states.map((o) => o.id)).size === s.states.length &&
+      new Set(s.switches.map((o) => o.id)).size === s.switches.length,
     "检查点物体编号重复",
   );
 export type PhysicsScene = z.infer<typeof physicsSceneSchema>;
@@ -331,6 +461,14 @@ const roomCommandFields = {
   sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 };
 export const physicsRoomCommandSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("toggle"),
+      ...roomCommandFields,
+      commandId: z.string().uuid(),
+      objectId: z.string().uuid(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("input"),
@@ -414,6 +552,10 @@ export const physicsFrameSchema = z
     layoutRevision: z.number().int().positive(),
     full: z.boolean(),
     bodies: z.array(bodyStateSchema).max(4096),
+    behaviors: z
+      .array(physicsBehaviorStateSchema)
+      .max(physicsBudgets.behaviorNodes)
+      .optional(),
     players: z.array(physicsPlayerStateSchema).max(physicsBudgets.players),
   })
   .strict();
@@ -439,6 +581,10 @@ export const physicsSharingSchema = z
   );
 /** Clients reference a server-resolved immutable definition; never submit geometry. */
 export const physicsLayoutOperationSchema = z.discriminatedUnion("type", [
+  z
+    .object({ type: z.literal("link"), link: physicsBehaviorLinkSchema })
+    .strict(),
+  z.object({ type: z.literal("unlink"), linkId: z.string().uuid() }).strict(),
   z.object({ type: z.literal("place"), object: objectInstanceSchema }).strict(),
   z
     .object({

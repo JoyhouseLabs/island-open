@@ -245,7 +245,8 @@
   color: #294336;
   padding: 6px 10px;
 }
-.physics-controls:has(.physics-editor) {
+.physics-controls:has(.physics-editor),
+.physics-controls:has(.physics-mechanisms) {
   max-height: 52dvh;
   overflow-y: auto;
 }
@@ -455,4 +456,26 @@ dialog.physics-workshop .physics-actions {
   background: #496d52;
   color: #fff;
   opacity: 1;
+}
+
+.physics-mechanisms {
+  width: 100%;
+  font-size: 13px;
+}
+.physics-mechanisms label {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 12px 6px 0;
+}
+.physics-mechanisms select {
+  max-width: 230px;
+  padding: 6px;
+}
+.physics-mechanisms button {
+  padding: 6px 12px;
+  border: 1px solid #bccaba;
+  border-radius: 8px;
+  background: white;
+  color: #294336;
 }

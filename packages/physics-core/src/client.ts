@@ -125,8 +125,8 @@ export class PhysicsPrediction {
       })
     )
       return false;
+    this.runtime.applyLayout(scene, changed[0] ?? "");
     if (changed.length) {
-      this.runtime.applyLayout(scene, changed[0]!);
       const body = this.runtime.bodies.get(changed[0]!);
       if (body?.isDynamic())
         body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, false);

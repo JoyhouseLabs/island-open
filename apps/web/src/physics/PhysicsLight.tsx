@@ -7,13 +7,15 @@ import type {
 export function PhysicsLight({
   parts,
   light,
+  enabled = true,
 }: {
   parts: ObjectPart[];
   light?: LightConfig;
+  enabled?: boolean;
 }) {
   const emitter =
     light && parts.find((part) => part.id === light.partId && !part.sensor);
-  if (!light || !emitter) return null;
+  if (!light || !emitter || !enabled) return null;
   return (
     <pointLight
       name="island-object-light"

@@ -1,3 +1,4 @@
+import { officialBehaviorObjects } from "./behaviors.js";
 import {
   physicsSceneSchema,
   identityQuaternion,
@@ -19,6 +20,7 @@ export function officialPhysicsObjects(): ObjectDefinition[] {
   const box = definitions.find((d) => d.id === "core:box")!;
   return [
     ...definitions,
+    ...officialBehaviorObjects(),
     ...(["sign", "bookshelf"] as const).map((kind): ObjectDefinition => ({
       id: `core:${kind}`,
       version: 1,
@@ -122,7 +124,13 @@ export function editedPhysicsScene(
   definition?: ObjectDefinition,
 ): PhysicsScene {
   const next = structuredClone(scene);
-  if (operation.type === "place") {
+  if (operation.type === "link") {
+    next.links.push(operation.link);
+  } else if (operation.type === "unlink") {
+    if (!next.links.some((l) => l.id === operation.linkId))
+      throw new Error("连接已经移除");
+    next.links = next.links.filter((l) => l.id !== operation.linkId);
+  } else if (operation.type === "place") {
     const object = operation.object;
     if (next.objects.some((o) => o.id === object.id))
       throw new Error("物品编号已存在");
@@ -145,9 +153,12 @@ export function editedPhysicsScene(
     const object = next.objects.find((o) => o.id === operation.objectId);
     if (!object) throw new Error("物品已被收起");
     if (object.infrastructureKey) throw new Error("场景基础设施暂不能编辑");
-    if (operation.type === "remove")
+    if (operation.type === "remove") {
       next.objects = next.objects.filter((o) => o.id !== object.id);
-    else if (operation.type === "content") {
+      next.links = next.links.filter(
+        (l) => l.from.objectId !== object.id && l.to.objectId !== object.id,
+      );
+    } else if (operation.type === "content") {
       const definition = next.definitions.find(
         (d) =>
           d.id === object.definitionId &&

@@ -1,3 +1,4 @@
+import PhysicsMechanisms from "./PhysicsMechanisms";
 import { snapBlockPosition } from "@island/physics-core";
 import PhysicsTransfer from "./PhysicsTransfer";
 import PhysicsContent from "./PhysicsContent";
@@ -399,6 +400,12 @@ export default function OnlinePhysics() {
               token={token}
               clearKeys={() => keys.clear()}
             />
+            <PhysicsMechanisms
+              key={conn.sceneId}
+              conn={conn}
+              owner={!!world?.owner}
+              selected={selected}
+            />
             <label className="physics-select">
               观察物品
               <select
@@ -419,7 +426,11 @@ export default function OnlinePhysics() {
                           (a) =>
                             a === "grabbable" ||
                             a === "content" ||
-                            a === "seat",
+                            a === "seat" ||
+                            a === "switch" ||
+                            a === "pressure" ||
+                            a === "door" ||
+                            a === "light",
                         ),
                   )
                   .map((object) => (
@@ -434,6 +445,28 @@ export default function OnlinePhysics() {
               </select>
             </label>
             <div className="physics-actions">
+              {conn.scene.objects.some(
+                (o) =>
+                  o.id === selected &&
+                  conn.scene!.definitions.some(
+                    (d) =>
+                      d.id === o.definitionId &&
+                      d.version === o.definitionVersion &&
+                      d.behavior?.kind === "switch",
+                  ),
+              ) && (
+                <button
+                  disabled={
+                    !canInteract ||
+                    conn.pending ||
+                    !!conn.me?.held ||
+                    !!conn.me?.seatId
+                  }
+                  onClick={() => conn.action("toggle", selected)}
+                >
+                  拨动开关
+                </button>
+              )}
               <button
                 disabled={
                   !connected ||

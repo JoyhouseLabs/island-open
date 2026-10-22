@@ -1,3 +1,4 @@
+import { PhysicsBehaviors } from "./behaviors.js";
 import { BlockChunks, isConstructionBlock } from "./block-chunks.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PhysicsCharacter } from "./character.js";
@@ -64,6 +65,7 @@ export function colliderDescription(shape: ColliderShape): RAPIER.ColliderDesc {
 export class PhysicsRuntime {
   readonly world: RAPIER.World;
   readonly scene: PhysicsScene;
+  readonly behaviors: PhysicsBehaviors;
   /** Individually simulated objects. Construction blocks are represented by blockChunks. */
   readonly bodies = new Map<string, RAPIER.RigidBody>();
   private blockChunks!: BlockChunks;
@@ -107,6 +109,7 @@ export class PhysicsRuntime {
         if (id) this.colliderObjects.set(handle, { id, material: "wood" });
         else this.colliderObjects.delete(handle);
       });
+      this.behaviors = new PhysicsBehaviors(this);
       this.capturePrevious();
     } catch (error) {
       this.dispose();
@@ -193,6 +196,9 @@ export class PhysicsRuntime {
     this.characters.set(id, character);
     return character;
   }
+  characterColliders(): RAPIER.Collider[] {
+    return [...this.characters.values()].map((character) => character.collider);
+  }
   removeCharacter(id: string) {
     this.characters.get(id)?.dispose();
     this.characters.delete(id);
@@ -272,6 +278,7 @@ export class PhysicsRuntime {
       });
     }
     beforeStep?.(PHYSICS_DT);
+    this.behaviors.step(PHYSICS_DT);
     const velocities = new Map<number, Vector3>();
     for (const [id, body] of this.bodies) {
       if (!body.isDynamic()) continue;
@@ -519,6 +526,7 @@ export class PhysicsRuntime {
     }
     this.scene.objects = next.objects;
     this.scene.definitions = next.definitions;
+    this.scene.links = next.links;
     const instance = next.objects.find((o) => o.id === changedId);
     const definition =
       instance &&
@@ -530,6 +538,7 @@ export class PhysicsRuntime {
     const block = definition && isConstructionBlock(definition);
     this.blockChunks.replace(changedId, block ? instance : undefined);
     if (instance && definition && !block) this.addBody(instance, definition);
+    this.behaviors.refresh();
     // Supporting geometry can disappear under sleeping objects.
     for (const body of this.bodies.values())
       if (body.isDynamic()) body.wakeUp();
@@ -571,6 +580,7 @@ export class PhysicsRuntime {
       )
         throw new Error("建造方块状态必须与布局一致");
     }
+    this.behaviors.validateRestore(checkpoint.switches, checkpoint.states);
     for (const state of checkpoint.states) {
       if (this.blockChunks.instances.has(state.id)) continue;
       const body = this.bodies.get(state.id)!;
@@ -585,6 +595,7 @@ export class PhysicsRuntime {
       if (state.sleeping && body.isDynamic()) body.sleep();
       this.recoveryAnchors.set(state.id, state);
     }
+    this.behaviors.restore(checkpoint.switches);
     this.tick = checkpoint.tick;
     this.pauseClock();
   }
@@ -614,3 +625,5 @@ export {
 } from "./block-chunks.js";
 
 export * from "./scenes.js";
+
+export { officialBehaviorObjects } from "./behaviors.js";

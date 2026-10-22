@@ -72,7 +72,11 @@ export class PhysicsRoom {
       throw new PhysicsRoomError("STALE_LAYOUT", "布局已更新，请重新布置");
     const scene = editedPhysicsScene(this.runtime.scene, operation, definition);
     const changedId =
-      operation.type === "place" ? operation.object.id : operation.objectId;
+      operation.type === "place"
+        ? operation.object.id
+        : "objectId" in operation
+          ? operation.objectId
+          : "";
     if (
       operation.type !== "content" &&
       [...this.players.values()].some((p) => p.seat?.objectId === changedId)
@@ -81,7 +85,7 @@ export class PhysicsRoom {
         "EDIT_CONFLICT",
         "有人坐在这件家具上，请先起身",
       );
-    if (operation.type !== "remove" && operation.type !== "content") {
+    if (operation.type === "place" || operation.type === "move") {
       if (
         [...this.players.keys()].some(
           (id) => this.playerState(id).held === changedId,
@@ -113,6 +117,19 @@ export class PhysicsRoom {
         rotation: object.rotation,
         sleeping: false,
       });
+    checkpoint.switches = scene.objects.flatMap((o) => {
+      const d = scene.definitions.find(
+        (d) => d.id === o.definitionId && d.version === o.definitionVersion,
+      );
+      return d?.behavior?.kind === "switch"
+        ? [
+            {
+              id: o.id,
+              on: checkpoint.switches.find((s) => s.id === o.id)?.on ?? false,
+            },
+          ]
+        : [];
+    });
     this.prepared = { id, scene, changedId };
     return { scene, checkpoint };
   }
@@ -147,6 +164,7 @@ export class PhysicsRoom {
         ...this.checkpoint(0),
         tick: candidate.tick,
         states: candidate.states(),
+        switches: candidate.behaviors.checkpoint(),
         layoutRevision: this.layoutRevision + 1,
       });
       this.prepared = { id, scene, changedId: "", replacement: candidate };
@@ -330,7 +348,10 @@ export class PhysicsRoom {
     try {
       if (player.seat && command.type !== "stand")
         throw new Error("请先起身再操作物品");
-      if (command.type === "sit") {
+      if (command.type === "toggle") {
+        if (player.grab.body) throw new Error("请先放下手里的物品");
+        this.runtime.behaviors.toggle(command.objectId, player.character);
+      } else if (command.type === "sit") {
         if (player.grab.body) throw new Error("请先放下手里的物品");
         if (
           [...this.players.values()].some(
@@ -463,6 +484,7 @@ export class PhysicsRoom {
       layoutRevision: this.layoutRevision,
       full,
       bodies,
+      behaviors: this.runtime.behaviors.states(),
       players: [...this.players.keys()].map((id) => this.playerState(id)),
     };
   }
@@ -474,6 +496,7 @@ export class PhysicsRoom {
       revision,
       tick: this.runtime.tick,
       states: this.runtime.states(),
+      switches: this.runtime.behaviors.checkpoint(),
     };
   }
   dispose() {

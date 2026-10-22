@@ -67,6 +67,9 @@ function Body({
         sample.alpha,
       );
   });
+  const behavior = conn.buffer.latest?.behaviors?.find(
+    (s) => s.id === object.id,
+  );
   return (
     <group
       ref={mesh}
@@ -82,16 +85,22 @@ function Body({
         else select(object.id);
       }}
     >
-      <PhysicsLight parts={definition.parts} light={definition.light} />
+      <PhysicsLight
+        parts={definition.parts}
+        light={definition.light}
+        enabled={behavior?.active ?? true}
+      />
       {definition.parts.map((part) => (
         <PhysicsPart
           key={part.id}
           part={part}
           selected={selected}
           glow={
-            definition.light?.partId === part.id
+            definition.light?.partId === part.id && (behavior?.active ?? true)
               ? definition.light.color
-              : undefined
+              : definition.behavior && behavior?.active
+                ? "#58c68e"
+                : undefined
           }
         />
       ))}
@@ -246,9 +255,11 @@ function Contents({
             ? "drop"
             : conn.me?.seatId
               ? "stand"
-              : definition?.seat
-                ? "sit"
-                : "grab",
+              : definition?.behavior?.kind === "switch"
+                ? "toggle"
+                : definition?.seat
+                  ? "sit"
+                  : "grab",
           selected,
         );
       } else if (key === "q" && !event.repeat) conn.action("toss", null);

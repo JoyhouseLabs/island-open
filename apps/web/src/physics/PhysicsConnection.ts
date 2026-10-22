@@ -73,6 +73,7 @@ export class PhysicsConnection {
     type: string;
     objectId: string | null;
     at: number;
+    expectedActive?: boolean;
   } | null = null;
   inputVisibleMs: number | null = null;
   maxCorrectionMeters = 0;
@@ -239,6 +240,7 @@ export class PhysicsConnection {
             push: "已轻推",
             sit: "已坐下",
             stand: "已起身",
+            toggle: "已拨动开关",
           };
           if (!message.ok) this.visiblePending = null;
           this.message = message.ok
@@ -338,7 +340,12 @@ export class PhysicsConnection {
         (pending.type === "grab" && player.held === pending.objectId) ||
         (["drop", "toss"].includes(pending.type) && player.held === null) ||
         (pending.type === "sit" && player.seatId === pending.objectId) ||
-        (pending.type === "stand" && player.seatId === null)
+        (pending.type === "stand" && player.seatId === null) ||
+        (pending.type === "toggle" &&
+          frame.behaviors?.some(
+            (s) =>
+              s.id === pending.objectId && s.active === pending.expectedActive,
+          ))
       ) {
         this.lastVisibleActionMs = performance.now() - pending.at;
         this.visiblePending = null;
@@ -350,7 +357,7 @@ export class PhysicsConnection {
     if (this.status === "connected") this.send({ type: "command", command });
   }
   action(
-    type: "grab" | "drop" | "push" | "toss" | "sit" | "stand",
+    type: "grab" | "drop" | "push" | "toss" | "sit" | "stand" | "toggle",
     objectId: string | null,
   ) {
     if (
@@ -359,7 +366,13 @@ export class PhysicsConnection {
       (!this.me?.canInteract && type !== "stand")
     )
       return;
-    if ((type === "grab" || type === "push" || type === "sit") && !objectId) {
+    if (
+      (type === "grab" ||
+        type === "push" ||
+        type === "sit" ||
+        type === "toggle") &&
+      !objectId
+    ) {
       this.message = "先点选一个物品";
       this.changed();
       return;
@@ -370,12 +383,23 @@ export class PhysicsConnection {
       commandId: crypto.randomUUID(),
     };
     const command: PhysicsRoomCommand =
-      type === "grab" || type === "push" || type === "sit"
+      type === "grab" || type === "push" || type === "sit" || type === "toggle"
         ? { ...base, type, objectId: objectId! }
         : { ...base, type };
     this.actionStarted = performance.now();
     this.lastVisibleActionMs = null;
-    this.visiblePending = { type, objectId, at: this.actionStarted };
+    this.visiblePending = {
+      type,
+      objectId,
+      at: this.actionStarted,
+      ...(type === "toggle"
+        ? {
+            expectedActive: !this.buffer.latest?.behaviors?.find(
+              (s) => s.id === objectId,
+            )?.active,
+          }
+        : {}),
+    };
     this.pendingCommand = command;
     this.pending = true;
     this.send({ type: "command", command });

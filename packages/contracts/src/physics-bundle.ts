@@ -27,6 +27,23 @@ export const physicsBundleSchema = z
       b.scene.objects.some((o) => !states.has(o.id))
     )
       ctx.addIssue({ code: "custom", message: "检查点必须与包内布局逐一对应" });
+    const switches = new Set(
+      b.scene.objects
+        .filter((o) =>
+          b.scene.definitions.some(
+            (d) =>
+              d.id === o.definitionId &&
+              d.version === o.definitionVersion &&
+              d.behavior?.kind === "switch",
+          ),
+        )
+        .map((o) => o.id),
+    );
+    if (
+      b.checkpoint.switches.length !== switches.size ||
+      b.checkpoint.switches.some((s) => !switches.has(s.id))
+    )
+      ctx.addIssue({ code: "custom", message: "开关状态必须与布局逐一对应" });
     const used = new Set(
       b.scene.objects.flatMap((o) =>
         o.contentRef ? [`${o.contentRef.id}@${o.contentRef.version}`] : [],
