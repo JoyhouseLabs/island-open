@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -19,12 +20,21 @@ import {
   wildHeight,
   wildBiome,
   WildStream,
+  wildEncounters,
+  wildRing,
+  type WildEncounter,
   type ChunkCoord,
 } from "@island/world-core";
 import { AvatarMesh, type AvatarAnim } from "../player/AvatarModel";
 import { loadAvatar, type AvatarConfig } from "../player/avatar";
 import RendererCleanup from "../RendererCleanup";
 import Terrain from "./Terrain";
+import { Wildlife, wildlifeNames, wildlifeNotes } from "./Wildlife";
+import {
+  packPosition,
+  unpackPosition,
+  type ExplorationJournal,
+} from "./journal";
 import "./wilderness.css";
 type Position = { x: number; z: number };
 type Input = { keys: Set<string>; touch: string; sprint: boolean };
@@ -62,8 +72,14 @@ function Walker({
       controls.current.target.x -= dx;
       controls.current.target.z -= dz;
     }
+    const p = position.current;
+    controls.current?.target.set(
+      p.x - center.x * CHUNK_SIZE,
+      wildHeight(seed, p.x, p.z) + 1.4,
+      p.z - center.z * CHUNK_SIZE,
+    );
     lastOrigin.current = center;
-  }, [center, camera]);
+  }, [center, camera, position, seed]);
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05),
       p = position.current,
@@ -140,7 +156,6 @@ function Walker({
         minDistance={8}
         maxDistance={70}
         maxPolarAngle={Math.PI * 0.47}
-        target={[CAMP.x, 1.4, CAMP.z - 8]}
       />
     </>
   );
@@ -186,15 +201,17 @@ export default function Wilderness({
   low,
   avatar,
   onExit,
+  journal,
 }: {
   seed: number;
   low: boolean;
   avatar: AvatarConfig | null;
   onExit(): void;
+  journal: ExplorationJournal;
 }) {
-  const position = useRef(spawn()),
+  const position = useRef(unpackPosition(journal.state)),
     input = useRef<Input>({ keys: new Set(), touch: "", sprint: false });
-  const [p, setP] = useState(spawn),
+  const [p, setP] = useState(() => unpackPosition(journal.state)),
     [epoch, setEpoch] = useState(0),
     [revision, setRevision] = useState(0),
     [running, setRunning] = useState(false);
@@ -203,13 +220,76 @@ export default function Wilderness({
     [Math.floor(p.x / CHUNK_SIZE), Math.floor(p.z / CHUNK_SIZE)],
   );
   const stream = useMemo(() => new WildStream(), [seed, epoch]);
-  const explored = useRef(new Map<string, boolean>());
+  const explored = useRef(
+    new Map(journal.state.explored.map((c) => [chunkKey(c), c])),
+  );
+  const [selected, setSelected] = useState<WildEncounter | null>(null),
+    [showJournal, setShowJournal] = useState(false);
+  const report = useCallback(
+    (next: Position) => {
+      setP(next);
+      journal.update({
+        ...journal.state,
+        position: packPosition(next.x, next.z),
+        explored: [...explored.current.values()],
+      });
+    },
+    [journal],
+  );
+  const encounters = useMemo(
+    () => wildRing(center, 1).flatMap((c) => wildEncounters(seed, c)),
+    [seed, center],
+  );
+  const nearby = encounters
+    .filter((e) => Math.hypot(e.x - p.x, e.z - p.z) < 80)
+    .sort(
+      (a, b) =>
+        Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z),
+    )
+    .slice(0, low ? 4 : 8);
+  const inspect = useCallback(
+    (e: WildEncounter) => {
+      if (Math.hypot(e.x - position.current.x, e.z - position.current.z) > 26)
+        return;
+      setSelected(e);
+      if (!journal.state.discoveries.includes(e.id))
+        journal.update({
+          ...journal.state,
+          discoveries: [...journal.state.discoveries, e.id].slice(-256),
+        });
+      void journal.flush();
+    },
+    [journal],
+  );
+  const initialView = useMemo(() => {
+    const pos = position.current,
+      c = chunkAt(pos.x, pos.z);
+    return [
+      pos.x - c.x * CHUNK_SIZE,
+      wildHeight(seed, pos.x, pos.z) + 12,
+      pos.z - c.z * CHUNK_SIZE + 20,
+    ] as [number, number, number];
+  }, [epoch, seed]);
+  const resolve = async (choice: "local" | "cloud") => {
+    await journal.resolve(choice);
+    if (choice === "cloud" && journal.status === "synced") {
+      input.current.keys.clear();
+      input.current.touch = "";
+      position.current = unpackPosition(journal.state);
+      setP(position.current);
+      explored.current = new Map(
+        journal.state.explored.map((c) => [chunkKey(c), c]),
+      );
+      setSelected(null);
+      setEpoch((e) => e + 1);
+    }
+  };
   useEffect(() => {
     stream.focus(center);
     setRevision((r) => r + 1);
     const key = chunkKey(center);
     explored.current.delete(key);
-    explored.current.set(key, true);
+    explored.current.set(key, center);
     if (explored.current.size > 256)
       explored.current.delete(explored.current.keys().next().value!);
     const id = window.setInterval(() => {
@@ -262,14 +342,17 @@ export default function Wilderness({
       document.removeEventListener("visibilitychange", clear);
     };
   }, []);
-  const ready = stream.chunks.has(chunkKey(center));
+  const ready = wildRing(center, 1).every((c) =>
+    stream.chunks.has(chunkKey(c)),
+  );
   const distance = Math.round(Math.hypot(p.x - CAMP.x, p.z - CAMP.z)),
     bearing = (Math.atan2(CAMP.x - p.x, p.z - CAMP.z) * 180) / Math.PI;
   const returnCamp = () => {
     input.current.keys.clear();
     input.current.touch = "";
     position.current = spawn();
-    setP(spawn());
+    report(spawn());
+    void journal.flush();
     setEpoch((e) => e + 1);
   };
   const cells = Array.from({ length: 49 }, (_, i) => ({
@@ -286,12 +369,15 @@ export default function Wilderness({
       data-x={p.x.toFixed(1)}
       data-z={p.z.toFixed(1)}
       data-revision={revision}
+      data-discovered={journal.state.discoveries.length}
+      data-wildlife={nearby.length}
+      data-save-status={journal.status}
     >
       <Canvas
         key={epoch}
         dpr={low ? 1 : [1, 1.5]}
         camera={{
-          position: [CAMP.x, 12, CAMP.z + 12],
+          position: initialView,
           fov: 52,
           near: 0.2,
           far: 450,
@@ -318,6 +404,16 @@ export default function Wilderness({
         {Math.abs(center.x) <= 2 && Math.abs(center.z) <= 2 && (
           <Camp center={center} />
         )}
+        {ready &&
+          nearby.map((e) => (
+            <Wildlife
+              key={e.id}
+              encounter={e}
+              seed={seed}
+              origin={center}
+              inspect={inspect}
+            />
+          ))}
         {ready && (
           <Walker
             seed={seed}
@@ -326,7 +422,7 @@ export default function Wilderness({
             position={position}
             input={input}
             avatar={avatar ?? loadAvatar()}
-            report={setP}
+            report={report}
           />
         )}
       </Canvas>
@@ -338,7 +434,7 @@ export default function Wilderness({
         </div>
         <button onClick={onExit}>返回恐龙公园</button>
       </header>
-      <aside className="wild-map" aria-label="本轮探索地图">
+      <aside className="wild-map" aria-label="探索地图">
         <div className="wild-map-grid">
           {cells.map((c) => (
             <span
@@ -371,8 +467,90 @@ export default function Wilderness({
       <footer className="wild-hint">
         WASD / 方向键行走 · Shift 奔跑 · 拖动画面转向
         <br />
-        <span>本轮探索暂不保存；刷新会回到营地</span>
+        <span role="status">
+          {journal.storageFailed
+            ? "本机保存失败，请保持页面打开并重试"
+            : {
+                loading: "正在读取手记…",
+                local: "探索已保存在本机",
+                dirty: "本机已保存，等待同步",
+                synced: "探索已同步到家园",
+                offline: "云端暂不可用，本机进度已保留",
+                conflict: "另一台设备更新了进度，本机记录已保留",
+              }[journal.status]}
+        </span>
+        <button className="wild-retry" onClick={() => void journal.flush()}>
+          保存进度
+        </button>
       </footer>
+      <section className="wild-discovery" aria-label="探索发现">
+        <button
+          onClick={() => setShowJournal((v) => !v)}
+          aria-expanded={showJournal}
+        >
+          探索手记 · {journal.state.discoveries.length} 处发现
+        </button>
+        {nearby
+          .filter((e) => Math.hypot(e.x - p.x, e.z - p.z) <= 26)
+          .slice(0, 2)
+          .map((e) => (
+            <button key={e.id} onClick={() => inspect(e)}>
+              观察{wildlifeNames[e.kind]}
+              {journal.state.discoveries.includes(e.id)
+                ? " · 已记录"
+                : " · 新发现"}
+            </button>
+          ))}
+        {selected && (
+          <div className="wild-observation">
+            <button
+              className="wild-close"
+              aria-label="关闭观察"
+              onClick={() => setSelected(null)}
+            >
+              ×
+            </button>
+            <h2>{wildlifeNames[selected.kind]}</h2>
+            <p>{wildlifeNotes[selected.kind]}</p>
+            <small>
+              区域 {selected.chunk.x}, {selected.chunk.z} · 已记入手记
+            </small>
+          </div>
+        )}
+        {showJournal && (
+          <div className="wild-journal">
+            <h2>探索手记</h2>
+            <p>
+              记住最近 {journal.state.explored.length} 个区域与{" "}
+              {journal.state.discoveries.length} 处发现（各最多 256）。
+            </p>
+            {!journal.state.discoveries.length && (
+              <p>走近动物或蛋巢，点击「观察」记录第一次发现。</p>
+            )}
+            <ul>
+              {journal.state.discoveries
+                .slice(-12)
+                .reverse()
+                .map((id) => {
+                  const [, x, z, , kind] = id.split(":");
+                  return (
+                    <li key={id}>
+                      {wildlifeNames[kind as keyof typeof wildlifeNames]} · 区域{" "}
+                      {x}, {z}
+                    </li>
+                  );
+                })}
+            </ul>
+          </div>
+        )}
+      </section>
+      {journal.status === "conflict" && (
+        <aside className="wild-conflict" role="alert">
+          <p>另一台设备更新了探索进度。选择后会保留本机备份。</p>
+          <button onClick={() => void resolve("cloud")}>载入云端进度</button>
+          <button onClick={() => void resolve("local")}>用本机进度继续</button>
+        </aside>
+      )}
       <div className="wild-pad" aria-label="探索行走控制">
         {[
           ["KeyW", "向前", "↑"],

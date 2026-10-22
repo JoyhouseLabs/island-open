@@ -110,17 +110,27 @@ function Wing({ side }: { side: number }) {
     </mesh>
   );
 }
-export function Pterosaur({ index, onInspect, interactive }: AnimalProps) {
+export function Pterosaur({
+  index,
+  onInspect,
+  interactive,
+  habitat,
+}: AnimalProps) {
   const body = useRef<T.Group>(null),
     left = useRef<T.Group>(null),
     right = useRef<T.Group>(null);
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime * 0.12 + index * Math.PI;
+    const t =
+      clock.elapsedTime * 0.12 + index * Math.PI + (habitat?.phase ?? 0);
     if (!body.current) return;
+    const x = (habitat?.x ?? -40) + Math.cos(t) * (habitat?.radius ?? 23),
+      z = (habitat?.z ?? -40) + Math.sin(t) * (habitat?.radius ?? 17);
     body.current.position.set(
-      -40 + Math.cos(t) * 23,
-      26 + Math.sin(t * 2) * 3 + index * 4,
-      -40 + Math.sin(t) * 17,
+      x,
+      (habitat ? habitat.ground(x, z) + 12 : 26) +
+        Math.sin(t * 2) * 3 +
+        index * 4,
+      z,
     );
     body.current.rotation.set(
       0,
@@ -172,9 +182,21 @@ type AnimalProps = {
   index: number;
   onInspect: (id: DinosaurHabitatId) => void;
   interactive: boolean;
+  habitat?: {
+    x: number;
+    z: number;
+    radius: number;
+    phase: number;
+    ground(x: number, z: number): number;
+  };
 };
 
-export function Raptor({ index, onInspect, interactive }: AnimalProps) {
+export function Raptor({
+  index,
+  onInspect,
+  interactive,
+  habitat,
+}: AnimalProps) {
   const body = useRef<T.Group>(null),
     legs = useRef<T.Group>(null),
     head = useRef<T.Group>(null);
@@ -187,12 +209,15 @@ export function Raptor({ index, onInspect, interactive }: AnimalProps) {
     const now = clock.elapsedTime,
       resting = now < pauseUntil.current || Math.sin(now * 0.25 + index) > 0.84;
     if (!resting) time.current += Math.min(dt, 0.05) * 0.3;
-    const t = time.current + index * 2.1;
+    const t = time.current + index * 2.1 + (habitat?.phase ?? 0);
     if (body.current) {
+      const x = (habitat?.x ?? -27) + Math.cos(t) * (habitat?.radius ?? 10),
+        z = (habitat?.z ?? 5) + Math.sin(t) * (habitat?.radius ?? 8);
       body.current.position.set(
-        -27 + Math.cos(t) * 10,
-        resting ? 0 : Math.abs(Math.sin(t * 18)) * 0.16,
-        5 + Math.sin(t) * 8,
+        x,
+        (habitat?.ground(x, z) ?? 0) +
+          (resting ? 0 : Math.abs(Math.sin(t * 18)) * 0.16),
+        z,
       );
       body.current.rotation.y = Math.atan2(-10 * Math.sin(t), 8 * Math.cos(t));
     }
@@ -273,21 +298,28 @@ export function Raptor({ index, onInspect, interactive }: AnimalProps) {
   );
 }
 
-export function Peacock({ index, onInspect, interactive }: AnimalProps) {
+export function Peacock({
+  index,
+  onInspect,
+  interactive,
+  habitat,
+}: AnimalProps) {
   const body = useRef<T.Group>(null),
     fan = useRef<T.Group>(null),
     clockTime = useRef(0),
     displayUntil = useRef(0);
   useFrame(({ clock }) => {
     const now = clock.elapsedTime,
-      t = now * 0.11 + index * Math.PI;
+      t = now * 0.11 + index * Math.PI + (habitat?.phase ?? 0);
     clockTime.current = now;
     const display =
       now < displayUntil.current
         ? 1
         : 0.35 + (Math.sin(now * 0.35 + index) + 1) * 0.325;
     if (body.current) {
-      body.current.position.set(19 + Math.cos(t) * 5, 0, 27 + Math.sin(t) * 6);
+      const x = (habitat?.x ?? 19) + Math.cos(t) * (habitat?.radius ?? 5),
+        z = (habitat?.z ?? 27) + Math.sin(t) * (habitat?.radius ?? 6);
+      body.current.position.set(x, habitat?.ground(x, z) ?? 0, z);
       body.current.rotation.y = 0.2 + Math.sin(t) * 0.55;
     }
     if (fan.current) {

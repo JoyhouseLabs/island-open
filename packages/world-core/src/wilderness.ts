@@ -1,5 +1,5 @@
 /** Independent from editable world snapshots. Bump this version if generation changes. */
-export const WILDERNESS_VERSION = 1;
+export const WILDERNESS_VERSION = 2;
 export const CHUNK_SIZE = 96;
 export const TERRAIN_STEP = 6;
 export const CAMP = { x: 48, z: 48 };
@@ -125,4 +125,76 @@ export function wildBlocked(chunk: WildChunk, x: number, z: number) {
       Math.hypot(p.x - x, p.z - z) <
       (p.kind === "tree" ? 0.5 : 1.3) * p.scale + 0.5,
   );
+}
+
+export type WildSpecies = "raptor" | "pterosaur" | "peacock" | "nest";
+export type WildEncounter = {
+  id: string;
+  kind: WildSpecies;
+  x: number;
+  z: number;
+  phase: number;
+  chunk: ChunkCoord;
+};
+/** Stable, sparse encounters; no runtime randomness or unbounded populations. */
+export function wildEncounters(
+  seed: number,
+  coord: ChunkCoord,
+): WildEncounter[] {
+  const chunk = generateWildChunk(seed, coord),
+    result: WildEncounter[] = [];
+  for (let slot = 0; slot < 3; slot++) {
+    const h = hash(seed ^ (771 + slot * 137), coord.x, coord.z);
+    if (slot === 2 && h < 0.65) continue;
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const x =
+        coord.x * CHUNK_SIZE +
+        12 +
+        hash(seed ^ (811 + attempt * 67 + slot * 997), coord.x, coord.z) * 72;
+      const z =
+        coord.z * CHUNK_SIZE +
+        12 +
+        hash(seed ^ (918 + attempt * 97 + slot * 971), coord.x, coord.z) * 72;
+      if (
+        Math.hypot(x - CAMP.x, z - CAMP.z) < 18 ||
+        Math.abs(x - CAMP.x) < 7 ||
+        chunk.props.some((p) => Math.hypot(x - p.x, z - p.z) < 7) ||
+        result.some((p) => Math.hypot(x - p.x, z - p.z) < 14)
+      )
+        continue;
+      const biome = wildBiome(seed, x, z);
+      const kind: WildSpecies =
+        slot === 2
+          ? "nest"
+          : h < 0.22
+            ? "pterosaur"
+            : biome === "rock"
+              ? "pterosaur"
+              : biome === "forest"
+                ? "raptor"
+                : "peacock";
+      result.push({
+        id: `wild2:${coord.x}:${coord.z}:${slot}:${kind}`,
+        kind,
+        x,
+        z,
+        phase: h * 6.28,
+        chunk: coord,
+      });
+      break;
+    }
+  }
+  // The departure trail always offers a first observation, still selected by seed.
+  if (coord.x === 0 && coord.z === 0) {
+    const kind = hash(seed ^ 219, 0, 0) > 0.5 ? "peacock" : "raptor";
+    result.splice(0, 1, {
+      id: `wild2:0:0:0:${kind}`,
+      kind,
+      x: CAMP.x + 9,
+      z: CAMP.z - 12,
+      phase: hash(seed, 0, 0) * 6.28,
+      chunk: coord,
+    });
+  }
+  return result;
 }
