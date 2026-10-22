@@ -81,6 +81,7 @@ export function gateLabel(dest: "island" | SubSceneId): string {
 function sceneTitle(dest: SubSceneId): string {
   // Kept local to avoid an import cycle (sceneConfig pulls Island types).
   const titles: Record<SubSceneId, string> = {
+    dinosaur: "恐龙公园",
     garden: "私家花园",
     home: "家园小院",
     meadow: "风眠草地",

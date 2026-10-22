@@ -387,6 +387,32 @@ export function Districts() {
         </mesh>
       ))}
       <Mountain />
+      <group position={[86, groundHeight(86, 56), 56]} rotation={[0, -0.3, 0]}>
+        {[-3.5, 3.5].map((x) => (
+          <Block
+            key={x}
+            x={x}
+            y={3}
+            z={0}
+            w={0.8}
+            h={6}
+            d={0.8}
+            color="#8a795b"
+          />
+        ))}
+        <Block x={0} y={5.6} z={0} w={8.5} h={1.5} d={0.7} color="#55775c" />
+        {[-1.4, 0, 1.4].map((x) => (
+          <mesh
+            key={x}
+            position={[x, 7, 0]}
+            scale={[0.55, 0.8, 0.55]}
+            castShadow
+          >
+            <sphereGeometry args={[1, 10, 8]} />
+            <meshStandardMaterial color="#e6d4a9" />
+          </mesh>
+        ))}
+      </group>
     </>
   );
 }

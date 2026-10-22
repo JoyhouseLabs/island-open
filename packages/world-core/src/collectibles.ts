@@ -38,6 +38,7 @@ const zones: Record<
   string,
   { cx: number; cz: number; rx: number; rz: number; kinds: ForageKind[] }
 > = {
+  dinosaur: { cx: 0, cz: 0, rx: 76, rz: 61, kinds: ["pinecone", "pebble", "petal"] },
   island: { cx: 0, cz: 16, rx: 104, rz: 78, kinds: ["petal", "pinecone", "pebble"] },
   garden: { cx: 0, cz: 0, rx: 30, rz: 25, kinds: ["petal"] },
   home: { cx: 0, cz: 2, rx: 24, rz: 18, kinds: ["petal"] },

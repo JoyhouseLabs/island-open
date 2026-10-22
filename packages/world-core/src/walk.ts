@@ -1,5 +1,6 @@
 import type { SubSceneId } from "@island/contracts";
 import type { Point } from "./index.js";
+import { dinosaurPark, dinosaurWalkable } from "./dinosaur.js";
 import {
   groundHeight,
   homeFeatures,
@@ -59,6 +60,12 @@ function islandGateList(): Gate[] {
 }
 
 export const walkSpecs: Record<"island" | SubSceneId, WalkSpec> = {
+  dinosaur: {
+    spawn: { x: 0, z: 56 },
+    walkable: dinosaurWalkable,
+    height: () => 0,
+    gates: roomGate(dinosaurPark.gate.z),
+  },
   island: {
     spawn: { x: 0, z: 82 },
     // Walkable to the shoreline's wet-sand edge so the whole beach ring is

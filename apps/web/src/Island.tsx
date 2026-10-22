@@ -759,7 +759,7 @@ class Boundary extends Component<{ children: ReactNode }, { error: boolean }> {
   }
 }
 const labelPlaces = landmarks.filter((l) =>
-  ["home", "garden", "meadow", "nursery", "mountain", "cave"].includes(l.id),
+  ["home", "garden", "meadow", "nursery", "mountain", "cave", "dinosaur"].includes(l.id),
 );
 function LabelPositions({
   elements,

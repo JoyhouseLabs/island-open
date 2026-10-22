@@ -40,6 +40,28 @@ const entry = (landmark: string) => {
 };
 
 export const sceneConfig: Record<SubSceneId, SceneUI> = {
+  dinosaur: {
+    landmark: "dinosaur",
+    icon: Compass,
+    title: "恐龙公园",
+    short: "公园",
+    eyebrow: "A WALK THROUGH DEEP TIME",
+    tagline: ["沿着足迹，走进远古森林，", "再与今天的羽毛朋友相遇。"],
+    loading: "正在打开恐龙公园的林间入口…",
+    saveEyebrow: "YOUR PARK, YOUR DISCOVERIES",
+    saveTitle: "公园里的新发现",
+    noteCaption: "一条步道，四处发现",
+    noteBody: ["抬头看翼龙，低头找蛋巢，", "停下来等孔雀展开羽屏。"],
+    noteHint: "岩崖 · 林地 · 蛋巢 · 湿地",
+    hints: {
+      explore: "点击动物或打开公园导览 · 沿步道慢慢探索",
+      flower: "在栖息地外的空地种花",
+      tree: "在园区边缘种树",
+      bench: "在步道旁放一把观察长椅",
+    },
+    accent: "#66896b",
+    entry: entry("dinosaur"),
+  },
   garden: {
     landmark: "garden",
     icon: Flower2,

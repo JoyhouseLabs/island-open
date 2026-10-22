@@ -10,6 +10,7 @@ import {
 } from "./src/index.js";
 
 const minimumEntities: Record<SubSceneId, number> = {
+  dinosaur: 55,
   garden: 30,
   home: 25,
   meadow: 40,

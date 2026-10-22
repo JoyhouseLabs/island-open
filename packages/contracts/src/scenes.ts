@@ -18,6 +18,7 @@ export const subSceneIds = [
   "mountain",
   "starlight",
   "beach",
+  "dinosaur",
 ] as const;
 export type SubSceneId = (typeof subSceneIds)[number];
 export type SceneKind = "world" | "room" | "platform";
@@ -34,6 +35,7 @@ const roomNames: Record<SubSceneId, string> = {
   mountain: "听风山",
   starlight: "星光秘境",
   beach: "月牙沙滩",
+  dinosaur: "恐龙公园",
 };
 
 export const sceneRegistry = [

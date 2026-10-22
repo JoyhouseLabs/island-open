@@ -7,6 +7,7 @@ export {
   gardenGreenhouse,
 } from "./garden.js";
 export { pathDistance } from "./geom.js";
+export * from "./dinosaur.js";
 export { segmentDistance } from "./geom.js";
 import { segmentDistance } from "./geom.js";
 import { subScenes } from "./scenes.js";
@@ -88,6 +89,10 @@ export const buildings = [
   { id: "lab", name: "自然实验室", x: 72, z: 6, style: 2 },
 ] as const;
 export const landmarks = [
+  {
+    id: "dinosaur", name: "恐龙公园", x: 86, z: 56,
+    description: "沿环园步道寻找翼龙、迅猛龙、蛋巢与现代孔雀。",
+  },
   {
     id: "home",
     name: "家园聚落",

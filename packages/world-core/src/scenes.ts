@@ -7,6 +7,7 @@ import type { Point } from "./index.js";
 import { createGarden, gardenPlacementError } from "./garden.js";
 import { random } from "./random.js";
 import { pathDistance } from "./geom.js";
+import { createDinosaurPark, dinosaurPlacementError } from "./dinosaur.js";
 
 /** A walkable sub-scene: its own generator, placement rules and island entrance. */
 export interface SubSceneDef {
@@ -338,6 +339,10 @@ const beach: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 /* ------------------------------- the registry ----------------------------- */
 
 export const subScenes: Record<SubSceneId, SubSceneDef> = {
+  dinosaur: {
+    id: "dinosaur", landmark: "dinosaur", title: "恐龙公园",
+    create: createDinosaurPark, placementError: dinosaurPlacementError,
+  },
   garden: {
     id: "garden",
     landmark: "garden",

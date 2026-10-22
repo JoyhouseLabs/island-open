@@ -6,6 +6,7 @@ const loaders: Record<
   SubSceneId,
   () => Promise<{ default: ComponentType<SceneProps> }>
 > = {
+  dinosaur: () => import("./DinosaurScene"),
   garden: () => import("./GardenScene"),
   home: () => import("./HomeScene"),
   meadow: () => import("./MeadowScene"),
