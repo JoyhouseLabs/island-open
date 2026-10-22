@@ -1,9 +1,16 @@
+import {
+  registerTerrain,
+  forgetTerrain,
+  contactWithTerrain,
+} from "./terrain.js";
 import { PhysicsBehaviors } from "./behaviors.js";
 import { BlockChunks, isConstructionBlock } from "./block-chunks.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PhysicsCharacter } from "./character.js";
 import { collisionGroups } from "./groups.js";
 import {
+  terrainGeometry,
+  terrainHeightAt,
   physicsSceneSchema,
   physicsBudgets,
   physicsMaterials,
@@ -69,6 +76,18 @@ export class PhysicsRuntime {
   /** Individually simulated objects. Construction blocks are represented by blockChunks. */
   readonly bodies = new Map<string, RAPIER.RigidBody>();
   private blockChunks!: BlockChunks;
+  private terrainColliders: RAPIER.Collider[] = [];
+  get terrainStats() {
+    return {
+      colliders: this.terrainColliders.length,
+      triangles: this.scene.terrain.reduce(
+        (n, t) =>
+          n +
+          2 * (t.cells ? t.cells.filter(Boolean).length : t.columns * t.rows),
+        0,
+      ),
+    };
+  }
   get blockStats() {
     return this.blockChunks.stats();
   }
@@ -97,6 +116,27 @@ export class PhysicsRuntime {
       const definitions = new Map(
         this.scene.definitions.map((d) => [`${d.id}@${d.version}`, d]),
       );
+      for (const tile of this.scene.terrain) {
+        const mesh = terrainGeometry(tile),
+          material = physicsMaterials[tile.material];
+        const collider = this.world.createCollider(
+          RAPIER.ColliderDesc.trimesh(
+            mesh.positions,
+            mesh.indices,
+            RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES,
+          )
+            .setTranslation(tile.origin.x, tile.origin.y, tile.origin.z)
+            .setCollisionGroups(collisionGroups.fixed)
+            .setFriction(material.friction)
+            .setRestitution(material.restitution),
+        );
+        registerTerrain(this.world, collider, tile);
+        this.terrainColliders.push(collider);
+        this.colliderObjects.set(collider.handle, {
+          id: `terrain:${tile.id}`,
+          material: tile.material,
+        });
+      }
       const blocks: ObjectInstance[] = [];
       for (const instance of this.scene.objects) {
         const def = definitions.get(
@@ -467,12 +507,35 @@ export class PhysicsRuntime {
               throw new Error("物品与现有物体重叠，请换一个位置");
           }
         }
+        if (
+          this.scene.terrain.some((tile) => {
+            const height = terrainHeightAt(tile, p.x, p.z);
+            return height !== undefined && p.y < height - 0.02;
+          })
+        )
+          throw new Error("物品不能埋入地形下方");
+        for (const terrain of this.terrainColliders)
+          if (
+            (contactWithTerrain(
+              this.world,
+              terrain,
+              shape.shape,
+              shape.translation(),
+              shape.rotation(),
+            )?.distance ?? 0) < -0.02
+          )
+            throw new Error("物品与地形重叠，请调整高度");
         if (this.blockChunks.overlaps(shape, radius, excluding))
           throw new Error("物品与现有方块重叠，请换一个位置");
         for (const character of this.characters.values())
           if (
-            (shape.contactCollider(character.collider, 0)?.distance ?? 0) <
-            -0.005
+            (contactWithTerrain(
+              this.world,
+              shape,
+              character.collider.shape,
+              character.collider.translation(),
+              character.collider.rotation(),
+            )?.distance ?? 0) < -0.005
           )
             throw new Error("这里有人，请让开后再放置");
       }
@@ -501,12 +564,18 @@ export class PhysicsRuntime {
       .flatMap((body) =>
         Array.from({ length: body.numColliders() }, (_, i) => body.collider(i)),
       )
-      .concat(this.blockChunks.colliders());
+      .concat(this.blockChunks.colliders(), this.terrainColliders);
     for (const character of this.characters.values())
       for (const shape of shapes) {
         if (
           !shape.isSensor() &&
-          (shape.contactCollider(character.collider, 0)?.distance ?? 0) < -0.005
+          (contactWithTerrain(
+            this.world,
+            shape,
+            character.collider.shape,
+            character.collider.translation(),
+            character.collider.rotation(),
+          )?.distance ?? 0) < -0.005
         )
           throw new Error("导入布局会挡住正在场景中的人，请移到空地再试");
       }
@@ -605,6 +674,8 @@ export class PhysicsRuntime {
     this.characters.clear();
     this.disposed = true;
     this.blockChunks?.dispose();
+    this.terrainColliders = [];
+    forgetTerrain(this.world);
     this.bodies.clear();
     this.previous.clear();
     this.ccdThresholds.clear();

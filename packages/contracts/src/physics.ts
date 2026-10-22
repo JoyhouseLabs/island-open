@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { physicsTerrainSchema } from "./physics-terrain.js";
+export * from "./physics-terrain.js";
 
 export const PHYSICS_RULES_VERSION = "1.0.0" as const;
 export const physicsBudgets = Object.freeze({
@@ -299,6 +301,7 @@ export const physicsSceneSchema = z
       .array(physicsBehaviorLinkSchema)
       .max(physicsBudgets.behaviorLinks)
       .default([]),
+    terrain: physicsTerrainSchema.default([]),
     spawn: vector3Schema,
     bounds: z.object({ min: vector3Schema, max: vector3Schema }).strict(),
   })
@@ -315,6 +318,20 @@ export const physicsSceneSchema = z
         s.spawn[axis] > s.bounds.max[axis]
       )
         ctx.addIssue({ code: "custom", message: "出生点超出场景" });
+    }
+    for (const tile of s.terrain) {
+      if (
+        tile.origin.x < s.bounds.min.x ||
+        tile.origin.z < s.bounds.min.z ||
+        tile.origin.x + tile.columns * tile.step > s.bounds.max.x ||
+        tile.origin.z + tile.rows * tile.step > s.bounds.max.z ||
+        tile.heights.some(
+          (h) =>
+            tile.origin.y + h < s.bounds.min.y ||
+            tile.origin.y + h > s.bounds.max.y,
+        )
+      )
+        ctx.addIssue({ code: "custom", message: "地形超出场景边界" });
     }
     if (definitions.size !== s.definitions.length)
       ctx.addIssue({ code: "custom", message: "定义版本重复" });
@@ -362,7 +379,7 @@ export const physicsSceneSchema = z
       shopObjects = 0,
       lights = 0;
     let dynamic = 0,
-      staticParts = 0;
+      staticParts = s.terrain.length;
     for (const o of s.objects) {
       const d = definitions.get(`${o.definitionId}@${o.definitionVersion}`);
       if (!d) {

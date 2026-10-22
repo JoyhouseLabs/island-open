@@ -1,3 +1,4 @@
+import { contactWithTerrain } from "./terrain.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
   identityQuaternion,
@@ -92,8 +93,14 @@ function clear(
   runtime.world.colliders.forEach((c: RAPIER.Collider) => {
     if (c.handle === character.collider.handle || c.isSensor()) return;
     if (
-      (c.contactShape(shape, position, identityQuaternion, 0)?.distance ?? 0) <
-      -0.005
+      (contactWithTerrain(
+        runtime.world,
+        c,
+        shape,
+        position,
+        identityQuaternion,
+        0,
+      )?.distance ?? 0) < -0.005
     )
       free = false;
   });
@@ -166,7 +173,7 @@ function ground(
       best = {
         y: top - hit.timeOfImpact,
         normal: hit.normal.y,
-        fixed: !!c.parent()?.isFixed(),
+        fixed: !c.parent() || !!c.parent()?.isFixed(),
       };
   });
   return best as { y: number; normal: number; fixed: boolean } | null;

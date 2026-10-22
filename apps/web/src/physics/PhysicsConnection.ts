@@ -454,7 +454,13 @@ export class PhysicsConnection {
     return completion;
   }
   dispose() {
+    if (this.disposed) return;
     this.disposed = true;
+    this.status = "disconnected";
+    // A Canvas frame may run after route cleanup but before its own unmount.
+    // Revoke access before freeing WASM-backed bodies and controllers.
+    const prediction = this.prediction;
+    this.prediction = null;
     this.finishSave("连接已关闭，保存结果未确认");
     clearTimeout(this.retry);
     clearTimeout(this.saveTimer);
@@ -462,6 +468,6 @@ export class PhysicsConnection {
     clearInterval(this.leaseTimer);
     this.clearPending();
     this.socket?.close();
-    this.prediction?.dispose();
+    prediction?.dispose();
   }
 }

@@ -1,6 +1,5 @@
 import {
   physicsSceneSchema,
-  identityQuaternion,
   PHYSICS_RULES_VERSION,
   type PhysicsScene,
   type PhysicsSceneTemplateRef,
@@ -20,7 +19,7 @@ export const physicsSceneDefinitions = [
   {
     key: "building-yard",
     id: "core:building-yard",
-    version: 1,
+    version: 2,
     name: "建造庭院",
     description: "独立保存的开阔场地，组合自己的建筑和家具",
     environment: { sky: "#e6edf5", ambient: 1.3, sun: 2 },
@@ -51,35 +50,18 @@ export function createPhysicsScene(
       template: { id: d.id, version: d.version },
       spawn: { x: 0, y: 1, z: 7 },
       bounds: { min: { x: -24, y: -5, z: -20 }, max: { x: 24, y: 32, z: 20 } },
-      definitions: [
+      definitions: [],
+      objects: [],
+      terrain: [
         {
-          id: "core:yard-ground",
-          version: 1,
-          name: "庭院地面",
-          source: "official",
-          bodyType: "fixed",
+          id: "yard-ground",
+          origin: { x: -24, y: 0, z: -20 },
+          columns: 12,
+          rows: 10,
+          step: 4,
+          heights: Array(143).fill(0),
           material: "stone",
-          abilities: [],
-          parts: [
-            {
-              id: "ground",
-              shape: { kind: "box", halfExtents: { x: 24, y: 0.5, z: 20 } },
-              position: { x: 0, y: 0, z: 0 },
-              rotation: identityQuaternion,
-              color: "#b6b49d",
-              sensor: false,
-            },
-          ],
-        },
-      ],
-      objects: [
-        {
-          id: "00000000-0000-4000-8000-000000000101",
-          definitionId: "core:yard-ground",
-          definitionVersion: 1,
-          infrastructureKey: "ground",
-          position: { x: 0, y: -0.5, z: 0 },
-          rotation: identityQuaternion,
+          color: "#b6b49d",
         },
       ],
     });
@@ -105,10 +87,11 @@ export function assertSceneTemplate(scene: PhysicsScene): PhysicsScene {
   const same = (a: unknown, b: unknown) =>
     JSON.stringify(ordered(a)) === JSON.stringify(ordered(b));
   if (
+    !same(scene.terrain, template.terrain) ||
     !same(scene.bounds, template.bounds) ||
     !same(scene.spawn, template.spawn)
   )
-    throw new Error("场景边界与出生点不能更改");
+    throw new Error("场景地形、边界与出生点不能更改");
   const expected = template.objects.filter((o) => o.infrastructureKey),
     actual = scene.objects.filter((o) => o.infrastructureKey);
   if (expected.length !== actual.length) throw new Error("场景基础设施不完整");

@@ -1,3 +1,4 @@
+import { contactWithTerrain } from "./terrain.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import {
   identityQuaternion,
@@ -252,7 +253,14 @@ export class PhysicsBehaviors {
           }
         }
         // Also test the current pose: another door may itself be blocked this tick.
-        const next = c.contactShape(shape.shape, end, shape.rotation(), 0.001);
+        const next = contactWithTerrain(
+          this.runtime.world,
+          c,
+          shape.shape,
+          end,
+          shape.rotation(),
+          0.001,
+        );
         if (next && next.distance < -0.001) {
           blocked = true;
           return;
@@ -271,7 +279,9 @@ export class PhysicsBehaviors {
           false,
         );
         if (hit && hit.time_of_impact < 1 - 1e-3) {
-          const now = c.contactShape(
+          const now = contactWithTerrain(
+            this.runtime.world,
+            c,
             shape.shape,
             start,
             shape.rotation(),

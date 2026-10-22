@@ -1,3 +1,4 @@
+import { contactWithTerrain } from "./terrain.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Vector3, Quaternion } from "@island/contracts";
 import type { PhysicsCharacter } from "./character.js";
@@ -103,7 +104,14 @@ export class PhysicsGrab {
         part.rotation(),
         part.shape,
         (other: RAPIER.Collider) => {
-          const contact = other.contactCollider(part, 0);
+          const contact = contactWithTerrain(
+            this.world,
+            other,
+            part.shape,
+            part.translation(),
+            part.rotation(),
+            0,
+          );
           if (contact && contact.distance < -0.015) penetrating = true;
           return !penetrating;
         },

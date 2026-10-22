@@ -9,15 +9,15 @@ import {
 } from "./src/index.js";
 
 describe("versioned scene templates", () => {
-  it("keeps definition identity stable while each scene and infrastructure get new instance IDs", () => {
+  it("keeps template terrain stable while each scene gets a new identity", () => {
     const a = createPhysicsScene("building-yard", randomUUID),
       b = createPhysicsScene("building-yard", randomUUID);
     expect(a.id).not.toBe(b.id);
-    expect(a.objects[0]!.id).not.toBe(b.objects[0]!.id);
+    expect(a.terrain).toEqual(b.terrain);
     expect(a.definitions).toEqual(b.definitions);
     expect(assertSceneTemplate(a).template).toEqual({
       id: "core:building-yard",
-      version: 1,
+      version: 2,
     });
     // jsonb is free to reorder object fields; arrays retain their order.
     const reorder = (value: unknown): unknown =>
@@ -32,7 +32,7 @@ describe("versioned scene templates", () => {
           : value;
     expect(() => assertSceneTemplate(reorder(a) as typeof a)).not.toThrow();
     expect(() => createPhysicsScene("unknown")).toThrow("尚未开放");
-    a.template.version = 2;
+    a.template.version = 99;
     expect(() => assertSceneTemplate(a)).toThrow("版本");
   });
   it("rejects changed infrastructure, spawn, bounds, forged motion and duplicated roles", () => {
@@ -60,7 +60,7 @@ describe("versioned scene templates", () => {
         });
       },
     ]) {
-      const s = createPhysicsScene("building-yard");
+      const s = createPhysicsScene("playground");
       change(s);
       expect(() => assertSceneTemplate(s)).toThrow();
     }
@@ -70,8 +70,8 @@ describe("versioned scene templates", () => {
     s.objects[1]!.infrastructureKey = "ground";
     expect(physicsSceneSchema.safeParse(s).success).toBe(false);
   });
-  it("protects infrastructure by role and saves independently edited yard geometry", async () => {
-    const scene = createPhysicsScene("building-yard", randomUUID),
+  it("protects infrastructure by role and saves independently edited scene geometry", async () => {
+    const scene = createPhysicsScene("playground", randomUUID),
       epoch = randomUUID();
     const room = await PhysicsRoom.create(scene, epoch);
     try {
@@ -88,7 +88,7 @@ describe("versioned scene templates", () => {
         id: randomUUID(),
         definitionId: d.id,
         definitionVersion: 1,
-        position: { x: 18, y: 0.5, z: 7 },
+        position: { x: 10, y: 0.5, z: 7 },
         rotation: identityQuaternion,
       };
       expect(() =>
@@ -112,7 +112,7 @@ describe("versioned scene templates", () => {
         room.checkpoint(1),
       );
       try {
-        expect(restored.runtime.state(object.id).position.x).toBe(18);
+        expect(restored.runtime.state(object.id).position.x).toBe(10);
       } finally {
         restored.dispose();
       }

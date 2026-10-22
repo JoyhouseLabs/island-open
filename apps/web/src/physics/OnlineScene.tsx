@@ -11,6 +11,7 @@ import type {
 } from "@island/contracts";
 import { previewError, type PhysicsDraft } from "./PhysicsEditor";
 import { sceneDefinition } from "@island/physics-core";
+import { PhysicsTerrain } from "./PhysicsTerrain";
 import { PhysicsLight } from "./PhysicsLight";
 import { PhysicsPart } from "./PhysicsPart";
 import type { PhysicsConnection } from "./PhysicsConnection";
@@ -368,6 +369,13 @@ function Contents({
         shadow-camera-top={16}
         shadow-camera-bottom={-16}
       />
+      {scene.terrain.map((tile) => (
+        <PhysicsTerrain
+          key={tile.id}
+          tile={tile}
+          placeAt={draft ? placeAt : undefined}
+        />
+      ))}
       {scene.objects.map((object) => (
         <Body
           key={object.id}

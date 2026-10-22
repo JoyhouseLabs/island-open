@@ -96,12 +96,14 @@ export class PhysicsPrediction {
         scene.bounds,
         scene.physicsVersion,
         scene.template,
+        scene.terrain,
       ]) !==
         JSON.stringify([
           old.spawn,
           old.bounds,
           old.physicsVersion,
           old.template,
+          old.terrain,
         ])
     )
       return false;
