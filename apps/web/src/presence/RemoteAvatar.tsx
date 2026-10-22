@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import PresenceLabel from "./PresenceLabel";
 import type * as T from "three";
 import type { SubSceneId } from "@island/contracts";
 import { walkSpecs } from "@island/world-core";
@@ -81,19 +81,12 @@ export function RemoteAvatar({
   return (
     <group ref={root}>
       <AvatarMesh config={player.avatar as AvatarConfig} anim={anim.current} />
-      <Html
+      <PresenceLabel
         position={[0, 2.35, 0]}
-        center
-        zIndexRange={[20, 0]}
-        style={{ pointerEvents: "none" }}
-      >
-        <div className="name-tag">{player.name}</div>
-        {bubble?.phrase && (
-          <div key={bubble.at} className="bubble-chip">
-            {phraseLabel(bubble.phrase)}
-          </div>
-        )}
-      </Html>
+        name={player.name}
+        phrase={bubble?.phrase ? phraseLabel(bubble.phrase) : undefined}
+        stamp={bubble?.at}
+      />
       {bubble?.emote && <Emote kind={bubble.emote as EmoteKind} ageRef={emoteAge} y={2.6} />}
     </group>
   );

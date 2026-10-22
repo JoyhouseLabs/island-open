@@ -5,6 +5,7 @@ import {
   type WorldSnapshot,
   type InventoryState,
   type ItemDefinition,
+  type DeviceInstance,
 } from "@island/contracts";
 import type { useWorld } from "../useWorld";
 import { api } from "../api";
@@ -21,62 +22,117 @@ type Props = {
   onClose: () => void;
   onSelect?: (id: string) => void;
 };
+type DeviceDraft = { value: string; basePayload: string | null };
+function deviceText(d: DeviceInstance): string {
+  return d.payload.kind === "sign"
+    ? d.payload.lines.join("\n")
+    : d.payload.kind === "nameplate"
+      ? d.payload.name
+      : d.payload.kind === "displayCase"
+        ? (d.payload.itemRef?.itemId ?? "")
+        : "";
+}
+
 export default function DevicePanel(p: Props) {
+  // Scope async reads and unsaved input to one account, room and device.
+  const scope = `${p.room?.user?.id ?? p.userId ?? "local"}:${p.room?.record?.id ?? p.worldId ?? "local-library"}:${p.deviceId}`;
+  return <DeviceEditor key={scope} {...p} />;
+}
+
+function DeviceEditor(p: Props) {
   const snapshot = p.room?.snapshot ?? p.snapshot!,
     d = snapshot.devices?.find((d) => d.id === p.deviceId),
     worldId = p.room?.record?.id ?? p.worldId,
     readonly = !p.room || p.room.unsupported,
     userId = p.room?.user?.id ?? p.userId ?? "local",
     key = `device-text-v1:${userId}:${worldId ?? "local-library"}:${p.deviceId}`;
-  const [value, setValue] = useState(""),
+  const [draft, setDraft] = useState<DeviceDraft | null>(null),
+    [ready, setReady] = useState(false),
     [items, setItems] = useState<ItemDefinition[]>([]),
     [message, setMessage] = useState(""),
     [display, setDisplay] = useState("");
+  const payload = d ? JSON.stringify(d.payload) : "",
+    value = draft?.value ?? (d ? deviceText(d) : ""),
+    conflict = draft !== null && draft.basePayload !== payload;
   useEffect(() => {
-    if (!d) return;
-    const text =
-      d.payload.kind === "sign"
-        ? d.payload.lines.join("\n")
-        : d.payload.kind === "nameplate"
-          ? d.payload.name
-          : d.payload.kind === "displayCase"
-            ? (d.payload.itemRef?.itemId ?? "")
-            : "";
-    setValue(text);
-    if (!readonly)
-      void readDraft<string | null>(key)
-        .then((v) => {
-          if (typeof v === "string") {
-            setValue(v);
-            setMessage("已恢复本机未提交文字。");
-          }
-        })
-        .catch(() => setMessage("本机草稿暂不可用，请先复制文字。"));
-    if (d.payload.kind === "displayCase") {
+    let active = true;
+    if (readonly) {
+      setReady(true);
+      return;
+    }
+    void readDraft<DeviceDraft | string | null>(key)
+      .then((v) => {
+        if (!active) return;
+        // Legacy drafts did not record their editing baseline. Require an
+        // explicit comparison instead of assuming they match the cloud.
+        if (typeof v === "string" || (v && typeof v.value === "string")) {
+          setDraft(typeof v === "string" ? { value: v, basePayload: null } : v);
+          setMessage("已恢复本机未提交文字。");
+        }
+      })
+      .catch(() => {
+        if (active) setMessage("本机草稿暂不可用，请先复制文字。");
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [key, readonly]);
+  useEffect(() => {
+    let active = true;
+    setDisplay("");
+    if (d?.payload.kind === "displayCase") {
       if (!readonly)
         void Promise.all([
           api<{ items: ItemDefinition[] }>("/items"),
           api<InventoryState>("/inventory"),
         ])
-          .then(([catalog, inventory]) =>
-            setItems(
-              catalog.items.filter(
-                (i) =>
-                  inventory.owned[i.id] || (inventory.collected[i.id] ?? 0) > 0,
-              ),
-            ),
-          )
-          .catch((e) => setMessage(e.message));
+          .then(([catalog, inventory]) => {
+            if (active)
+              setItems(
+                catalog.items.filter(
+                  (i) =>
+                    inventory.owned[i.id] ||
+                    (inventory.collected[i.id] ?? 0) > 0,
+                ),
+              );
+          })
+          .catch((e) => {
+            if (active) setMessage(e.message);
+          });
       if (worldId)
         void api<{ name: string; available: boolean }>(
           `/worlds/${worldId}/devices/${d.id}?${p.token ? `t=${encodeURIComponent(p.token)}` : ""}`,
         )
-          .then((v) => setDisplay(v.available ? v.name : "展示物暂不可用"))
-          .catch(() => setDisplay("展示权限已失效。"));
+          .then((v) => {
+            if (active) setDisplay(v.available ? v.name : "展示物暂不可用");
+          })
+          .catch(() => {
+            if (active) setDisplay("展示权限已失效。");
+          });
     }
-  }, [p.deviceId, worldId]);
+    return () => {
+      active = false;
+    };
+  }, [p.deviceId, worldId, payload, readonly, p.token]);
+  const persistDraft = (next: DeviceDraft | null) => {
+    setDraft(next);
+    void writeDraft(key, next).catch(() =>
+      setMessage("本机草稿无法保存，请先复制文字。"),
+    );
+  };
+  const changeValue = (value: string) => {
+    persistDraft({
+      value,
+      basePayload: draft?.basePayload ?? (draft ? null : payload),
+    });
+    setMessage("文字已留在本机，点击保存修改后同步。");
+  };
   if (!d) return null;
   const save = () => {
+    if (readonly || !ready || conflict) return;
     const next =
       d.payload.kind === "sign"
         ? {
@@ -106,11 +162,23 @@ export default function DevicePanel(p: Props) {
       setMessage("文字太长：命名牌最多 20 字，告示每行最多 24 字。");
       return;
     }
-    p.room!.edit((w) => ({
-      ...w,
-      devices: w.devices?.map((x) => (x.id === d.id ? parsed.data : x)),
-    }));
-    void writeDraft(key, null).catch(() => {});
+    const applied = p.room!.edit((w) => {
+      const current = w.devices?.find((x) => x.id === d.id);
+      // The layout can advance between rendering this form and handling a
+      // click. Preserve its placement and check the payload again here.
+      if (!current || JSON.stringify(current.payload) !== payload) {
+        setMessage("装置已发生变化，本机输入已保留，请先查看当前内容。");
+        return w;
+      }
+      return {
+        ...w,
+        devices: w.devices?.map((x) =>
+          x.id === d.id ? { ...parsed.data, placement: x.placement } : x,
+        ),
+      };
+    });
+    if (!applied) return;
+    persistDraft(null);
     setMessage("修改已加入房间草稿，等待同步。");
   };
   return (
@@ -180,7 +248,8 @@ export default function DevicePanel(p: Props) {
                   选择背包已有物品
                   <select
                     value={value}
-                    onChange={(e) => setValue(e.target.value)}
+                    disabled={!ready}
+                    onChange={(e) => changeValue(e.target.value)}
                   >
                     <option value="">不展示</option>
                     {items.map((i) => (
@@ -198,16 +267,36 @@ export default function DevicePanel(p: Props) {
                   <textarea
                     value={value}
                     rows={4}
-                    onChange={(e) => {
-                      setValue(e.target.value);
-                      void writeDraft(key, e.target.value).catch(() =>
-                        setMessage("本机草稿无法保存，请先复制文字。"),
-                      );
-                    }}
+                    disabled={!ready}
+                    onChange={(e) => changeValue(e.target.value)}
                   />
                 </label>
               )}
-              <button className="primary-button" onClick={save}>
+              {conflict && (
+                <div role="alert">
+                  <p>
+                    其他设备已修改这个装置，或本机草稿缺少版本记录。本机输入已保留，请先比较当前内容。
+                  </p>
+                  <p className="plain-text">
+                    当前内容：{deviceText(d) || "空白"}
+                  </p>
+                  <button onClick={() => persistDraft(null)}>
+                    使用当前文字
+                  </button>
+                  <button
+                    onClick={() =>
+                      persistDraft({ value, basePayload: payload })
+                    }
+                  >
+                    以当前文字为基准继续编辑
+                  </button>
+                </div>
+              )}
+              <button
+                className="primary-button"
+                onClick={save}
+                disabled={!ready || conflict}
+              >
                 保存修改
               </button>
               {d.payload.kind === "displayCase" && (
