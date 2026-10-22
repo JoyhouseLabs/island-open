@@ -56,6 +56,7 @@ export class PhysicsRoom {
     id: string;
     scene: PhysicsScene;
     changedId: string;
+    replacement?: PhysicsRuntime;
   } | null = null;
   prepareEdit(
     id: string,
@@ -105,13 +106,70 @@ export class PhysicsRoom {
     this.prepared = { id, scene, changedId };
     return { scene, checkpoint };
   }
+  async prepareReplacement(
+    id: string,
+    expectedRevision: number,
+    scene: PhysicsScene,
+    checkpoint: unknown,
+  ) {
+    if (this.prepared)
+      throw new PhysicsRoomError("EDIT_CONFLICT", "另一项布置正在提交");
+    if (expectedRevision !== this.layoutRevision)
+      throw new PhysicsRoomError("STALE_LAYOUT", "布局已更新，请重新导入");
+    this.prepared = { id, scene, changedId: "" };
+    let candidate: PhysicsRuntime | undefined;
+    try {
+      candidate = await PhysicsRuntime.create(scene);
+      candidate.restore(checkpoint);
+      for (const [playerId, player] of this.players)
+        candidate.createCharacter(
+          playerId,
+          player.character.position(),
+          player.canInteract,
+        );
+      candidate.validateReplacement();
+      const next = physicsCheckpointSchema.parse({
+        ...this.checkpoint(0),
+        tick: candidate.tick,
+        states: candidate.states(),
+        layoutRevision: this.layoutRevision + 1,
+      });
+      this.prepared = { id, scene, changedId: "", replacement: candidate };
+      return { scene, checkpoint: next, backupCheckpoint: this.checkpoint(0) };
+    } catch (error) {
+      candidate?.dispose();
+      this.prepared = null;
+      throw error;
+    }
+  }
   abortEdit(id: string) {
-    if (this.prepared?.id === id) this.prepared = null;
+    if (this.prepared?.id === id) {
+      this.prepared.replacement?.dispose();
+      this.prepared = null;
+    }
   }
   commitEdit(id: string) {
     const pending = this.prepared;
     if (!pending || pending.id !== id)
       throw new PhysicsRoomError("EDIT_CONFLICT", "布置提交已失效");
+    if (pending.replacement) {
+      const old = this.runtime;
+      this.runtime = pending.replacement;
+      for (const [playerId, player] of this.players) {
+        player.grab.release();
+        // Validation capsules are replaced with the same position, zero velocity and cleared grab.
+        const position = player.character.position();
+        this.runtime.removeCharacter(playerId);
+        player.character = this.runtime.createCharacter(
+          playerId,
+          position,
+          player.canInteract,
+        );
+        player.grab = new PhysicsGrab(this.runtime.world, player.character);
+        player.inputTick = this.runtime.tick;
+      }
+      old.dispose();
+    }
     for (const player of this.players.values()) {
       if (player.grab.body === this.runtime.bodies.get(pending.changedId))
         player.grab.release();
@@ -123,14 +181,15 @@ export class PhysicsRoom {
         layoutRevision: this.layoutRevision + 1,
       };
     }
-    this.runtime.applyLayout(pending.scene, pending.changedId);
+    if (!pending.replacement)
+      this.runtime.applyLayout(pending.scene, pending.changedId);
     this.layoutRevision++;
     this.prepared = null;
     this.sentBodies.clear();
     return this.frame(true);
   }
   private constructor(
-    readonly runtime: PhysicsRuntime,
+    public runtime: PhysicsRuntime,
     readonly epoch: string,
     public layoutRevision: number,
   ) {}
@@ -378,6 +437,7 @@ export class PhysicsRoom {
     };
   }
   dispose() {
+    this.prepared?.replacement?.dispose();
     for (const id of [...this.players.keys()]) this.leave(id);
     this.runtime.dispose();
     this.sentBodies.clear();

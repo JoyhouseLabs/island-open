@@ -1,3 +1,4 @@
+import PhysicsTransfer from "./PhysicsTransfer";
 import PhysicsContent from "./PhysicsContent";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
@@ -283,6 +284,14 @@ export default function OnlinePhysics() {
                 selected={selected}
                 draft={draft}
                 setDraft={setDraft}
+                clearKeys={() => keys.clear()}
+              />
+            )}
+            {world?.owner && (
+              <PhysicsTransfer
+                key={`${user.id}:${conn.sceneId}`}
+                conn={conn}
+                userId={user.id}
                 clearKeys={() => keys.clear()}
               />
             )}

@@ -1,3 +1,4 @@
+import { createPlayground } from "./playground.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PhysicsCharacter } from "./character.js";
 import { collisionGroups } from "./groups.js";
@@ -447,6 +448,46 @@ export class PhysicsRuntime {
     } finally {
       this.world.removeRigidBody(temporary);
     }
+  }
+  /** Whole-layout import: check new geometry and every live capsule before atomic replacement. */
+  validateReplacement() {
+    const template = createPlayground();
+    for (const object of this.scene.objects) {
+      const definition = this.scene.definitions.find(
+        (d) =>
+          d.id === object.definitionId &&
+          d.version === object.definitionVersion,
+      )!;
+      const state = this.state(object.id);
+      // The authored ground and embedded ramp intentionally intersect. Only their exact template poses are exempt.
+      const base = template.objects.find(
+        (o) =>
+          o.definitionId === object.definitionId &&
+          ["core:floor", "core:ramp"].includes(o.definitionId),
+      );
+      const samePose =
+        base &&
+        JSON.stringify(base.position) === JSON.stringify(object.position) &&
+        JSON.stringify(base.rotation) === JSON.stringify(object.rotation);
+      if (!samePose)
+        this.validatePlacement(
+          { ...object, position: state.position, rotation: state.rotation },
+          definition,
+          object.id,
+        );
+    }
+    this.world.propagateModifiedBodyPositionsToColliders();
+    for (const character of this.characters.values())
+      for (const body of this.bodies.values())
+        for (let i = 0; i < body.numColliders(); i++) {
+          const shape = body.collider(i);
+          if (
+            !shape.isSensor() &&
+            (shape.contactCollider(character.collider, 0)?.distance ?? 0) <
+              -0.005
+          )
+            throw new Error("导入布局会挡住正在场景中的人，请移到空地再试");
+        }
   }
   /** Called only after durable commit, between simulation steps. Unchanged bodies keep velocity. */
   applyLayout(next: PhysicsScene, changedId: string) {

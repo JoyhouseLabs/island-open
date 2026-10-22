@@ -147,15 +147,17 @@ function Contents({
   );
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const target = event.target as HTMLElement;
       if (
-        (event.target as HTMLElement)?.closest(
-          "input,textarea,select,button,a,dialog",
+        target?.closest(
+          "input,textarea,select,dialog,[contenteditable=true]",
         ) ||
+        (key === " " && target?.closest("button,a")) ||
         conn.status !== "connected" ||
         conn.editing
       )
         return;
-      const key = event.key.toLowerCase();
       if (
         [
           "w",
