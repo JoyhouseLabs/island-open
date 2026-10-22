@@ -1,3 +1,4 @@
+import { homePath, visitPath, type PhysicsEntry } from "./routes";
 import DinosaurGuide, { type DinosaurFocus } from "./DinosaurGuide";
 import { dinosaurHabitats } from "@island/world-core";
 import { physicalThemeSpecs } from "@island/world-core";
@@ -6,7 +7,14 @@ import { snapBlockPosition } from "@island/physics-core";
 import PhysicsTransfer from "./PhysicsTransfer";
 import PhysicsContent from "./PhysicsContent";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useBlocker,
+  type To,
+} from "react-router";
 import type { AuthConfig, User } from "@island/contracts";
 import { api, RequestError } from "../api";
 import { PhysicsConnection } from "./PhysicsConnection";
@@ -28,13 +36,22 @@ interface World {
   shareToken?: string | null;
   scenes: Array<{ id: string; key: string; name: string; revision: number }>;
 }
-export default function OnlinePhysics() {
-  const { worldId } = useParams(),
+export default function OnlinePhysics({
+  entry,
+  scene,
+}: { entry?: PhysicsEntry; scene?: string } = {}) {
+  const route = useParams(),
     location = useLocation(),
     navigate = useNavigate();
   const params = new URLSearchParams(location.search);
+  const worldId =
+    entry === "home" ? (params.get("world") ?? undefined) : route.worldId;
   const token = params.get("t");
-  const sceneKey = params.get("scene") ?? "playground";
+  const sceneKey =
+    scene ??
+    (entry === "visit"
+      ? (route.scene ?? "island")
+      : (params.get("scene") ?? "playground"));
   const [sceneChoices, setSceneChoices] = useState<
     Array<{ key: string; name: string; description: string }>
   >([]);
@@ -114,24 +131,101 @@ export default function OnlinePhysics() {
     setError("");
     if (!user || !enabled) return;
     let cancelled = false;
-    const request = worldId
-      ? api<World>(
-          `/physics/worlds/${worldId}${token ? `?t=${encodeURIComponent(token)}` : ""}`,
-        ).then((value) => {
-          if (!cancelled) setWorld(value);
-        })
-      : api<{ items: Array<{ id: string; name: string }> }>(
-          "/physics/worlds",
-        ).then((value) => {
-          if (!cancelled) setItems(value.items);
-        });
+    const request =
+      entry === "home"
+        ? api<World>("/physics/home", {
+            method: "POST",
+            body: JSON.stringify(worldId ? { worldId } : {}),
+          }).then(async (value) => {
+            if (cancelled) return;
+            if (!worldId) {
+              navigate(homePath(value.id, sceneKey), { replace: true });
+              return;
+            }
+            if (!value.scenes.some((s) => s.key === sceneKey))
+              value = await api<World>(
+                `/physics/worlds/${value.id}/scenes/${encodeURIComponent(sceneKey)}`,
+                { method: "POST", body: "{}" },
+              );
+            if (!cancelled) setWorld(value);
+          })
+        : worldId
+          ? api<World>(
+              `/physics/worlds/${worldId}${token ? `?t=${encodeURIComponent(token)}` : ""}`,
+            ).then((value) => {
+              if (!cancelled) setWorld(value);
+            })
+          : api<{ items: Array<{ id: string; name: string }> }>(
+              "/physics/worlds",
+            ).then((value) => {
+              if (!cancelled) setItems(value.items);
+            });
     void request.catch((e) => {
       if (!cancelled) setError(e.message);
     });
     return () => {
       cancelled = true;
     };
-  }, [user, enabled, worldId, token]);
+  }, [
+    user,
+    enabled,
+    worldId,
+    token,
+    entry,
+    entry === "home" ? sceneKey : null,
+  ]);
+  const permitted = useRef(false);
+  const go = (to: To) => {
+    permitted.current = true;
+    navigate(to);
+  };
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (permitted.current) {
+      permitted.current = false;
+      return false;
+    }
+    return (
+      !!world?.owner &&
+      !!conn?.scene &&
+      (currentLocation.pathname !== nextLocation.pathname ||
+        currentLocation.search !== nextLocation.search)
+    );
+  });
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+    if (
+      !conn ||
+      busy ||
+      conn.editing ||
+      conn.editPending ||
+      conn.pending ||
+      overlayOpen
+    ) {
+      setError("请先完成当前操作，再离开场景");
+      blocker.reset();
+      return;
+    }
+    let active = true;
+    keys.clear();
+    setError("");
+    setBusy(true);
+    void (async () => {
+      await conn.saveBeforeLeave();
+      if (active) blocker.proceed();
+    })()
+      .catch((e) => {
+        if (active) {
+          setError(e.message);
+          blocker.reset();
+        }
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [blocker, conn]);
   const switchGeneration = useRef(0);
   useEffect(() => {
     setBusy(false);
@@ -184,7 +278,13 @@ export default function OnlinePhysics() {
       }
       const next = new URLSearchParams(location.search);
       next.set("scene", key);
-      navigate({ pathname: location.pathname, search: next.toString() });
+      go(
+        entry === "home"
+          ? homePath(world.id, key)
+          : entry === "visit"
+            ? visitPath(world.id, key, token)
+            : { pathname: location.pathname, search: next.toString() },
+      );
     } catch (e) {
       if (generation === switchGeneration.current)
         setError((e as Error).message);
@@ -217,14 +317,14 @@ export default function OnlinePhysics() {
       if (generation !== switchGeneration.current) return;
       rememberReturn(
         {
-          destination: "physics",
+          destination: entry ? "physics-home" : "physics",
           worldId: world.id,
           scene: "library",
           position: null,
         },
         user.id,
       );
-      navigate("/learn");
+      go("/learn");
     } catch (e) {
       if (generation === switchGeneration.current)
         setError((e as Error).message);
@@ -248,15 +348,45 @@ export default function OnlinePhysics() {
       setBusy(false);
     }
   }
+  async function logout() {
+    if (
+      busy ||
+      conn?.editing ||
+      conn?.editPending ||
+      conn?.pending ||
+      overlayOpen
+    )
+      return;
+    setBusy(true);
+    setError("");
+    keys.clear();
+    try {
+      if (world?.owner && conn?.status === "connected")
+        await conn.saveBeforeLeave();
+      await api("/auth/logout", { method: "POST", body: "{}" });
+      setUser(null);
+      setWorld(null);
+      setItems([]);
+      if (entry === "home") go("/island");
+      else if (!entry && worldId) go("/physics/online");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "退出失败，请重试");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function create() {
     setBusy(true);
     setError("");
     try {
       const value = await api<World>("/physics/worlds", {
         method: "POST",
-        body: JSON.stringify({ id: crypto.randomUUID(), name: "我的物理世界" }),
+        body: JSON.stringify({
+          id: crypto.randomUUID(),
+          name: entry ? "我的家园" : "我的物理世界",
+        }),
       });
-      navigate(`/physics/online/${value.id}`);
+      navigate(entry ? homePath(value.id) : `/physics/online/${value.id}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -292,7 +422,7 @@ export default function OnlinePhysics() {
     }
   }
   const shareUrl = world?.shareToken
-    ? `${window.location.origin}/physics/online/${world.id}?t=${world.shareToken}&scene=${encodeURIComponent(sceneKey)}`
+    ? `${window.location.origin}${entry ? visitPath(world.id, sceneKey, world.shareToken) : `/physics/online/${world.id}?t=${world.shareToken}&scene=${encodeURIComponent(sceneKey)}`}`
     : "";
   const connected = conn?.status === "connected",
     canInteract = connected && !conn?.editing && !!conn?.me?.canInteract;
@@ -300,13 +430,28 @@ export default function OnlinePhysics() {
     <main
       className={`physics-playground ${world ? "physics-has-scenes" : ""} ${conn?.scene ? "" : "physics-lobby"}`}
     >
-      <header className="physics-header" inert={overlayOpen}>
-        <Link to="/physics/online">← 我的世界</Link>
+      <header className="physics-header" inert={busy || overlayOpen}>
+        <Link to={entry ? "/worlds" : "/physics/online"}>← 我的世界</Link>
         <div>
-          <h1>{world?.name ?? "在线物理世界"}</h1>
+          <h1>{world?.name ?? (entry ? "我的家园" : "在线物理世界")}</h1>
           <p>{conn?.scene?.name ?? "一起布置、搬动和探索"}</p>
         </div>
-        <Link to="/physics">本地试验</Link>
+        {entry ? (
+          <Link to="/island">回我的岛</Link>
+        ) : (
+          <Link to="/physics">本地试验</Link>
+        )}
+        {user && (
+          <button
+            className="physics-sound"
+            disabled={
+              busy || !!conn?.editing || !!conn?.editPending || !!conn?.pending
+            }
+            onClick={() => void logout()}
+          >
+            退出登录
+          </button>
+        )}
       </header>
       {world && (
         <nav
@@ -378,15 +523,20 @@ export default function OnlinePhysics() {
             以访客身份进入
           </button>
         </section>
+      ) : !worldId && entry === "home" ? (
+        <p role="status">正在准备你的家园…</p>
       ) : !worldId ? (
         <section className="physics-login">
           <h2>我的新世界</h2>
           <p>新世界使用在线物理规则，每五秒保存一次，离开时补存。</p>
           <button disabled={busy} onClick={() => void create()}>
-            创建物理世界
+            {entry ? "创建新家园" : "创建物理世界"}
           </button>
           {items.map((item) => (
-            <Link key={item.id} to={`/physics/online/${item.id}`}>
+            <Link
+              key={item.id}
+              to={entry ? homePath(item.id) : `/physics/online/${item.id}`}
+            >
               {item.name} →
             </Link>
           ))}

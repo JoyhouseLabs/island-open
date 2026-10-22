@@ -95,7 +95,7 @@ export type LearnerStep =
 export type LessonView = Omit<Lesson, "steps"> & { steps: LearnerStep[] };
 export const learningReturnSchema = z
   .object({
-    destination: z.literal("physics").optional(),
+    destination: z.enum(["physics", "physics-home"]).optional(),
     worldId: z.string().uuid().nullable().default(null),
     scene: z.enum(sceneIds).default("island"),
     position: z
@@ -111,8 +111,7 @@ export const learningReturnSchema = z
   .strict()
   .refine(
     (context) =>
-      context.destination !== "physics" ||
-      (!!context.worldId && context.position === null),
+      !context.destination || (!!context.worldId && context.position === null),
     "物理场景返回需要世界编号，并从安全出生点进入",
   );
 export type LearningReturn = z.infer<typeof learningReturnSchema>;

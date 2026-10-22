@@ -7,10 +7,12 @@ const roomPaths = Object.fromEntries(
 ) as Record<SubSceneId, string>;
 
 // Only implemented scenes are routable. New modules get their own page and path.
-export const paths: { island: string; books: string; studio: string; wilderness: string } & Record<
-  SubSceneId,
-  string
-> = {
+export const paths: {
+  island: string;
+  books: string;
+  studio: string;
+  wilderness: string;
+} & Record<SubSceneId, string> = {
   island: "/island",
   wilderness: "/dinosaur/explore",
   books: "/books",
@@ -20,6 +22,9 @@ export const paths: { island: string; books: string; studio: string; wilderness:
 
 export const pageTitles: Record<string, string> = {
   "/physics": "物理游乐场 · 心灵家园",
+  "/worlds": "我的世界 · 心灵家园",
+  "/playground": "物理游乐场 · 心灵家园",
+  "/building-yard": "建造庭院 · 心灵家园",
   [paths.wilderness]: "外围探索 · 心灵家园",
   [paths.books]: "共读书架 · 心灵家园",
   [paths.studio]: "AI 工坊 · 心灵家园",
@@ -31,8 +36,5 @@ for (const scene of sceneRegistry)
 /** Read-only visit links (param routes cannot be literal keys above). */
 export const visitIslandPath = (worldId: string, t: string) =>
   `/visit/${worldId}?t=${encodeURIComponent(t)}`;
-export const visitScenePath = (
-  worldId: string,
-  scene: SubSceneId,
-  t: string,
-) => `/visit/${worldId}/${scene}?t=${encodeURIComponent(t)}`;
+export const visitScenePath = (worldId: string, scene: SubSceneId, t: string) =>
+  `/visit/${worldId}/${scene}?t=${encodeURIComponent(t)}`;

@@ -34,7 +34,8 @@ export default function LearningPlayer() {
   const exit = () => {
     if (session) {
       learningTravel.pending =
-        session.returnContext.destination === "physics"
+        session.returnContext.destination === "physics" ||
+        session.returnContext.destination === "physics-home"
           ? null
           : session.returnContext;
       void navigate(returnUrl(session.returnContext));

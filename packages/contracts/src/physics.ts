@@ -622,6 +622,10 @@ export const physicsFrameSchema = z
 export type PhysicsPlayerState = z.infer<typeof physicsPlayerStateSchema>;
 export type PhysicsFrame = z.infer<typeof physicsFrameSchema>;
 
+export const selectPhysicsHomeSchema = z
+  .object({ worldId: z.string().uuid().optional() })
+  .strict();
+
 export const createPhysicsWorldSchema = z
   .object({
     id: z.string().uuid(),

@@ -1,5 +1,21 @@
-import { Component, lazy, Suspense, useEffect, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useLocation } from "react-router";
+import { api } from "./api";
+import { physicalRoutes } from "./physics/routes";
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  Outlet,
+} from "react-router";
 import { subSceneIds } from "@island/contracts";
 import { pageTitles, paths } from "./routes";
 const HomeSession = lazy(() => import("./HomeSession"));
@@ -81,6 +97,30 @@ class PageBoundary extends Component<
 }
 export default function App() {
   const location = useLocation();
+  const [physical, setPhysical] = useState<boolean | null>(null);
+  const [runtimeError, setRuntimeError] = useState("");
+  const worldPath =
+    physicalRoutes.some(
+      (key) => location.pathname.replace(/\/+$/, "") === `/${key}`,
+    ) ||
+    location.pathname.startsWith("/visit/") ||
+    location.pathname === "/worlds" ||
+    location.pathname === "/";
+  useEffect(() => {
+    let alive = true;
+    void api<{ enabled: boolean }>("/physics/config")
+      .then((c) => {
+        if (typeof c.enabled !== "boolean")
+          throw new Error("无法确认家园服务状态，请重新连接");
+        if (alive) setPhysical(c.enabled);
+      })
+      .catch((e) => {
+        if (alive) setRuntimeError(e.message);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   // After a pointer click, buttons give up focus: otherwise Space (jump,
   // talk, enter doorway) would re-trigger the last-clicked button instead.
   useEffect(() => {
@@ -94,10 +134,12 @@ export default function App() {
   useEffect(() => {
     document.title = location.pathname.startsWith("/visit/")
       ? "朋友的家园 · 心灵家园"
-      : location.pathname.startsWith("/learn") ? "学习中心 · 心灵家园"
-      : location.pathname.startsWith("/physics/online") ? "在线物理世界 · 心灵家园"
-      : (pageTitles[location.pathname.replace(/\/+$/, "")] ??
-        "页面未找到 · 心灵家园");
+      : location.pathname.startsWith("/learn")
+        ? "学习中心 · 心灵家园"
+        : location.pathname.startsWith("/physics/online")
+          ? "在线物理世界 · 心灵家园"
+          : (pageTitles[location.pathname.replace(/\/+$/, "")] ??
+            "页面未找到 · 心灵家园");
     // A fresh mount means the last reload (if any) succeeded.
     try {
       sessionStorage.removeItem("island-page-reload");
@@ -105,10 +147,26 @@ export default function App() {
       /* Ignore private-browsing failures. */
     }
   }, [location.pathname]);
+  if (worldPath && physical === null)
+    return (
+      <div className="scene-loading" role={runtimeError ? "alert" : "status"}>
+        <p>{runtimeError || "正在连接家园…"}</p>
+        {runtimeError && (
+          <button onClick={() => window.location.reload()}>重新连接</button>
+        )}
+      </div>
+    );
   return (
     <PageBoundary path={location.pathname}>
-      {/* One chat panel for every mode: host or visitor, any scene. */}
-      {!location.pathname.startsWith("/learn") && !location.pathname.startsWith("/physics") && location.pathname.replace(/\/+$/, "") !== paths.wilderness && <Suspense fallback={null}><GameChrome /></Suspense>}
+      {/* Legacy overlays remain on routes whose activities still await migration. */}
+      {!(physical && worldPath) &&
+        !location.pathname.startsWith("/learn") &&
+        !location.pathname.startsWith("/physics") &&
+        location.pathname.replace(/\/+$/, "") !== paths.wilderness && (
+          <Suspense fallback={null}>
+            <GameChrome />
+          </Suspense>
+        )}
       <Suspense
         fallback={
           <div className="scene-loading" role="status">
@@ -124,34 +182,80 @@ export default function App() {
           <Route path="/" element={<Navigate to={paths.island} replace />} />
           <Route element={<LearningLayout />}>
             <Route path="/learn/programs" element={<TrainingCenter />} />
-            <Route path="/learn/programs/:programId" element={<TrainingCenter />} />
+            <Route
+              path="/learn/programs/:programId"
+              element={<TrainingCenter />}
+            />
             <Route path="/learn/plans/:planId" element={<TrainingPlan />} />
             <Route path="/learn/reports/:planId" element={<TrainingPlan />} />
-            <Route path="/learn/attempts/:attemptId" element={<TrainingPlayer />} />
+            <Route
+              path="/learn/attempts/:attemptId"
+              element={<TrainingPlayer />}
+            />
             <Route path="/learn" element={<LearningHome />} />
             <Route path="/learn/lessons/:lessonId" element={<LearningHome />} />
-            <Route path="/learn/sessions/:sessionId" element={<LearningPlayer />} />
+            <Route
+              path="/learn/sessions/:sessionId"
+              element={<LearningPlayer />}
+            />
           </Route>
-          <Route element={<HomeSession />}>
-            <Route path={paths.island} element={<IslandPage />} />
-            <Route path={paths.wilderness} element={<WildernessPage />} />
+          <Route path="/worlds" element={<OnlinePhysics entry="lobby" />} />
+          <Route
+            path="/playground"
+            element={<OnlinePhysics entry="home" scene="playground" />}
+          />
+          <Route
+            path="/building-yard"
+            element={<OnlinePhysics entry="home" scene="building-yard" />}
+          />
+          <Route element={physical ? <Outlet /> : <HomeSession />}>
+            <Route
+              path={paths.island}
+              element={
+                physical ? (
+                  <OnlinePhysics entry="home" scene="island" />
+                ) : (
+                  <IslandPage />
+                )
+              }
+            />
             {subSceneIds.map((scene) => (
               <Route
                 key={scene}
                 path={paths[scene]}
-                element={<SubScenePage scene={scene} />}
+                element={
+                  physical ? (
+                    <OnlinePhysics entry="home" scene={scene} />
+                  ) : (
+                    <SubScenePage scene={scene} />
+                  )
+                }
               />
             ))}
+          </Route>
+          <Route element={<HomeSession />}>
+            <Route path={paths.wilderness} element={<WildernessPage />} />
             <Route path="/place/:sceneId" element={<PlacePage />} />
             <Route path="/books" element={<BooksPage />} />
             <Route path="/books/:bookId" element={<BookReaderPage />} />
             <Route path="/studio" element={<StudioPage />} />
           </Route>
-          <Route element={<VisitSession />}>
-            <Route path="/visit/:worldId" element={<VisitIslandPage />} />
+          <Route element={physical ? <Outlet /> : <VisitSession />}>
+            <Route
+              path="/visit/:worldId"
+              element={
+                physical ? (
+                  <OnlinePhysics entry="visit" scene="island" />
+                ) : (
+                  <VisitIslandPage />
+                )
+              }
+            />
             <Route
               path="/visit/:worldId/:scene"
-              element={<VisitScenePage />}
+              element={
+                physical ? <OnlinePhysics entry="visit" /> : <VisitScenePage />
+              }
             />
           </Route>
           <Route
