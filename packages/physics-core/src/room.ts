@@ -85,7 +85,11 @@ export class PhysicsRoom {
         "EDIT_CONFLICT",
         "有人坐在这件家具上，请先起身",
       );
-    if (operation.type === "place" || operation.type === "move") {
+    if (
+      operation.type === "place" ||
+      operation.type === "move" ||
+      operation.type === "grow"
+    ) {
       if (
         [...this.players.keys()].some(
           (id) => this.playerState(id).held === changedId,
@@ -101,7 +105,7 @@ export class PhysicsRoom {
       this.runtime.validatePlacement(
         object,
         def,
-        operation.type === "move" ? changedId : undefined,
+        operation.type !== "place" ? changedId : undefined,
       );
     }
     const checkpoint = this.checkpoint(0);

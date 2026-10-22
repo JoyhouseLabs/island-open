@@ -7,11 +7,28 @@ import {
 import {
   createIslandPhysicsScene,
   createLibraryPhysicsScene,
+  createGardenPhysicsScene,
 } from "@island/world-core";
 import { createPlayground } from "./playground.js";
 
 /** Registered, versioned scene identities. Each template owns its canonical infrastructure. */
 export const physicsSceneDefinitions = [
+  {
+    key: "garden",
+    id: "core:garden",
+    version: 1,
+    name: "私家花园",
+    description: "种花、育树，围坐茶桌与睡莲池",
+    environment: { sky: "#dce7d4", ambient: 1.3, sun: 2 },
+  },
+  {
+    key: "nursery",
+    id: "core:nursery",
+    version: 1,
+    name: "实验种植园",
+    description: "在温室与苗床里培育自己的植物",
+    environment: { sky: "#dce8d7", ambient: 1.3, sun: 2 },
+  },
   {
     key: "library",
     id: "core:library",
@@ -61,6 +78,8 @@ export function createPhysicsScene(
   if (!d) throw new Error("这个场景尚未开放");
   let scene: PhysicsScene;
   if (d.key === "playground") scene = createPlayground();
+  else if (d.key === "garden" || d.key === "nursery")
+    scene = createGardenPhysicsScene(d.key);
   else if (d.key === "library") scene = createLibraryPhysicsScene();
   else if (d.key === "island") scene = createIslandPhysicsScene();
   else

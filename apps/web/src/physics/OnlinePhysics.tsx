@@ -386,7 +386,8 @@ export default function OnlinePhysics() {
               }}
               draft={conn.editing ? draft : null}
               placeAt={(point, normal) => {
-                if (!draft || !conn.editing || conn.editPending) return;
+                if (!draft || draft.growth || !conn.editing || conn.editPending)
+                  return;
                 setDraft({
                   ...draft,
                   object: {
@@ -413,6 +414,20 @@ export default function OnlinePhysics() {
             </div>
           </section>
           <section className="physics-controls" inert={busy || !!reading}>
+            {["core:garden", "core:nursery"].includes(
+              conn.scene.template.id,
+            ) && (
+              <section
+                className="physics-library-activities"
+                aria-label="种植活动"
+              >
+                <strong>培育自己的小花园</strong>
+                <span>在「布置家园」选择橡树或雏菊，点击地面或苗床种下。</span>
+                <small>
+                  选中植物后可预览生长。周围空间足够时，确认进入下一阶段；成熟后仍可移动或收起。
+                </small>
+              </section>
+            )}
             {conn.scene.template.id === "core:library" && (
               <section
                 className="physics-library-activities"
@@ -528,7 +543,8 @@ export default function OnlinePhysics() {
                             a === "switch" ||
                             a === "pressure" ||
                             a === "door" ||
-                            a === "light",
+                            a === "light" ||
+                            a === "grow",
                         ),
                   )
                   .map((object) => (

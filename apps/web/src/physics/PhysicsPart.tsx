@@ -64,9 +64,15 @@ export function PhysicsPart({
         roughness={0.75}
         emissive={glow ?? (selected ? "#9a5a13" : "#000000")}
         emissiveIntensity={glow ? 0.8 : 0.3}
-        transparent={part.sensor || !!ghost}
-        opacity={part.sensor || ghost ? 0.25 : 1}
-        depthWrite={!ghost}
+        transparent={
+          part.sensor ||
+          !!ghost ||
+          (part.opacity !== undefined && part.opacity < 1)
+        }
+        opacity={ghost ? 0.25 : (part.opacity ?? (part.sensor ? 0.25 : 1))}
+        depthWrite={
+          !ghost && (part.opacity === undefined || part.opacity === 1)
+        }
       />
     </mesh>
   );

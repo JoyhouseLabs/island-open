@@ -1,3 +1,4 @@
+import { physicsPlantingError } from "@island/world-core";
 import {
   registerTerrain,
   forgetTerrain,
@@ -451,6 +452,12 @@ export class PhysicsRuntime {
     definition: ObjectDefinition,
     excluding?: string,
   ) {
+    const plantingError = physicsPlantingError(
+      this.scene,
+      instance,
+      definition,
+    );
+    if (plantingError) throw new Error(plantingError);
     const temporary = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed()
         .setTranslation(

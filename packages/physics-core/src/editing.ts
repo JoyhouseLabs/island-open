@@ -1,7 +1,8 @@
-import { libraryBookDefinition } from "@island/world-core";
+import { libraryBookDefinition, physicsPlants } from "@island/world-core";
 import { officialBehaviorObjects } from "./behaviors.js";
 import {
   physicsSceneSchema,
+  objectDefinitionSchema,
   identityQuaternion,
   type ObjectDefinition,
   type PhysicsLayoutOperation,
@@ -23,6 +24,7 @@ export function officialPhysicsObjects(): ObjectDefinition[] {
     ...definitions,
     ...officialBehaviorObjects(),
     libraryBookDefinition(),
+    ...physicsPlants(),
     ...(["sign", "bookshelf"] as const).map((kind): ObjectDefinition => ({
       id: `core:${kind}`,
       version: 1,
@@ -126,6 +128,19 @@ export function editedPhysicsScene(
   definition?: ObjectDefinition,
 ): PhysicsScene {
   const next = structuredClone(scene);
+  const register = (value: ObjectDefinition) => {
+    const canonical = objectDefinitionSchema.parse(value);
+    const existing = next.definitions.find(
+      (d) => d.id === canonical.id && d.version === canonical.version,
+    );
+    if (
+      existing &&
+      JSON.stringify(objectDefinitionSchema.parse(existing)) !==
+        JSON.stringify(canonical)
+    )
+      throw new Error("物品定义版本不一致");
+    if (!existing) next.definitions.push(canonical);
+  };
   if (operation.type === "link") {
     next.links.push(operation.link);
   } else if (operation.type === "unlink") {
@@ -144,12 +159,7 @@ export function editedPhysicsScene(
       throw new Error("找不到物品定义版本");
     if (object.infrastructureKey) throw new Error("不能自行添加场景基础设施");
     if (object.motion) throw new Error("不能自行配置运动轨迹");
-    const existing = next.definitions.find(
-      (d) => d.id === definition.id && d.version === definition.version,
-    );
-    if (existing && JSON.stringify(existing) !== JSON.stringify(definition))
-      throw new Error("物品定义版本不一致");
-    if (!existing) next.definitions.push(definition);
+    register(definition);
     next.objects.push(object);
   } else {
     const object = next.objects.find((o) => o.id === operation.objectId);
@@ -160,6 +170,28 @@ export function editedPhysicsScene(
       next.links = next.links.filter(
         (l) => l.from.objectId !== object.id && l.to.objectId !== object.id,
       );
+    } else if (operation.type === "grow") {
+      const current = next.definitions.find(
+        (d) =>
+          d.id === object.definitionId &&
+          d.version === object.definitionVersion,
+      )!;
+      const target = current.plant?.next;
+      const grown =
+        target &&
+        officialPhysicsObjects().find(
+          (d) => d.id === target.id && d.version === target.version,
+        );
+      if (
+        !current.abilities.includes("grow") ||
+        !grown ||
+        grown.plant?.species !== current.plant?.species ||
+        grown.plant!.stage !== current.plant!.stage + 1
+      )
+        throw new Error("这株植物已成熟或不能继续生长");
+      register(grown);
+      object.definitionId = grown.id;
+      object.definitionVersion = grown.version;
     } else if (operation.type === "content") {
       const definition = next.definitions.find(
         (d) =>

@@ -1,3 +1,5 @@
+import { nurseryFeatures } from "./garden-geography.js";
+export { nurseryFeatures } from "./garden-geography.js";
 import type {
   IslandEntity,
   SubSceneId,
@@ -227,12 +229,6 @@ const lab: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 
 /* -------------------------------- nursery -------------------------------- */
 
-export const nurseryFeatures = {
-  gate: 30,
-  greenhouse: { x: 0, z: -14, w: 30, d: 12 },
-  beds: [-30, -18, -6, 6, 18, 30].flatMap((x) => [{ x, z: 6 }, { x, z: 14 }]),
-  barrel: { x: -36, z: -2 },
-} as const;
 const nursery: Rule = (p, entities = [], ignoreId, kind = "tree") => {
   if (Math.abs(p.x) > 42 || Math.abs(p.z) > 34) return "请在种植园内布置。";
   if (

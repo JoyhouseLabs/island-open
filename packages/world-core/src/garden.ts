@@ -1,11 +1,16 @@
 import type { IslandEntity, WorldSnapshot } from "@island/contracts";
 import { random } from "./random.js";
 
-export const gardenPond = { x: 23, z: -10, rx: 9, rz: 7 };
-export const gardenGreenhouse = { x: -22, z: -23, w: 18, d: 12 };
-export const gardenBeds = [-18, 18].flatMap((x) =>
-  [8, 21].map((z) => ({ x, z, w: 19, d: 8 })),
-);
+import {
+  gardenPond,
+  gardenGreenhouse,
+  gardenBeds,
+} from "./garden-geography.js";
+export {
+  gardenPond,
+  gardenGreenhouse,
+  gardenBeds,
+} from "./garden-geography.js";
 export const gardenHeight = (_x: number, _z: number) => 0;
 export function gardenPlacementError(
   p: { x: number; z: number },

@@ -17,6 +17,7 @@ export interface PhysicsDraft {
   definition: ObjectDefinition;
   object: ObjectInstance;
   existing: boolean;
+  growth?: boolean;
 }
 export function bottomOf(definition: ObjectDefinition) {
   return physicsPartsBounds(definition.parts.filter((p) => !p.sensor)).min.y;
@@ -142,6 +143,17 @@ export default function PhysicsEditor({
     });
   }
   const selectedObject = conn.scene?.objects.find((o) => o.id === selected);
+  const selectedDefinition = conn.scene?.definitions.find(
+    (d) =>
+      d.id === selectedObject?.definitionId &&
+      d.version === selectedObject?.definitionVersion,
+  );
+  const nextStage = selectedDefinition?.plant?.next;
+  const grownDefinition =
+    nextStage &&
+    catalog.items.find(
+      (d) => d.id === nextStage.id && d.version === nextStage.version,
+    );
   const editable = selectedObject && !selectedObject.infrastructureKey;
   const invalid = previewError(conn, draft);
   const blocked = conn.editBusy || !!conn.editPending;
@@ -172,14 +184,16 @@ export default function PhysicsEditor({
   function submit() {
     if (!draft) return;
     conn.edit(
-      draft.existing
-        ? {
-            type: "move",
-            objectId: draft.object.id,
-            position: draft.object.position,
-            rotation: draft.object.rotation,
-          }
-        : { type: "place", object: draft.object },
+      draft.growth
+        ? { type: "grow", objectId: draft.object.id }
+        : draft.existing
+          ? {
+              type: "move",
+              objectId: draft.object.id,
+              position: draft.object.position,
+              rotation: draft.object.rotation,
+            }
+          : { type: "place", object: draft.object },
     );
     setSubmittedId(conn.editPending?.commandId ?? null);
   }
@@ -309,6 +323,26 @@ export default function PhysicsEditor({
             >
               预览新物品
             </button>
+            {selectedDefinition?.plant && (
+              <button
+                disabled={blocked || !editable || !grownDefinition}
+                onClick={() => {
+                  if (selectedObject && grownDefinition)
+                    setDraft({
+                      definition: grownDefinition,
+                      object: {
+                        ...selectedObject,
+                        definitionId: grownDefinition.id,
+                        definitionVersion: grownDefinition.version,
+                      },
+                      existing: true,
+                      growth: true,
+                    });
+                }}
+              >
+                {grownDefinition ? "预览生长" : "已经成熟"}
+              </button>
+            )}
             <button disabled={blocked || !editable} onClick={move}>
               移动所选
             </button>
@@ -338,13 +372,13 @@ export default function PhysicsEditor({
                       type="number"
                       step={draft.definition.id === "core:block" ? "1" : "0.25"}
                       value={draft.object.position[axis]}
-                      disabled={blocked}
+                      disabled={blocked || draft.growth}
                       onChange={(e) => coordinate(axis, e.target.value)}
                     />
                   </label>
                 ))}
                 <button
-                  disabled={blocked}
+                  disabled={blocked || draft.growth}
                   onClick={() => {
                     const q = draft.object.rotation,
                       c = Math.SQRT1_2;
@@ -370,7 +404,7 @@ export default function PhysicsEditor({
               </p>
               <div className="physics-actions">
                 <button disabled={blocked || !!invalid} onClick={submit}>
-                  确认布置
+                  {draft.growth ? "确认生长" : "确认布置"}
                 </button>
                 <button disabled={blocked} onClick={() => setDraft(null)}>
                   取消预览

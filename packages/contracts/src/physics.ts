@@ -84,6 +84,7 @@ export const objectPartSchema = z
     rotation: quaternionSchema,
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     sensor: z.boolean().default(false),
+    opacity: z.number().finite().min(0.05).max(1).optional(),
   })
   .strict();
 /** One bounded point light, anchored to an actual solid part in object-local coordinates. */
@@ -178,6 +179,20 @@ export const objectDefinitionSchema = z
     bodyType: z.enum(["fixed", "dynamic", "kinematic"]),
     material: z.enum(["wood", "stone", "rubber", "ice"]),
     parts: z.array(objectPartSchema).min(1).max(physicsBudgets.partsPerObject),
+    plant: z
+      .object({
+        species: z.enum(["oak", "daisy"]),
+        stage: z.number().int().min(1).max(3),
+        next: z
+          .object({
+            id: z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,95}$/),
+            version: z.number().int().positive(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
     light: physicsLightSchema.optional(),
     seat: physicsSeatSchema.optional(),
     behavior: physicsBehaviorSchema.optional(),
@@ -185,6 +200,7 @@ export const objectDefinitionSchema = z
       .array(
         z.enum([
           "grabbable",
+          "grow",
           "seat",
           "light",
           "switch",
@@ -198,6 +214,12 @@ export const objectDefinitionSchema = z
   })
   .strict()
   .superRefine((d, ctx) => {
+    if (d.plant && (d.source !== "official" || d.bodyType !== "fixed"))
+      ctx.addIssue({ code: "custom", message: "当前植物使用官方固定物体定义" });
+    if (!!d.plant?.next !== d.abilities.includes("grow"))
+      ctx.addIssue({ code: "custom", message: "生长能力需要下一阶段定义" });
+    if (d.plant?.next?.id === d.id && d.plant.next.version === d.version)
+      ctx.addIssue({ code: "custom", message: "生长不能指向当前阶段" });
     for (const kind of ["switch", "pressure", "door"] as const)
       if ((d.behavior?.kind === kind) !== d.abilities.includes(kind))
         ctx.addIssue({
@@ -285,6 +307,8 @@ export const physicsSceneKeys = [
   "building-yard",
   "island",
   "library",
+  "garden",
+  "nursery",
 ] as const;
 export const physicsSceneKeySchema = z.enum(physicsSceneKeys);
 export const physicsSceneTemplateRefSchema = z
@@ -620,6 +644,7 @@ export const physicsLayoutOperationSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("remove"), objectId: z.string().uuid() }).strict(),
+  z.object({ type: z.literal("grow"), objectId: z.string().uuid() }).strict(),
   z
     .object({
       type: z.literal("content"),

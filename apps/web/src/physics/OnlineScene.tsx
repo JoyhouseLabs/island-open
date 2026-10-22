@@ -1,4 +1,9 @@
-import { islandGroundColor } from "@island/world-core";
+import GardenAmbience from "./GardenAmbience";
+import {
+  islandGroundColor,
+  gardenGroundColor,
+  nurseryGroundColor,
+} from "@island/world-core";
 import LibraryAmbience from "./LibraryAmbience";
 import IslandAmbience from "./IslandAmbience";
 import { useEffect, useMemo, useRef } from "react";
@@ -383,12 +388,24 @@ function Contents({
         <IslandAmbience scene={scene} night={night} />
       )}
       {scene.template.id === "core:library" && <LibraryAmbience />}
+      {["core:garden", "core:nursery"].includes(scene.template.id) && (
+        <GardenAmbience
+          nursery={scene.template.id === "core:nursery"}
+          night={night}
+        />
+      )}
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
           tile={tile}
           vertexColor={
-            scene.template.id === "core:island" ? islandGroundColor : undefined
+            scene.template.id === "core:island"
+              ? islandGroundColor
+              : scene.template.id === "core:garden"
+                ? gardenGroundColor
+                : scene.template.id === "core:nursery"
+                  ? nurseryGroundColor
+                  : undefined
           }
           placeAt={draft ? placeAt : undefined}
         />
