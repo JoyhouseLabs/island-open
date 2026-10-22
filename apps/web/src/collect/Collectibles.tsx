@@ -8,6 +8,7 @@ import {
   type ForageSpot,
 } from "@island/world-core";
 import { playerAgent } from "../animals/registry";
+import { openCard } from "../cards/store";
 import { specFor } from "../places/specs";
 import { emitGrowth, growth } from "../progress/store";
 import { pickupChime } from "./chime";
@@ -297,6 +298,12 @@ export default function Collectibles({
         taken[spot.id] ? null : (
           <group
             key={spot.id}
+            onClick={(e) => {
+              // A camera drag also ends in a click; only real taps open cards.
+              if (e.delta > 5) return;
+              e.stopPropagation();
+              openCard(`forage:${spot.kind}`);
+            }}
             ref={(g) => {
               if (g) groups.current.set(spot.id, g);
               else groups.current.delete(spot.id);

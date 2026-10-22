@@ -11,8 +11,11 @@ import { useWorld } from "./useWorld";
 import { useAudio } from "./useAudio";
 import type { Focus } from "./Island";
 import { paths } from "./routes";
-import { avatarHats, type AvatarConfig } from "./player/avatar";
+import { AVATAR_KEY, loadAvatar, type AvatarConfig } from "./player/avatar";
 import { presence, usePresence } from "./presence/client";
+import { growth } from "./progress/store";
+import { IslandConfigProvider } from "./contentStore";
+import CardModal from "./cards/CardModal";
 
 type Quality = "auto" | "low" | "high";
 type Session = {
@@ -33,7 +36,6 @@ export function useHomeSession() {
   if (!session) throw new Error("家园页面需要共享会话。");
   return session;
 }
-const AVATAR_KEY = "island-avatar-v1";
 export default function HomeSession() {
   const world = useWorld(),
     location = useLocation();
@@ -43,21 +45,9 @@ export default function HomeSession() {
   });
   const [quality, setQuality] = useState<Quality>("auto");
   const [islandEntry, setIslandEntry] = useState<Focus>(null);
-  const [avatar, setAvatar] = useState<AvatarConfig | null>(() => {
-    try {
-      const raw = localStorage.getItem(AVATAR_KEY);
-      const parsed = raw ? (JSON.parse(raw) as Partial<AvatarConfig>) : null;
-      if (!parsed?.form || !parsed?.accent) return null;
-      // Older saves have no hat; keep them valid with an empty head.
-      const hat = avatarHats.some((h) => h.id === parsed.hat)
-        ? (parsed.hat as AvatarConfig["hat"])
-        : "none";
-      return { form: parsed.form, accent: parsed.accent, hat };
-    } catch {
-      return null;
-    }
-  });
-  const [walking, setWalking] = useState(false);
+  // Enter every fresh visit with a visible resident; keep any saved outfit.
+  const [avatar, setAvatar] = useState<AvatarConfig | null>(loadAvatar);
+  const [walking, setWalking] = useState(true);
   useEffect(() => {
     try {
       if (avatar) localStorage.setItem(AVATAR_KEY, JSON.stringify(avatar));
@@ -74,6 +64,9 @@ export default function HomeSession() {
     scene =
       Object.entries(paths).find(([, p]) => p === location.pathname)?.[0] ??
       "island";
+  useEffect(() => {
+    growth.bind(world.user?.id ?? null);
+  }, [world.user?.id]);
   useEffect(() => {
     if (!recordId || !avatar || !userName) return;
     presence.connect({
@@ -112,7 +105,10 @@ export default function HomeSession() {
       }}
     >
       {world.ready ? (
-        <Outlet />
+        <IslandConfigProvider userId={world.user?.id ?? null}>
+          <Outlet />
+          <CardModal />
+        </IslandConfigProvider>
       ) : (
         <div className="scene-loading" role="status">
           正在读取你的家园…

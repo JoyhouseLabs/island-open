@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { forageCatalog } from "@island/world-core";
+import { openCard } from "../cards/store";
 import { useGrowth } from "../progress/store";
 import { useHomeSession } from "../HomeSession";
 import { AvatarPreview } from "./AvatarModel";
@@ -355,6 +356,15 @@ export default function PlayerPanel() {
                   key={c.kind}
                   className={`pack-cell ${count ? "" : "empty"}`}
                   title={c.note}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openCard(`forage:${c.kind}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openCard(`forage:${c.kind}`);
+                    }
+                  }}
                 >
                   <span className="pack-emoji" aria-hidden="true">
                     {c.emoji}

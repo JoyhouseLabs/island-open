@@ -1,3 +1,4 @@
+import RendererCleanup from "../RendererCleanup";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Canvas,
@@ -5,6 +6,7 @@ import {
   useThree,
   type ThreeEvent,
 } from "@react-three/fiber";
+import type { BuildingEditor } from "../building/types";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as T from "three";
 import type { SubSceneId, Weather, WorldSnapshot } from "@island/contracts";
@@ -17,6 +19,12 @@ import { acquireStorm, onStormFlash } from "../storm";
 import { swayingMaterial } from "../Plants";
 
 export type SceneProps = {
+  unknownSnapshot?: WorldSnapshot;
+  building?: BuildingEditor;
+  onDevicePositions?: (
+    points: import("../building/DeviceLabels").DeviceScreenPoint[],
+  ) => void;
+  onDevice?: (id: string) => void;
   world: WorldSnapshot;
   tool: Tool;
   low: boolean;
@@ -353,6 +361,7 @@ export function SceneCanvas({
         gl.toneMappingExposure = 1.05;
       }}
     >
+      <RendererCleanup />
       {children}
       {scene && <RemoteLayer scene={scene} />}
     </Canvas>
@@ -383,10 +392,18 @@ function createGrassTuftGeometry() {
       lean = 0.18,
       base = positions.length / 3;
     positions.push(
-      px * -w0 * 0.5, 0, pz * -w0 * 0.5,
-      px * w0 * 0.5, 0, pz * w0 * 0.5,
-      px * w1 * 0.5 + dx * lean * h, h, pz * w1 * 0.5 + dz * lean * h,
-      px * -w1 * 0.5 + dx * lean * h, h, pz * -w1 * 0.5 + dz * lean * h,
+      px * -w0 * 0.5,
+      0,
+      pz * -w0 * 0.5,
+      px * w0 * 0.5,
+      0,
+      pz * w0 * 0.5,
+      px * w1 * 0.5 + dx * lean * h,
+      h,
+      pz * w1 * 0.5 + dz * lean * h,
+      px * -w1 * 0.5 + dx * lean * h,
+      h,
+      pz * -w1 * 0.5 + dz * lean * h,
     );
     const nx = dx * 0.82,
       ny = 0.57,
@@ -439,7 +456,12 @@ export function GrassField({
   const blades = useRef<T.InstancedMesh>(null);
   // A gentle 0.13 amplitude: tufts nod a few degrees, never lean over.
   const material = useMemo(
-    () => swayingMaterial({ color: "#ffffff", roughness: 1, side: T.DoubleSide }, 0.13, 0.02),
+    () =>
+      swayingMaterial(
+        { color: "#ffffff", roughness: 1, side: T.DoubleSide },
+        0.13,
+        0.02,
+      ),
     [],
   );
   const geometry = useMemo(() => createGrassTuftGeometry(), []);
@@ -452,7 +474,11 @@ export function GrassField({
       total = Math.round(count * (low ? 0.45 : 1)),
       settle = (x: number, z: number) => {
         dummy.position.set(x, height ? height(x, z) : 0, z);
-        dummy.rotation.set((rng() - 0.5) * 0.1, rng() * Math.PI, (rng() - 0.5) * 0.1);
+        dummy.rotation.set(
+          (rng() - 0.5) * 0.1,
+          rng() * Math.PI,
+          (rng() - 0.5) * 0.1,
+        );
         dummy.scale.set(
           (0.85 + rng() * 0.5) * scale,
           (0.7 + rng() * 0.75) * scale,
@@ -494,7 +520,8 @@ export function GrassField({
     matrices.forEach((m, i) => blades.current!.setMatrixAt(i, m));
     colors.forEach((c, i) => blades.current!.setColorAt(i, c));
     blades.current.instanceMatrix.needsUpdate = true;
-    if (blades.current.instanceColor) blades.current.instanceColor.needsUpdate = true;
+    if (blades.current.instanceColor)
+      blades.current.instanceColor.needsUpdate = true;
     blades.current.computeBoundingSphere();
   }, [matrices, colors]);
   return (

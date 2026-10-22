@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  BUILDING_CAPABILITIES,
   worldSchema,
+  saveWorldSchema,
   sameWorld,
   type SubSceneId,
   type WorldSnapshot,
@@ -11,12 +13,19 @@ import {
   type SaveWorldRequest,
 } from "@island/contracts";
 import {
+  applyWorldOps,
+  canRebase,
   createWorld,
+  diffWorld,
   growWorld,
   placementError,
   subScenes,
+  terrainScale,
   validatePlacement,
+  hasBuilding,
+  validateBuilding,
 } from "@island/world-core";
+import { readSnapshot } from "./building/readSnapshot";
 import { api, RequestError } from "./api";
 import { readDraft, writeDraft } from "./drafts";
 import { emitGrowth } from "./progress/store";
@@ -25,9 +34,31 @@ type Draft = {
   baseRevision: number;
   dirty: boolean;
   pending?: SaveWorldRequest;
+  pendingSnapshot?: WorldSnapshot;
 };
 export type SyncStatus =
   "guest" | "synced" | "dirty" | "saving" | "offline" | "conflict" | "loading";
+/** Small edits upload as operations. A large edit uploads one checkpoint and needs the lease. */
+function buildSave(
+  base: WorldSnapshot,
+  next: WorldSnapshot,
+  revision: number,
+  deviceId: string,
+  idempotencyKey: string,
+  leaseToken?: number,
+): SaveWorldRequest | null {
+  const operations = diffWorld(base, next);
+  if (operations.length === 0) return null;
+  const terrain = terrainScale(operations);
+  return {
+    baseRevision: revision,
+    deviceId,
+    idempotencyKey,
+    capabilities: [...BUILDING_CAPABILITIES],
+    operations,
+    ...(terrain && leaseToken !== undefined ? { leaseToken } : {}),
+  };
+}
 function device() {
   try {
     let id = sessionStorage.getItem("island-device");
@@ -51,6 +82,8 @@ export function useWorld(scope?: SceneScope) {
   const [snapshot, setSnapshot] = useState<WorldSnapshot>(() =>
     scope ? subScenes[scope.scene].create(scope.seed) : createWorld(),
   );
+  const unsupportedRaw = useRef<WorldSnapshot | null>(null);
+  const [unsupported, setUnsupported] = useState(false);
   const [ready, setReady] = useState(false),
     [loadError, setLoadError] = useState(""),
     [loadAttempt, setLoadAttempt] = useState(0);
@@ -60,10 +93,13 @@ export function useWorld(scope?: SceneScope) {
     [status, setStatus] = useState<SyncStatus>("guest");
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
-    [history, setHistory] = useState<WorldSnapshot[]>([]);
+    [history, setHistory] = useState<
+      { before: WorldSnapshot; after: WorldSnapshot; remoteChanged?: boolean }[]
+    >([]);
   const deviceId = useRef(device()),
     lease = useRef<Lease | null>(null),
     pending = useRef<SaveWorldRequest | undefined>(undefined),
+    pendingSnapshot = useRef<WorldSnapshot | undefined>(undefined),
     saving = useRef(false);
   const current = useRef({ snapshot, user, record, status });
   current.current = { snapshot, user, record, status };
@@ -87,6 +123,7 @@ export function useWorld(scope?: SceneScope) {
           baseRevision: r?.revision ?? 0,
           dirty,
           pending: pending.current,
+          pendingSnapshot: pendingSnapshot.current,
         } satisfies Draft);
       } catch {
         notify("浏览器无法保存本地草稿，请尽快同步或导出。");
@@ -104,9 +141,25 @@ export function useWorld(scope?: SceneScope) {
   }, []);
   const openWorld = useCallback(
     async (u: User, r: WorldRecord) => {
+      const parsed = worldSchema.safeParse(r.snapshot);
+      unsupportedRaw.current = parsed.success ? null : r.snapshot;
+      setUnsupported(!parsed.success);
+      if (!parsed.success) {
+        const raw = r.snapshot;
+        const display = readSnapshot(raw).snapshot;
+        setRecord({ ...r, snapshot: display });
+        setSnapshot(display);
+        setStatus("conflict");
+        setHistory([]);
+        notify(
+          "部分建造对象需要新版客户端。房间已设为只读，原始数据保留，可导出布局文件。",
+        );
+        return;
+      }
       setRecord(r);
       setHistory([]);
       pending.current = undefined;
+      pendingSnapshot.current = undefined;
       lease.current = null;
       let draft: Draft | undefined;
       try {
@@ -124,14 +177,25 @@ export function useWorld(scope?: SceneScope) {
       }
       if (draft && !worldSchema.safeParse(draft.snapshot).success)
         draft = undefined;
+      if (draft?.pending && !saveWorldSchema.safeParse(draft.pending).success)
+        draft = { ...draft, pending: undefined };
       if (draft?.pending) {
         try {
           const acknowledged = await api<WorldRecord>(`/worlds/${r.id}`, {
             method: "PUT",
             body: JSON.stringify(draft.pending),
           });
+          const sent = draft.pendingSnapshot;
+          if (sent) {
+            const followup = applyWorldOps(
+              acknowledged.snapshot,
+              diffWorld(sent, draft.snapshot),
+            );
+            if (followup.ok) draft = { ...draft, snapshot: followup.snapshot };
+          }
           draft = {
             ...draft,
+            pendingSnapshot: undefined,
             baseRevision: acknowledged.revision,
             pending: undefined,
             dirty: !sameWorld(draft.snapshot, acknowledged.snapshot),
@@ -145,6 +209,7 @@ export function useWorld(scope?: SceneScope) {
       if (draft?.dirty && worldSchema.safeParse(draft.snapshot).success) {
         setSnapshot(draft.snapshot);
         pending.current = draft.pending;
+        pendingSnapshot.current = draft.pendingSnapshot;
         if (draft.baseRevision !== r.revision) {
           setStatus("conflict");
           notify(
@@ -220,6 +285,12 @@ export function useWorld(scope?: SceneScope) {
         if (cancelled) return;
         setUser(u);
         const r =
+          worlds.find(
+            (w) =>
+              w.id ===
+                new URLSearchParams(window.location.search).get("world") &&
+              worldSchema.safeParse(w.snapshot).success,
+          ) ??
           worlds.find((w) => worldSchema.safeParse(w.snapshot).success) ??
           (await api<WorldRecord>("/worlds", {
             method: "POST",
@@ -254,9 +325,18 @@ export function useWorld(scope?: SceneScope) {
   const edit = useCallback(
     (update: (w: WorldSnapshot) => WorldSnapshot) => {
       const c = current.current;
+      if (unsupportedRaw.current) {
+        notify("请更新客户端后再编辑这个房间。");
+        return;
+      }
       const next = update(c.snapshot);
       if (next === c.snapshot) return;
-      setHistory((h) => [...h.slice(-24), c.snapshot]);
+      const problem = validateBuilding(next, c.snapshot);
+      if (problem) {
+        notify(problem);
+        return;
+      }
+      setHistory((h) => [...h.slice(-24), { before: c.snapshot, after: next }]);
       setSnapshot(next);
       const nextStatus =
         c.status === "conflict" ? "conflict" : c.user ? "dirty" : "guest";
@@ -264,57 +344,171 @@ export function useWorld(scope?: SceneScope) {
       current.current = { ...c, snapshot: next, status: nextStatus };
       void persist(next, c.record, c.user, true);
     },
-    [persist],
+    [persist, notify],
   );
+  const rebaseDraft = useCallback(async () => {
+    const c = current.current;
+    if (!c.user || !c.record) return false;
+    const latest = await api<WorldRecord>(`/worlds/${c.record.id}`);
+    const localOps = diffWorld(c.record.snapshot, c.snapshot);
+    if (localOps.length === 0) {
+      pending.current = undefined;
+      pendingSnapshot.current = undefined;
+      setRecord(latest);
+      setSnapshot(latest.snapshot);
+      setStatus("synced");
+      current.current = {
+        ...current.current,
+        record: latest,
+        snapshot: latest.snapshot,
+        status: "synced",
+      };
+      await persist(latest.snapshot, latest, c.user, false);
+      return true;
+    }
+    // Building conflicts include ABA edits recorded on the server; never
+    // erase that evidence by rebasing solely from the current net snapshot.
+    if (
+      hasBuilding(c.snapshot) ||
+      localOps.some((op) => op.op === "block.set" || op.op === "device.put")
+    )
+      return false;
+    const remoteOps = diffWorld(c.record.snapshot, latest.snapshot);
+    if (!canRebase(localOps, remoteOps)) return false;
+    const applied = applyWorldOps(latest.snapshot, localOps);
+    if (!applied.ok) return false;
+    pending.current = undefined;
+    pendingSnapshot.current = undefined;
+    setRecord(latest);
+    setSnapshot(applied.snapshot);
+    setStatus("dirty");
+    current.current = {
+      ...current.current,
+      record: latest,
+      snapshot: applied.snapshot,
+      status: "dirty",
+    };
+    await persist(applied.snapshot, latest, c.user, true);
+    return true;
+  }, [persist]);
   const save = useCallback(async () => {
     const c = current.current;
     if (!c.user || !c.record) {
       notify("本地草稿已保留。登录后可保存到服务器。");
       return;
     }
-    if (saving.current || c.status === "conflict") return;
+    if (unsupportedRaw.current || saving.current || c.status === "conflict")
+      return;
     saving.current = true;
     setStatus("saving");
     try {
       // Keep the exact request until acknowledgement, including across a lost response/reload.
       if (!pending.current) {
-        const l =
-          lease.current &&
-          Date.parse(lease.current.expiresAt) > Date.now() + 5000
+        const terrain = terrainScale(diffWorld(c.record.snapshot, c.snapshot));
+        const l = terrain
+          ? lease.current &&
+            Date.parse(lease.current.expiresAt) > Date.now() + 5000
             ? lease.current
-            : await acquire(c.record);
-        pending.current = {
-          baseRevision: c.record.revision,
-          leaseToken: l.token,
-          deviceId: deviceId.current,
-          idempotencyKey: crypto.randomUUID(),
-          snapshot: c.snapshot,
-        };
+            : await acquire(c.record)
+          : undefined;
+        const request = buildSave(
+          c.record.snapshot,
+          c.snapshot,
+          c.record.revision,
+          deviceId.current,
+          crypto.randomUUID(),
+          l?.token,
+        );
+        if (!request) {
+          setStatus("synced");
+          current.current = { ...current.current, status: "synced" };
+          return;
+        }
+        pending.current = request;
+        pendingSnapshot.current = c.snapshot;
       }
       const request = pending.current;
+      const reconstructed = applyWorldOps(
+        c.record.snapshot,
+        request.operations,
+      );
+      const sentSnapshot =
+        pendingSnapshot.current ??
+        (reconstructed.ok ? reconstructed.snapshot : c.snapshot);
       await persist(current.current.snapshot, c.record, c.user, true);
       const saved = await api<WorldRecord>(`/worlds/${c.record.id}`, {
         method: "PUT",
         body: JSON.stringify(request),
       });
       pending.current = undefined;
+      pendingSnapshot.current = undefined;
       setRecord(saved);
-      const stillDirty = !sameWorld(current.current.snapshot, saved.snapshot);
-      setStatus(stillDirty ? "dirty" : "synced");
+      const followup = diffWorld(sentSnapshot, current.current.snapshot);
+      const merged = applyWorldOps(saved.snapshot, followup);
+      const nextSnapshot = merged.ok
+        ? merged.snapshot
+        : current.current.snapshot;
+      setSnapshot(nextSnapshot);
+      const stillDirty = !sameWorld(nextSnapshot, saved.snapshot);
+      const nextStatus = merged.ok
+        ? stillDirty
+          ? "dirty"
+          : "synced"
+        : "conflict";
+      setStatus(nextStatus);
       current.current = {
         ...current.current,
         record: saved,
-        status: stillDirty ? "dirty" : "synced",
+        snapshot: nextSnapshot,
+        status: nextStatus,
       };
       await persist(current.current.snapshot, saved, c.user, stillDirty);
     } catch (e) {
+      const request = pending.current;
+      if (
+        e instanceof RequestError &&
+        e.code === "REVISION_CONFLICT" &&
+        request &&
+        !terrainScale(request.operations)
+      ) {
+        try {
+          if (await rebaseDraft()) return;
+        } catch {
+          /* The server copy could not be read; keep the draft and show the conflict. */
+        }
+      }
+      if (
+        e instanceof RequestError &&
+        (e.status === 422 || e.code === "ITEM_NOT_OWNED")
+      ) {
+        await writeDraft(`${key(c.user, c.record)}:backup`, {
+          snapshot: current.current.snapshot,
+          baseRevision: c.record.revision,
+          dirty: true,
+          pending: pending.current,
+          pendingSnapshot: pendingSnapshot.current,
+        }).catch(() => {});
+        pending.current = undefined;
+        pendingSnapshot.current = undefined;
+        setSnapshot(c.record.snapshot);
+        setHistory([]);
+        setStatus("synced");
+        current.current = {
+          ...current.current,
+          snapshot: c.record.snapshot,
+          status: "synced",
+        };
+        await persist(c.record.snapshot, c.record, c.user, false);
+        notify(`${e.message} 已恢复确认过的布局；尝试内容可从载入前备份导出。`);
+        return;
+      }
       const conflict = e instanceof RequestError && e.status === 409;
       setStatus(conflict ? "conflict" : "offline");
       notify(e instanceof Error ? e.message : "连接中断，本地草稿已保留。");
     } finally {
       saving.current = false;
     }
-  }, [acquire, notify, persist]);
+  }, [acquire, notify, persist, rebaseDraft]);
   // Browser back/forward can leave a scene before its debounce timer fires.
   // The draft was already persisted; also try to finish the cloud save.
   useEffect(
@@ -340,15 +534,12 @@ export function useWorld(scope?: SceneScope) {
     if (!user || !record) return;
     const timer = setInterval(() => {
       if (current.current.status === "conflict" || saving.current) return;
-      void acquire(record).catch((e) => {
-        if (e instanceof RequestError && e.status === 409) {
-          setStatus("conflict");
-          notify(e.message);
-        }
+      void acquire(record).catch(() => {
+        lease.current = null;
       });
     }, 30000);
     return () => clearInterval(timer);
-  }, [user, record?.id, acquire, notify]);
+  }, [user, record?.id, acquire]);
   useEffect(() => {
     const onOnline = () => {
       if (current.current.status === "offline") setStatus("dirty");
@@ -383,16 +574,19 @@ export function useWorld(scope?: SceneScope) {
           body: JSON.stringify({ name: local.name, seed: local.seed }),
         });
         const l = await acquire(r);
-        r = await api<WorldRecord>(`/worlds/${r.id}`, {
-          method: "PUT",
-          body: JSON.stringify({
-            snapshot: local,
-            baseRevision: 1,
-            leaseToken: l.token,
-            deviceId: deviceId.current,
-            idempotencyKey: crypto.randomUUID(),
-          }),
-        });
+        const request = buildSave(
+          r.snapshot,
+          local,
+          1,
+          deviceId.current,
+          crypto.randomUUID(),
+          l.token,
+        );
+        if (request)
+          r = await api<WorldRecord>(`/worlds/${r.id}`, {
+            method: "PUT",
+            body: JSON.stringify(request),
+          });
       }
       await openWorld(u, r);
       notify("已连接开发账号，存档使用真实 PostgreSQL。");
@@ -408,6 +602,10 @@ export function useWorld(scope?: SceneScope) {
     setBusy(true);
     try {
       const r = await api<WorldRecord>(`/worlds/${c.record.id}`);
+      if (!worldSchema.safeParse(r.snapshot).success) {
+        await openWorld(c.user, r);
+        return;
+      }
       await acquire(r);
       await writeDraft(`${key(c.user, c.record)}:backup`, {
         snapshot: c.snapshot,
@@ -415,6 +613,7 @@ export function useWorld(scope?: SceneScope) {
         dirty: c.status !== "synced",
       } satisfies Draft);
       pending.current = undefined;
+      pendingSnapshot.current = undefined;
       await persist(r.snapshot, r, c.user, false);
       setRecord(r);
       setSnapshot(r.snapshot);
@@ -428,12 +627,45 @@ export function useWorld(scope?: SceneScope) {
       setBusy(false);
     }
   };
+  const refresh = async () => {
+    const c = current.current;
+    if (!c.user || !c.record || c.status !== "synced") return;
+    try {
+      const r = await api<WorldRecord>(`/worlds/${c.record.id}`);
+      if (
+        r.revision <= c.record.revision ||
+        current.current.status !== "synced"
+      )
+        return;
+      if (!worldSchema.safeParse(r.snapshot).success) {
+        await openWorld(c.user, r);
+        return;
+      }
+      setRecord(r);
+      setSnapshot(r.snapshot);
+      setHistory((h) =>
+        h.map((change) => ({ ...change, remoteChanged: true })),
+      );
+      current.current = {
+        ...current.current,
+        record: r,
+        snapshot: r.snapshot,
+        status: "synced",
+      };
+      await persist(r.snapshot, r, c.user, false);
+      notify("已读取云端布局变化。较早的撤销需重新确认，避免覆盖其他设备。");
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "暂时无法读取云端变化。");
+    }
+  };
   const takeover = async () => {
+    if (unsupportedRaw.current) return;
     const c = current.current;
     if (!c.record) return;
     try {
       await acquire(c.record, true);
       pending.current = undefined;
+      pendingSnapshot.current = undefined;
       const latest = await api<WorldRecord>(`/worlds/${c.record.id}`);
       if (latest.revision !== c.record.revision) {
         notify("云端已有新版本，请先导出或另存本地草稿，再载入云端。");
@@ -446,6 +678,11 @@ export function useWorld(scope?: SceneScope) {
     }
   };
   const fork = async () => {
+    if (unsupportedRaw.current) return;
+    if (current.current.snapshot.scene !== "island") {
+      notify("书屋副本请使用完整备份导入，避免丢失作品内容。");
+      return;
+    }
     const c = current.current;
     if (!c.user || saving.current) return;
     setBusy(true);
@@ -459,17 +696,22 @@ export function useWorld(scope?: SceneScope) {
       });
       const l = await acquire(r);
       const copy = { ...c.snapshot, name: r.snapshot.name };
-      const saved = await api<WorldRecord>(`/worlds/${r.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          snapshot: copy,
-          baseRevision: 1,
-          leaseToken: l.token,
-          deviceId: deviceId.current,
-          idempotencyKey: crypto.randomUUID(),
-        }),
-      });
+      const request = buildSave(
+        r.snapshot,
+        copy,
+        1,
+        deviceId.current,
+        crypto.randomUUID(),
+        l.token,
+      );
+      const saved = request
+        ? await api<WorldRecord>(`/worlds/${r.id}`, {
+            method: "PUT",
+            body: JSON.stringify(request),
+          })
+        : r;
       pending.current = undefined;
+      pendingSnapshot.current = undefined;
       setRecord(saved);
       setSnapshot(saved.snapshot);
       setStatus("synced");
@@ -482,9 +724,27 @@ export function useWorld(scope?: SceneScope) {
     }
   };
   const undo = () => {
-    const previous = history.at(-1);
-    if (!previous) return;
-    const c = current.current;
+    if (unsupportedRaw.current) return;
+    const change = history.at(-1);
+    if (!change) return;
+    if (change.remoteChanged) {
+      notify(
+        "这次修改之后云端已被其他设备编辑，不能直接撤销；请检查当前布局后重新操作。",
+      );
+      return;
+    }
+    const c = current.current,
+      inverse = diffWorld(change.after, change.before);
+    if (!canRebase(inverse, diffWorld(change.after, c.snapshot))) {
+      notify("这个物件在操作后已有变化，不能直接撤销；你的草稿仍保留。");
+      return;
+    }
+    const applied = applyWorldOps(c.snapshot, inverse);
+    if (!applied.ok || validateBuilding(applied.snapshot, c.snapshot)) {
+      notify("当前支撑或物件已改变，不能直接撤销。");
+      return;
+    }
+    const previous = applied.snapshot;
     current.current = {
       ...c,
       snapshot: previous,
@@ -492,9 +752,7 @@ export function useWorld(scope?: SceneScope) {
     };
     setHistory((h) => h.slice(0, -1));
     setSnapshot(previous);
-    setStatus(
-      c.status === "conflict" ? "conflict" : c.user ? "dirty" : "guest",
-    );
+    setStatus(current.current.status);
     void persist(previous, c.record, c.user, true);
   };
   const place = (x: number, z: number, kind: "tree" | "flower" | "bench") => {
@@ -548,7 +806,8 @@ export function useWorld(scope?: SceneScope) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-  const exportWorld = () => download(current.current.snapshot);
+  const exportWorld = () =>
+    download(unsupportedRaw.current ?? current.current.snapshot);
   const exportBackup = async () => {
     const c = current.current;
     try {
@@ -589,6 +848,8 @@ export function useWorld(scope?: SceneScope) {
   };
   return {
     ready,
+    unsupported,
+    unknownSnapshot: unsupportedRaw.current ?? undefined,
     loadError,
     retryLoad: () => setLoadAttempt((n) => n + 1),
     snapshot,
@@ -603,6 +864,7 @@ export function useWorld(scope?: SceneScope) {
     login,
     save,
     reload,
+    refresh,
     takeover,
     fork,
     edit,

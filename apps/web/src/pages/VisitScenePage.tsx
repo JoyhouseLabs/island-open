@@ -1,3 +1,7 @@
+import DeviceLabels, { type DeviceScreenPoint } from "../building/DeviceLabels";
+import { readSnapshot } from "../building/readSnapshot";
+import DevicePanel from "../devices/DevicePanel";
+import SpeakingSigns from "../devices/SpeakingSigns";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import type { SubSceneId } from "@island/contracts";
@@ -12,6 +16,7 @@ import TalkPrompt from "../dialogue/TalkPrompt";
 import DialogueBox from "../dialogue/DialogueBox";
 import { emitGrowth } from "../progress/store";
 import { RequestError } from "../api";
+import { cursorStyle, glyphForTool, ItemGlyph } from "../building/itemGlyphs";
 
 const PLANT_TOOLS: { id: Exclude<Tool, "explore">; label: string }[] = [
   { id: "tree", label: "种树" },
@@ -31,15 +36,22 @@ export default function VisitScenePage() {
   const scene = subSceneIds.includes(raw as SubSceneId)
     ? (raw as SubSceneId)
     : null;
-  const { visit, worldId, token, avatar, walking, quality } =
-    useVisitSession();
+  const { visit, worldId, token, avatar, walking, quality } = useVisitSession();
   const navigate = useNavigate();
   const fp = useFirstPerson();
   const island = visit.island!;
-  const record = scene ? visit.scenes[scene] : undefined;
+  const rawRecord = scene ? visit.scenes[scene] : undefined;
+  const decoded =
+    rawRecord && rawRecord !== 404 ? readSnapshot(rawRecord.snapshot) : null;
+  const record =
+    decoded && rawRecord && rawRecord !== 404
+      ? { ...rawRecord, snapshot: decoded.snapshot }
+      : rawRecord;
   const [reset, setReset] = useState(0);
   const [tool, setTool] = useState<Tool>("explore");
   const [note, setNote] = useState("");
+  const [devicePoints, setDevicePoints] = useState<DeviceScreenPoint[]>([]);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (scene && record === undefined) void visit.loadScene(scene);
@@ -75,7 +87,11 @@ export default function VisitScenePage() {
       </div>
     );
 
-  const place = async (x: number, z: number, kind: "tree" | "flower" | "bench") => {
+  const place = async (
+    x: number,
+    z: number,
+    kind: "tree" | "flower" | "bench",
+  ) => {
     try {
       await visit.place(scene, kind, x, z);
       emitGrowth({ type: `${kind}.planted` });
@@ -95,6 +111,32 @@ export default function VisitScenePage() {
       className={`app scene-room${night ? " night" : ""}`}
       style={{ ["--room-accent" as string]: config.accent }}
     >
+      <DeviceLabels
+        world={record.snapshot}
+        points={devicePoints}
+        onSelect={setDeviceId}
+      />
+      <SpeakingSigns
+        devices={record.snapshot.devices}
+        worldId={record.id}
+        token={token}
+      />
+      {deviceId && (
+        <DevicePanel
+          snapshot={record.snapshot}
+          worldId={record.id}
+          userId="visitor"
+          token={token}
+          deviceId={deviceId}
+          onSelect={setDeviceId}
+          onClose={() => setDeviceId(null)}
+        />
+      )}
+      {decoded && !decoded.supported && (
+        <p role="status">
+          部分装置需要新版客户端，暂以缺失对象占位。请更新客户端查看。
+        </p>
+      )}
       <div className="visit-topbar">
         <Link className="small-button" to={visitIslandPath(worldId, token)}>
           回到岛上
@@ -107,6 +149,22 @@ export default function VisitScenePage() {
           {config.title}
           <small>正在参观 · {island.owner.name}的家园</small>
         </span>
+        {record.snapshot.devices?.some(
+          (d) => d.placement.state === "placed",
+        ) && (
+          <button
+            className="small-button"
+            onClick={() =>
+              setDeviceId(
+                record.snapshot.devices!.find(
+                  (d) => d.placement.state === "placed",
+                )!.id,
+              )
+            }
+          >
+            书屋装置
+          </button>
+        )}
         <button className="small-button" onClick={() => setReset(Date.now())}>
           重置视角
         </button>
@@ -128,22 +186,40 @@ export default function VisitScenePage() {
               className={tool === t.id ? "active" : ""}
               onClick={() => setTool(t.id)}
             >
+              <ItemGlyph id={t.id} size={22} />
               {t.label}
             </button>
           ))}
         </nav>
       )}
-      {note && <div className="visit-note" role="status">{note}</div>}
-      <div className={`scene tool-${tool}`} aria-label={`${config.title}（参观）`}>
+      {note && (
+        <div className="visit-note" role="status">
+          {note}
+        </div>
+      )}
+      <div
+        className={`scene tool-${tool}`}
+        style={cursorStyle(glyphForTool(tool))}
+        aria-label={`${config.title}（参观）`}
+      >
         <Visual
           world={{
             ...record.snapshot,
             environment: island.world.snapshot.environment,
           }}
+          unknownSnapshot={
+            decoded && !decoded.supported && rawRecord && rawRecord !== 404
+              ? rawRecord.snapshot
+              : undefined
+          }
+          onDevice={setDeviceId}
+          onDevicePositions={setDevicePoints}
           tool={tool}
           low={quality === "low"}
           reset={reset}
-          onPlace={island.plant ? (x, z, kind) => void place(x, z, kind) : () => {}}
+          onPlace={
+            island.plant ? (x, z, kind) => void place(x, z, kind) : () => {}
+          }
           onExit={() => navigate(visitIslandPath(worldId, token))}
           walk={walking}
           avatar={avatar}

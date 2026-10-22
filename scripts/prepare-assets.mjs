@@ -188,10 +188,11 @@ const manifest = {
   id: "island/core",
   version: "1.1.0",
   assets: [
-    ["fox", fox, "model/gltf-binary"],
-    ...files.map(([id, data]) => [id, data, "audio/wav"]),
-  ].map(([id, data, mime]) => ({
+    ["fox", fox, "model/gltf-binary", "fox.glb"],
+    ...files.map(([id, data]) => [id, data, "audio/wav", `${id}.wav`]),
+  ].map(([id, data, mime, file]) => ({
     id,
+    file,
     url: `/api/content/core/${id}`,
     sha256: createHash("sha256").update(data).digest("hex"),
     bytes: data.length,

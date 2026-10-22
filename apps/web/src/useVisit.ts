@@ -42,19 +42,21 @@ export function useVisit(worldId: string, token: string) {
 
   /** Dev login for a visiting guest; deliberately NOT useWorld.login(),
    *  which would auto-create an island of the guest's own. */
-  const guestLogin = useCallback(async () => {
-    const suffix = Math.floor(Math.random() * 900 + 100);
-    try {
-      await api("/auth/development", {
-        method: "POST",
-        body: JSON.stringify({ name: `小旅人${suffix}` }),
-      });
-      await load();
-    } catch {
-      setMessage("暂时登录不上，请稍后再试。");
-      setStatus("error");
-    }
-  }, [load]);
+  const guestLogin = useCallback(
+    async (name: string) => {
+      try {
+        await api("/auth/guest", {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        });
+        await load();
+      } catch (e) {
+        setMessage(e instanceof RequestError ? e.message : "暂时登录不上，请稍后再试。");
+        setStatus("error");
+      }
+    },
+    [load],
+  );
 
   const loadScene = useCallback(
     async (scene: SubSceneId) => {

@@ -58,6 +58,9 @@ const zones: Record<
  * bound stays under the smallest shoreline wobble (0.947 - margin) so every
  * spot lands on walkable ground.
  */
+/** Scenes with their own forage patch. A new room should add one. */
+export const forageSceneIds = Object.keys(zones);
+
 const shoreRing: { from: number; to: number; kinds: ForageKind[] } = {
   from: 0.88,
   to: 0.92,

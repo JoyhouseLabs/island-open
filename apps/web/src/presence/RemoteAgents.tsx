@@ -6,7 +6,7 @@ import { walkSpecs } from "@island/world-core";
 import { AnimalMesh, type AnimalAction, type AnimalAnim } from "../animals/AnimalMesh";
 import { useGlbModel } from "../animals/CustomAnimal";
 import { allAgents, reportAgent, dropAgent } from "../animals/registry";
-import { contentFeed } from "../contentStore";
+import { contentFeed, useIslandConfig } from "../contentStore";
 import { Emote } from "../animals/Emote";
 import { playVoice } from "../animals/voices";
 import { emitGrowth } from "../progress/store";
@@ -151,9 +151,10 @@ function useAnimalConfig(agentId: string) {
   const [config, setConfig] = useState<Awaited<
     ReturnType<typeof contentFeed>
   >["animals"][number] | null>(null);
+  const islandConfig = useIslandConfig();
   useEffect(() => {
     let alive = true;
-    void contentFeed().then((feed) => {
+    void contentFeed(islandConfig).then((feed) => {
       const found = feed.animals.find(
         (a) => agentId === `content-${a.id}`,
       );
@@ -162,7 +163,7 @@ function useAnimalConfig(agentId: string) {
     return () => {
       alive = false;
     };
-  }, [agentId]);
+  }, [agentId, islandConfig.userId, islandConfig.worldId, islandConfig.token]);
   return config;
 }
 

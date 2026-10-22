@@ -3,13 +3,16 @@ import type { SubSceneId, IslandEntity, AnimalConfig } from "@island/contracts";
 import { residents, type Resident } from "@island/world-core";
 import { Animal } from "./Animal";
 import { CustomAnimal } from "./CustomAnimal";
-import { contentFeed, npcSpeakers } from "../contentStore";
+import { useEcology } from "./ecologyStore";
+import { npcSpeakers, useContentFeed } from "../contentStore";
 import { useGrowth } from "../progress/store";
 import { presence } from "../presence/client";
 import { HostAgentsSender, RemoteAgents } from "../presence/RemoteAgents";
 
 /** The resident animals of one scene; scenes render this once.
- *  Some residents only move in after a growth unlock.
+ *  Some residents only move in after a growth unlock. On the main island,
+ *  the bounded ecology adds (and gently loses) a few friends around the
+ *  static roster — same derivation for host and visitors.
  *
  *  Co-play: whoever simulates the animals locally also relays them
  *  (HostAgentsSender no-ops unless the server called this connection the
@@ -18,10 +21,15 @@ import { HostAgentsSender, RemoteAgents } from "../presence/RemoteAgents";
 export function Residents({
   scene,
   entities,
+  seed,
+  season,
 }: {
   /** Built-in scene, or "place-<id>" for a published place. */
   scene: "island" | SubSceneId | (string & {});
   entities: IslandEntity[];
+  /** World seed + season drive the island ecology (main island only). */
+  seed?: number;
+  season?: "spring" | "summer" | "autumn" | "winter";
 }) {
   const { state } = useGrowth();
   const [remote, setRemote] = useState(false);
@@ -29,24 +37,47 @@ export function Residents({
     const timer = setInterval(() => setRemote(presence.agentsFresh()), 700);
     return () => clearInterval(timer);
   }, []);
+  // Hooks stay unconditional; useEcology no-ops without a seed.
+  const ecology = useEcology(
+    scene === "island" && seed !== undefined ? seed : null,
+    season ?? "summer",
+  );
   const roster = residents[scene as keyof typeof residents]?.filter(
     (r) => !r.unlockId || state.owned[r.unlockId],
   );
+  const born = (ecology ?? [])
+    .filter((m) => m.bornTick > 0)
+    // A born wolf still waits on the same unlock as 风哨.
+    .filter(
+      (m) =>
+        m.species !== "wolf" || state.owned["resident-wolf"],
+    );
   return (
     <>
       <HostAgentsSender />
       {remote ? (
         <RemoteAgents scene={scene} />
       ) : (
-        roster?.map((r) => (
-          <Animal
-            key={`${scene}-${r.name}`}
-            id={`${scene}-${r.name}`}
-            resident={r}
-            scene={scene}
-            entities={entities}
-          />
-        ))
+        <>
+          {roster?.map((r) => (
+            <Animal
+              key={`${scene}-${r.name}`}
+              id={`${scene}-${r.name}`}
+              resident={r}
+              scene={scene}
+              entities={entities}
+            />
+          ))}
+          {born.map((m) => (
+            <Animal
+              key={m.id}
+              id={m.id}
+              resident={m}
+              scene={scene}
+              entities={entities}
+            />
+          ))}
+        </>
       )}
       <ContentAnimals scene={scene} entities={entities} />
     </>
@@ -71,17 +102,11 @@ export function ContentAnimals({
     const timer = setInterval(() => setRemote(presence.agentsFresh()), 700);
     return () => clearInterval(timer);
   }, []);
+  const roster = useContentFeed()?.animals;
   useEffect(() => {
-    let alive = true;
-    void contentFeed()
-      .then((feed) =>
-        alive && setAnimals(feed.animals.filter((a) => a.placement.scene === scene)),
-      )
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [scene]);
+    if (!roster) return;
+    setAnimals(roster.filter((a) => a.placement.scene === scene));
+  }, [roster, scene]);
   // Publish configs by live agent id so dialogue can find their persona.
   useEffect(() => {
     if (!animals) return;

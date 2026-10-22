@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { Season } from "@island/contracts";
 import { useHomeSession } from "../HomeSession";
-import { contentFeed } from "../contentStore";
+import { contentFeed, useIslandConfig } from "../contentStore";
 import { proximity } from "../dialogue/proximity";
 import { playerIntent } from "../player/avatar";
 import DialogueBox from "../dialogue/DialogueBox";
@@ -53,9 +53,10 @@ export default function PlacePage() {
     q.addEventListener("change", change);
     return () => q.removeEventListener("change", change);
   }, []);
+  const islandConfig = useIslandConfig();
   useEffect(() => {
     let alive = true;
-    void contentFeed()
+    void contentFeed(islandConfig)
       .then((feed) => {
         if (alive)
           setState({
@@ -67,7 +68,7 @@ export default function PlacePage() {
     return () => {
       alive = false;
     };
-  }, [sceneId]);
+  }, [sceneId, islandConfig.userId, islandConfig.worldId, islandConfig.token]);
   const hour = world.snapshot.environment.hour,
     weather = world.snapshot.environment.weather ?? "sun",
     season = world.snapshot.environment.season,

@@ -22,7 +22,7 @@ import { readDraft, writeDraft } from "./drafts";
 import { emitGrowth } from "./progress/store";
 import { speak, stopSpeaking } from "./tutor/speech";
 import { TutorChat, type AskCommand, type ChatMessage } from "./tutor/TutorChat";
-import { contentFeed } from "./contentStore";
+import { useContentFeed } from "./contentStore";
 
 type ShelfData = {
   notes: Record<string, string>;
@@ -139,13 +139,14 @@ export default function Bookshelf({
     tutorTimer = useRef<number | undefined>(undefined),
     chainStop = useRef(true);
 
+  const installedBooks = useContentFeed()?.books ?? builtinBooks;
   useEffect(() => {
     let alive = true;
     Promise.all([
       readDraft<ShelfData>(SHELF_KEY).catch(() => null),
       readDraft<TutorData>(TUTOR_KEY).catch(() => null),
-      contentFeed().then((f) => f.books).catch(() => builtinBooks),
-    ]).then(([shelf, saved, published]) => {
+    ]).then(([shelf, saved]) => {
+      const published = installedBooks;
       if (!alive) return;
       // Built-ins load first; admin-published books join once fetched.
       setBooks(published);
@@ -172,7 +173,7 @@ export default function Bookshelf({
     return () => {
       alive = false;
     };
-  }, [initialBookId]);
+  }, [initialBookId, installedBooks]);
 
   // Reading one page after another keeps its place between visits.
   useEffect(() => {

@@ -2,9 +2,8 @@ import { api } from "../api";
 import type { BookNote, BookReader } from "@island/contracts";
 
 /** Shared-reading endpoints (see apps/api/src/reading.ts). */
-export async function fetchNotes(bookId: string) {
-  const data = await api<{ notes: BookNote[] }>(`/books/${bookId}/notes`);
-  return data.notes;
+export async function fetchNotes(bookId: string,cursor?:string) {
+  return api<{notes:BookNote[];nextCursor:string|null}>(`/books/${bookId}/notes?limit=20${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`);
 }
 export async function postNote(bookId: string, page: number, text: string) {
   return api<BookNote>(`/books/${bookId}/notes`, {

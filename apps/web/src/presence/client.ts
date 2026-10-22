@@ -222,6 +222,8 @@ class PresenceClient {
       this.agents.clear();
       for (const a of msg.agents) this.agents.set(a.id, a);
       this.agentsAt = Date.now();
+    } else if (msg.type === "content") {
+      window.dispatchEvent(new CustomEvent("island-content-changed",{detail:{worldId:msg.world,revision:msg.revision}}));
     } else if (msg.type === "world") {
       this.commit({
         worldEvent: {

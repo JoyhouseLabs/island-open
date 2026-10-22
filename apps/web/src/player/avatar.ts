@@ -53,11 +53,13 @@ export function loadAvatar(): AvatarConfig {
   try {
     const raw = localStorage.getItem(AVATAR_KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<AvatarConfig>) : null;
-    if (parsed?.form && parsed?.accent && parsed?.hat)
+    if (parsed?.form && avatarForms.some((f) => f.id === parsed.form) &&
+        typeof parsed.accent === "string" && /^#[0-9a-f]{6}$/i.test(parsed.accent))
       return {
         form: parsed.form,
         accent: parsed.accent,
-        hat: parsed.hat,
+        // Older saved outfits predate hats. Preserve their form and color.
+        hat: avatarHats.some((h) => h.id === parsed.hat) ? parsed.hat! : "none",
       };
   } catch {
     /* fall through to the default */

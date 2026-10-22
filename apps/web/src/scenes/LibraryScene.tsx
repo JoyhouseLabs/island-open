@@ -1,3 +1,5 @@
+import UnknownBuilding from "../building/UnknownBuilding";
+import BuildingLayer from "../building/BuildingLayer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as T from "three";
 import { useFrame } from "@react-three/fiber";
@@ -51,7 +53,9 @@ function BookWall() {
         dummy.updateMatrix();
         items.push({
           matrix: dummy.matrix.clone(),
-          color: new T.Color(bookColors[Math.floor(rng() * bookColors.length)]!),
+          color: new T.Color(
+            bookColors[Math.floor(rng() * bookColors.length)]!,
+          ),
           w,
         });
         z += w + 0.05 + rng() * 0.1;
@@ -66,7 +70,8 @@ function BookWall() {
       books.current!.setColorAt(i, d.color);
     });
     books.current.instanceMatrix.needsUpdate = true;
-    if (books.current.instanceColor) books.current.instanceColor.needsUpdate = true;
+    if (books.current.instanceColor)
+      books.current.instanceColor.needsUpdate = true;
     books.current.computeBoundingSphere();
   }, [data]);
   return (
@@ -172,13 +177,7 @@ function RealBooks({ onOpenBook }: { onOpenBook?: (id: string) => void }) {
  *  planes stay OUTSIDE the clickable group — from the overview camera,
  *  every ray at the book wall passes through the roof first, so a
  *  clickable roof would swallow the real books' taps. */
-function Pavilion({
-  night,
-  onRead,
-}: {
-  night: boolean;
-  onRead?: () => void;
-}) {
+function Pavilion({ night, onRead }: { night: boolean; onRead?: () => void }) {
   const { x, z } = libraryFeatures.pavilion;
   return (
     <group position={[x, 0, z]}>
@@ -251,11 +250,19 @@ function ReadingNook() {
   });
   return (
     <group>
-      <mesh position={[table.x, 0.05, table.z]} rotation={[-Math.PI / 2, 0, 0.3]} receiveShadow>
+      <mesh
+        position={[table.x, 0.05, table.z]}
+        rotation={[-Math.PI / 2, 0, 0.3]}
+        receiveShadow
+      >
         <circleGeometry args={[3.6, 30]} />
         <meshStandardMaterial color="#c58f7a" roughness={1} />
       </mesh>
-      <Box position={[table.x, 0.75, table.z]} scale={[2.6, 0.18, 1.6]} color="#a8814f" />
+      <Box
+        position={[table.x, 0.75, table.z]}
+        scale={[2.6, 0.18, 1.6]}
+        color="#a8814f"
+      />
       {[
         [-3.1, 0.5, "#8fb3c7"],
         [2.9, -0.7, "#c9a15c"],
@@ -263,7 +270,11 @@ function ReadingNook() {
       ].map(([dx, dz, color], i) => (
         <mesh
           key={i}
-          position={[table.x + (dx as number) * 0.85, 0.28, table.z + (dz as number) * 0.85]}
+          position={[
+            table.x + (dx as number) * 0.85,
+            0.28,
+            table.z + (dz as number) * 0.85,
+          ]}
           castShadow
         >
           <cylinderGeometry args={[0.8, 0.9, 0.3, 14]} />
@@ -328,8 +339,20 @@ function Library(props: SceneProps) {
         entities={world.entities}
         season={season}
         low={low}
-        height={() => 0}
+        height={(x, z) => {
+          const e = world.entities.find((e) => e.x === x && e.z === z);
+          return (
+            world.entityPlacements?.find((p) => p.entityId === e?.id)?.y ?? 0
+          );
+        }}
         wind={weatherWind[weather]}
+      />
+      <UnknownBuilding raw={props.unknownSnapshot} />
+      <BuildingLayer
+        world={world}
+        editor={props.building}
+        onDevice={props.onDevice}
+        onDevicePositions={props.onDevicePositions}
       />
       <ContentAnimals scene="library" entities={world.entities} />
       <Collectibles scene="library" seed={world.seed} />
@@ -357,9 +380,21 @@ function Library(props: SceneProps) {
         ))}
       </group>
       {props.walk && props.avatar && props.onGate && (
-        <PlayerRig scene="library" avatar={props.avatar} entities={world.entities} onGate={props.onGate} />
+        <PlayerRig
+          scene="library"
+          avatar={props.avatar}
+          entities={world.entities}
+          world={world}
+          onGate={props.onGate}
+        />
       )}
-      <SceneFrame reset={props.reset} position={[64, 60, 86]} max={300} />
+      {/* Look down the open boardwalk when walking; the low overview angle
+          puts the camera inside the surrounding tree canopy. */}
+      <SceneFrame
+        reset={props.reset}
+        position={props.walk ? [0, 70, 45] : [64, 60, 86]}
+        max={300}
+      />
     </>
   );
 }

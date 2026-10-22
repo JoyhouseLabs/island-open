@@ -2,27 +2,22 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { BookOpen, FileText } from "lucide-react";
 import { books as builtinBooks, type Book } from "@island/contracts";
-import { contentFeed } from "../contentStore";
+import { useContentFeed } from "../contentStore";
 import { useHomeSession } from "../HomeSession";
 
 /**
- * The shared bookshelf: built-in classics plus everything the admin has
- * published (including PDF books). Picking one opens the real-book reader.
+ * This island's bookshelf: built-in classics plus the books installed for
+ * its owner. Picking one opens the real-book reader.
  */
 export default function BooksPage() {
   const navigate = useNavigate();
   const { world } = useHomeSession();
+  const installed = useContentFeed()?.books;
   const [shelf, setShelf] = useState<Book[]>(builtinBooks);
   useEffect(() => {
     document.title = "共读书架 · 心灵家园";
-    let alive = true;
-    void contentFeed()
-      .then((feed) => alive && setShelf(feed.books))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
+    if (installed) setShelf(installed);
+  }, [installed]);
   return (
     <main className="app books-page">
       <header className="books-head">

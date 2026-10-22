@@ -4,18 +4,27 @@ import {
   bookSchema,
   contentSceneSchema,
   npcChatRequestSchema,
+  isRoomScene,
   placeSchema,
+  sceneIds,
+  sceneRegistry,
   seasonSchema,
   subSceneIds,
   weatherSchema,
 } from "./src/index";
 
-/** The content enums duplicate index.ts lists to avoid a TDZ cycle. */
 describe("content schema stays in sync with the world contract", () => {
   it("covers the island plus every sub-scene", () => {
     const options = contentSceneSchema.options;
     expect(options[0]).toBe("island");
     expect(options.slice(1)).toEqual([...subSceneIds]);
+    expect(sceneRegistry.filter((scene) => scene.kind === "room").map((scene) => scene.id)).toEqual([
+      ...subSceneIds,
+    ]);
+    expect([...sceneIds]).toEqual(["island", ...subSceneIds]);
+    expect(isRoomScene("garden")).toBe(true);
+    expect(isRoomScene("island")).toBe(false);
+    expect(isRoomScene("market")).toBe(false);
   });
   it("accepts the live weather and season values", () => {
     for (const weather of weatherSchema.options)

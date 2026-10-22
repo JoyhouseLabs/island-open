@@ -34,6 +34,23 @@ export type { WalkSpec, Gate } from "./walk.js";
 export { residents } from "./residents.js";
 export type { Species, Interest, Resident } from "./residents.js";
 export {
+  ECOLOGY_TICK_MS,
+  ECOLOGY_SLOT_MS,
+  MAX_BORN,
+  MAX_REPLAY_TICKS,
+  baseEcology,
+  ecologyState,
+  ecologyPlan,
+  stepEcology,
+} from "./ecology.js";
+export type {
+  EcologyMember,
+  EcologyEvent,
+  EcologyState,
+  EcologySeason,
+  EcologyEncounter,
+} from "./ecology.js";
+export {
   starterTasks,
   emptyGrowth,
   applyGrowthEvent,
@@ -50,6 +67,7 @@ export type {
 } from "./growth.js";
 export {
   forageCatalog,
+  forageSceneIds,
   forageSpots,
 } from "./collectibles.js";
 export type { ForageKind, ForageSpot } from "./collectibles.js";
@@ -447,3 +465,15 @@ export function walkRoute(distance: number): Point {
   }
   return route[0]!;
 }
+export {
+  TERRAIN_ENTITY_OPS,
+  terrainScale,
+  operationTargets,
+  operationDependencies,
+  canRebase,
+  diffWorld,
+  applyWorldOps,
+} from "./patch.js";
+export { FORAGE_STACK, builtinItems } from "./items.js";
+
+export * from "./building.js";

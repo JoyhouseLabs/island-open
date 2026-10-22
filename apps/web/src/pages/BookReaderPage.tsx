@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { Book, BookNote, BookReader } from "@island/contracts";
 import { books as builtinBooks } from "@island/contracts";
-import { contentFeed } from "../contentStore";
+import { useContentFeed } from "../contentStore";
 import { contentAssetBytes } from "../api";
 import { useHomeSession } from "../HomeSession";
 import { emitGrowth } from "../progress/store";
@@ -39,6 +39,7 @@ export default function BookReaderPage() {
   const [spread, setSpread] = useState(0); // spread index (2 pages each)
   const [flipping, setFlipping] = useState<"fwd" | "back" | null>(null);
   const [notes, setNotes] = useState<BookNote[]>([]);
+  const [noteCursor,setNoteCursor]=useState<string|null>(null);
   const [readers, setReaders] = useState<BookReader[]>([]);
   const [draft, setDraft] = useState("");
   const [explain, setExplain] = useState<string>("");
@@ -48,25 +49,16 @@ export default function BookReaderPage() {
   const explainAbort = useRef<AbortController | null>(null);
   const progressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Resolve the book: published feed first, built-in fallback.
+  const installed = useContentFeed()?.books;
+  // Resolve the book from this island's shelf, then the built-in classics.
   useEffect(() => {
-    let alive = true;
-    void contentFeed()
-      .then((feed) => {
-        if (!alive) return;
-        const found =
-          feed.books.find((b) => b.id === bookId) ??
-          builtinBooks.find((b) => b.id === bookId) ??
-          null;
-        setBook(found);
-        if (found)
-          document.title = `${found.title} · 共读 · 心灵家园`;
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [bookId]);
+    const found =
+      installed?.find((b) => b.id === bookId) ??
+      builtinBooks.find((b) => b.id === bookId) ??
+      null;
+    setBook(found);
+    if (found) document.title = `${found.title} · 共读 · 心灵家园`;
+  }, [bookId, installed]);
 
   // PDF books load their document once.
   useEffect(() => {
@@ -103,7 +95,7 @@ export default function BookReaderPage() {
         fetchNotes(bookId),
         fetchReaders(bookId),
       ]);
-      setNotes(n);
+      setNotes(n.notes);setNoteCursor(n.nextCursor);
       setReaders(r);
     } catch {
       /* offline: keep what we have */
@@ -154,7 +146,7 @@ export default function BookReaderPage() {
       emitGrowth({ type: "note.written" });
       await refresh();
     } catch {
-      setDraft("");
+      world.notify("笔记尚未保存，输入已保留，请稍后重试。");
     }
   };
 
@@ -387,7 +379,7 @@ export default function BookReaderPage() {
                   <div className="note-meta">
                     <strong>{note.author.name.replace("旅人 · ", "")}</strong>
                     <small>
-                      第 {note.page} 页 ·{" "}
+                      {note.locationKind==='legacy'?'旧版定位':`版本 ${note.bookVersion??1}`} · 第 {note.page} 页 ·{" "}
                       {new Date(note.createdAt).toLocaleDateString("zh-CN", {
                         month: "numeric",
                         day: "numeric",
@@ -408,6 +400,7 @@ export default function BookReaderPage() {
                   <p>{note.text}</p>
                 </li>
               ))}
+              {noteCursor&&<li><button className="small-button" onClick={()=>{void fetchNotes(bookId,noteCursor).then(r=>{setNotes(n=>[...n,...r.notes.filter(x=>!n.some(y=>y.id===x.id))]);setNoteCursor(r.nextCursor);}).catch(()=>world.notify("读取失败，已有笔记仍保留。"));}}>更早的共读笔记</button></li>}
               {notes.length === 0 && (
                 <li className="empty">还没有笔记，你来写第一条吧。</li>
               )}

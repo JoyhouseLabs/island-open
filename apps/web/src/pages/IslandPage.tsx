@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { cursorStyle, glyphForTool } from "../building/itemGlyphs";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -50,8 +51,7 @@ import { paths } from "../routes";
 import type { Tool, Focus } from "../Island";
 import { sceneByLandmark, sceneConfig } from "../sceneConfig";
 import SoundMixer from "../SoundMixer";
-import { contentFeed } from "../contentStore";
-import type { PlaceConfig } from "@island/contracts";
+import { useContentFeed } from "../contentStore";
 import {
   avatarAccents,
   avatarForms,
@@ -69,6 +69,7 @@ import { useGrowth, emitGrowth } from "../progress/store";
 import GrowthToasts from "../progress/GrowthToasts";
 import TalkPrompt from "../dialogue/TalkPrompt";
 import DialogueBox from "../dialogue/DialogueBox";
+import NpcChat from "../dialogue/NpcChat";
 import { proximity } from "../dialogue/proximity";
 import SceneBoundary from "../SceneBoundary";
 import PlayerPanel, {
@@ -152,9 +153,9 @@ export default function IslandPage() {
     ),
     [asset, setAsset] = useState("loading"),
     [toast, setToast] = useState(""),
-    [publishedPlaces, setPublishedPlaces] = useState<PlaceConfig[]>([]),
     [share, setShare] = useState<SharingStatus | null>(null),
     [shareBusy, setShareBusy] = useState(false);
+  const publishedPlaces = useContentFeed()?.places ?? [];
   const location = useLocation();
   // The bottom dock keeps one drawer open at a time. Pointer users get pure
   // hover behaviour — the drawer leaves with the mouse; click-pinning only
@@ -190,16 +191,6 @@ export default function IslandPage() {
     window.clearTimeout(dockLeave.current);
     dockLeave.current = window.setTimeout(() => setHoverDock(null), 800);
   };
-  // Published places extend the island from the admin console.
-  useEffect(() => {
-    let alive = true;
-    void contentFeed()
-      .then((feed) => alive && setPublishedPlaces(feed.places))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
   const upload = useRef<HTMLInputElement>(null),
     dialog = useRef<HTMLDivElement>(null),
     previousFocus = useRef<HTMLElement | null>(null);
@@ -346,6 +337,7 @@ export default function IslandPage() {
     <main className={night ? "app night" : "app"}>
       <div
         className={`scene tool-${tool}`}
+        style={cursorStyle(glyphForTool(tool))}
         aria-label="可旋转缩放的三维心灵岛屿"
       >
         <Suspense
@@ -752,6 +744,9 @@ export default function IslandPage() {
         </div>
       )}
       <GrowthToasts />
+      <TalkPrompt />
+      <DialogueBox />
+      <NpcChat />
       <PlayerPanel />
       <DressingPanel />
       {panel && (
@@ -876,7 +871,7 @@ export default function IslandPage() {
               <h2>把家园，好好收藏</h2>
               <p className="panel-copy">
                 {world.user
-                  ? `${world.user.name} · ${world.user.provider === "development" ? "开发账号" : "微信账号"}`
+                  ? `${world.user.name} · ${world.user.provider === "development" ? "开发账号" : world.user.provider === "guest" ? "访客" : world.user.provider === "joyhouse" ? "JoyHouse 账号" : "微信账号"}`
                   : "当前是本地体验，草稿保存在此浏览器。"}
               </p>
               <div className="storage-status">
@@ -1104,6 +1099,13 @@ export default function IslandPage() {
                 岛屿、建筑、分形树木由代码生成。同一颗种子，会长出同一片起点；你的每次布置，让它逐渐成为自己的家。
               </p>
               <div className="panel-divider" />
+              <strong className="credits-title">开放的客户端</strong>
+              <p className="credits-copy">客户端采用 AGPL-3.0-only；共享协议与世界规则采用 Apache-2.0。</p>
+              <div className="credit-links">
+                <a href="https://github.com/JoyhouseLabs/island-open" target="_blank" rel="noreferrer">开源项目 ↗</a>
+                <a href="https://app.joyhouse.chat/source/island-open-20261021.tar.gz" download>此版本客户端源码 ↓</a>
+              </div>
+              <div className="panel-divider" />
               <strong className="credits-title">狐狸与声音</strong>
               <p className="credits-copy">
                 狐狸模型：PixelMannen（CC0）。绑定与动画：tomkranis；glTF
@@ -1168,7 +1170,17 @@ export default function IslandPage() {
               <br />
               下次回来，继续让它生长。
             </p>
-            {world.config?.website && (
+            {world.config?.joyhouse && (
+              <>
+                <a className="primary-button" href="/api/auth/joyhouse/start?mode=scan">
+                  微信扫码登录 <ArrowUpRight size={17} />
+                </a>
+                <a className="small-button" href="/api/auth/joyhouse/start?mode=h5">
+                  微信内授权登录
+                </a>
+              </>
+            )}
+            {!world.config?.joyhouse && world.config?.website && (
               <a
                 className="primary-button"
                 href="/api/auth/wechat/website/start"
@@ -1176,12 +1188,12 @@ export default function IslandPage() {
                 微信扫码登录 <ArrowUpRight size={17} />
               </a>
             )}
-            {world.config?.h5 && (
+            {!world.config?.joyhouse && world.config?.h5 && (
               <a className="small-button" href="/api/auth/wechat/h5/start">
                 微信内授权登录
               </a>
             )}
-            {!world.config?.website && !world.config?.h5 && (
+            {!world.config?.joyhouse && !world.config?.website && !world.config?.h5 && (
               <div className="wechat-pending">
                 <ShieldCheck size={17} />
                 <span>微信登录等待开放平台配置</span>
@@ -1208,7 +1220,7 @@ export default function IslandPage() {
               先在岛上走走 <ChevronRight size={14} />
             </button>
             <small className="tiny-note">
-              开发账号仅用于本机联调，不代表微信授权。
+              {world.config?.joyhouse ? "在微信内打开可直接授权，电脑上请使用微信扫码。" : world.config?.development ? "开发账号仅用于本机联调，不代表微信授权。" : "登录后可保存和恢复你的家园。"}
             </small>
           </div>
         </div>

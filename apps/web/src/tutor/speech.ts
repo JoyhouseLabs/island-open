@@ -54,6 +54,7 @@ export function isSpeaking(): boolean {
 
 async function speakViaServer(
   text: string,
+  voice: string | undefined,
   onEnd: (() => void) | undefined,
 ): Promise<boolean> {
   try {
@@ -61,7 +62,7 @@ async function speakViaServer(
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(voice ? { text, voice } : { text }),
       signal: AbortSignal.timeout(20000),
     });
     if (!response.ok) return false;
@@ -108,10 +109,10 @@ function speakViaBrowser(text: string, onEnd: (() => void) | undefined) {
 
 export async function speak(
   text: string,
-  opts: { onEnd?: () => void } = {},
+  opts: { voice?: string; onEnd?: () => void } = {},
 ): Promise<void> {
   // Unlock audio synchronously while we are still in the click gesture.
   audioContext();
-  const played = await speakViaServer(text, opts.onEnd);
+  const played = await speakViaServer(text, opts.voice, opts.onEnd);
   if (!played) speakViaBrowser(text, opts.onEnd);
 }

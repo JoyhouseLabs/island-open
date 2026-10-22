@@ -113,7 +113,8 @@ export const walkSpecs: Record<"island" | SubSceneId, WalkSpec> = {
     gates: roomGate(34),
   },
   library: {
-    spawn: { x: 0, z: 23 },
+    // Inside the clear boardwalk, away from the entrance tree canopy.
+    spawn: { x: 0, z: 8 },
     walkable: (x, z) => Math.abs(x) <= 36 && Math.abs(z) <= 30,
     height: () => 0,
     gates: roomGate(libraryFeatures.gate),

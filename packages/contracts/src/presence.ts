@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { WorldRecord } from "./index.js";
+import { sceneIds } from "./scenes.js";
 
 /**
  * Island sharing and realtime presence: read-only visits through secret
@@ -8,24 +9,7 @@ import type { WorldRecord } from "./index.js";
  * Quick-phrase chat is enum-only on purpose — the server relays known
  * phrase/emote ids and never free text, which is what actually keeps
  * visitor chat safe for children. Chinese labels live in the client UI.
- *
- * The scene list below is duplicated from index.ts on purpose (same TDZ
- * reason as content.ts); presence.test.ts asserts it stays in sync.
  */
-const sceneIds = [
-  "island",
-  "garden",
-  "home",
-  "meadow",
-  "forest",
-  "library",
-  "pond",
-  "lab",
-  "nursery",
-  "mountain",
-  "starlight",
-  "beach",
-] as const;
 export const presenceSceneSchema = z.enum(sceneIds);
 export type PresenceScene = (typeof sceneIds)[number];
 
@@ -205,7 +189,7 @@ export const presenceServerSchema = z.discriminatedUnion("type", [
     .strict(),
   z
     .object({
-      type: z.literal("world"),
+      type: z.enum(["world", "content"]),
       /** The room's parent world id and scene, plus the new revision. */
       world: z.string(),
       scene: z.string(),

@@ -1,11 +1,22 @@
+import DeviceLabels, { type DeviceScreenPoint } from "./building/DeviceLabels";
+import {
+  cursorStyle,
+  glyphForBlock,
+  glyphForKind,
+  glyphForTool,
+  ItemGlyph,
+} from "./building/itemGlyphs";
+import { useBuilder } from "./building/useBuilder";
+import BuildingControls from "./building/BuildingControls";
+import type { BuildMode } from "./building/types";
+import DevicePanel from "./devices/DevicePanel";
+import SpeakingSigns from "./devices/SpeakingSigns";
+import RoomBackup from "./backup/RoomBackup";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowLeft,
   BookOpen,
-  Flower2,
-  TreePine,
-  Armchair,
   Compass,
   Footprints,
   Glasses,
@@ -68,7 +79,12 @@ const weatherChoices: {
   { id: "thunder", name: "雷雨", icon: CloudLightning },
   { id: "wind", name: "大风", icon: Wind },
 ];
-export default function SceneExperience({ scene, parent, quality, onExit }: Props) {
+export default function SceneExperience({
+  scene,
+  parent,
+  quality,
+  onExit,
+}: Props) {
   const config = sceneConfig[scene],
     Visual = sceneVisuals[scene];
   const { avatar, walking, setWalking, audio } = useHomeSession(),
@@ -81,7 +97,7 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
     scene,
     label: config.short,
   });
-  const [tool, setTool] = useState<Tool>("explore"),
+  const [tool, setTool] = useState<Tool | BuildMode>("explore"),
     [reset, setReset] = useState(0),
     [panel, setPanel] = useState<"save" | "time" | null>(null),
     [leaving, setLeaving] = useState(false),
@@ -90,6 +106,11 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
       bookId?: string;
       focusChat?: boolean;
     } | null>(null);
+  const buildMode =
+    tool === "build" || tool === "remove" || tool === "device" ? tool : null;
+  const builder = useBuilder(room, room.unsupported ? null : buildMode);
+  const [devicePoints, setDevicePoints] = useState<DeviceScreenPoint[]>([]);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   // 空格 near 小墨老师 opens the lesson chat directly.
   useEffect(() => {
     if (scene === "library")
@@ -99,11 +120,12 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
 
   // In walk mode the ground taps drive the resident instead of being ignored.
   useEffect(() => {
-    playerIntent.active = walking && !!avatar && tool === "explore" && !leaving;
+    playerIntent.active =
+      walking && !!avatar && tool === "explore" && !leaving && !deviceId;
     return () => {
       playerIntent.active = false;
     };
-  }, [walking, avatar, tool, leaving]);
+  }, [walking, avatar, tool, leaving, deviceId]);
   const upload = useRef<HTMLInputElement>(null),
     back = useRef<HTMLButtonElement>(null);
   const [narrow, setNarrow] = useState(() => window.innerWidth < 700);
@@ -122,9 +144,9 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
   useEffect(() => {
     if (!worldEvent || worldEvent.scene !== scene) return;
     if (room.record && worldEvent.revision <= room.record.revision) return;
-    if (room.status === "dirty" || room.status === "saving")
+    if (room.status !== "synced")
       setToast("这处小天地有了新变化。记得先保存，再载入云端。");
-    else void room.reload();
+    else void room.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldEvent?.at]);
   useEffect(() => {
@@ -187,7 +209,26 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
       className={`app scene-room${night ? " night" : ""}`}
       style={{ ["--room-accent" as string]: config.accent }}
     >
-      <div className={`scene tool-${tool}`} aria-label={`${config.title}独立三维场景`}>
+      <DeviceLabels
+        world={room.snapshot}
+        points={devicePoints}
+        onSelect={(id) =>
+          builder.editor?.mode === "remove"
+            ? builder.editor.select({ deviceId: id })
+            : setDeviceId(id)
+        }
+      />
+      <div
+        className={`scene tool-${tool}`}
+        style={cursorStyle(
+          tool === "build"
+            ? glyphForBlock(builder.material)
+            : tool === "device"
+              ? glyphForKind(builder.kind)
+              : glyphForTool(tool),
+        )}
+        aria-label={`${config.title}独立三维场景`}
+      >
         {room.ready ? (
           <SceneBoundary label={config.short}>
             <Visual
@@ -195,7 +236,15 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
                 ...room.snapshot,
                 environment: parent.snapshot.environment,
               }}
-              tool={tool}
+              tool={buildMode ? "explore" : (tool as Tool)}
+              building={
+                scene === "library" && builder.enabled && !room.unsupported
+                  ? builder.editor
+                  : undefined
+              }
+              unknownSnapshot={room.unknownSnapshot}
+              onDevice={setDeviceId}
+              onDevicePositions={setDevicePoints}
               low={quality === "low" || (quality === "auto" && narrow)}
               reset={reset}
               onPlace={room.place}
@@ -203,16 +252,16 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
               walk={walking}
               avatar={avatar}
               onGate={(dest) => void navigate(paths[dest])}
-              onRead={
-                scene === "library" ? () => setReading({}) : undefined
-              }
+              onRead={scene === "library" ? () => setReading({}) : undefined}
               onOpenBook={
                 scene === "library"
                   ? (bookId) => setReading({ bookId })
                   : undefined
               }
               onTutor={
-                scene === "library" ? () => setReading({ focusChat: true }) : undefined
+                scene === "library"
+                  ? () => setReading({ focusChat: true })
+                  : undefined
               }
             />
           </SceneBoundary>
@@ -228,6 +277,23 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
           </div>
         )}
       </div>
+      {scene === "library" && builder.enabled && (
+        <BuildingControls builder={builder} room={room} />
+      )}
+      {deviceId && (
+        <DevicePanel
+          room={room}
+          deviceId={deviceId}
+          onSelect={setDeviceId}
+          onClose={() => setDeviceId(null)}
+        />
+      )}
+      {!room.unsupported && (
+        <SpeakingSigns
+          devices={room.snapshot.devices}
+          worldId={room.record?.id ?? null}
+        />
+      )}
       <div className="edge-fade" />
       <header className="topbar">
         <button
@@ -351,21 +417,27 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
       )}
       <div className="bottom-center">
         <div className="tool-hint">
-          {tool === "explore"
-            ? config.hints.explore
-            : tool === "flower"
-              ? config.hints.flower
-              : tool === "tree"
-                ? config.hints.tree
-                : config.hints.bench}
+          {tool === "build"
+            ? "单击预览，双击地面或方块表面放置。"
+            : tool === "remove"
+              ? "选中物件后整理；撤销可恢复上一步。"
+              : tool === "device"
+                ? "单击预览，双击地面或完整支撑的顶面摆放装置。"
+                : tool === "explore"
+                  ? config.hints.explore
+                  : tool === "flower"
+                    ? config.hints.flower
+                    : tool === "tree"
+                      ? config.hints.tree
+                      : config.hints.bench}
         </div>
         <nav className="toolbar" aria-label="场景编辑工具">
           {(
             [
               { id: "explore", label: "漫游", icon: Compass },
-              { id: "flower", label: "种花", icon: Flower2 },
-              { id: "tree", label: "种树", icon: TreePine },
-              { id: "bench", label: "长椅", icon: Armchair },
+              { id: "flower", label: "种花" },
+              { id: "tree", label: "种树" },
+              { id: "bench", label: "长椅" },
             ] as const
           ).map((t) => (
             <button
@@ -373,12 +445,66 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
               disabled={!room.ready || leaving}
               className={`tool ${tool === t.id ? "active" : ""}`}
               aria-pressed={tool === t.id}
-              onClick={() => setTool(t.id)}
+              onClick={() => {
+                setTool(t.id);
+                if (t.id === "explore") setWalking(true);
+              }}
             >
-              <t.icon size={20} />
+              {"icon" in t ? (
+                <t.icon size={20} />
+              ) : (
+                <ItemGlyph id={t.id} size={22} />
+              )}
               <span>{t.label}</span>
             </button>
           ))}
+          {scene === "library" &&
+            builder.enabled &&
+            (["build", "device", "remove"] as const).map((mode) => (
+              <button
+                key={mode}
+                className={`tool ${tool === mode ? "active" : ""}`}
+                aria-pressed={tool === mode}
+                onClick={() => {
+                  setTool(mode);
+                  setWalking(false);
+                  setReset((n) => n + 1);
+                }}
+              >
+                <ItemGlyph
+                  id={
+                    mode === "build"
+                      ? "blocks"
+                      : mode === "device"
+                        ? glyphForKind(builder.kind)
+                        : "shovel"
+                  }
+                  size={22}
+                />
+                <span>
+                  {mode === "build"
+                    ? "建造"
+                    : mode === "device"
+                      ? "装置"
+                      : "铲子"}
+                </span>
+              </button>
+            ))}
+          {scene === "library" && builder.enabled && (
+            <button
+              className="tool"
+              onClick={() => {
+                const d = room.snapshot.devices?.find(
+                  (d) => d.payload.kind === "bookshelf",
+                );
+                if (d) setDeviceId(d.id);
+                else room.notify("先摆一座书架，再来写自己的作品。");
+              }}
+            >
+              <ItemGlyph id="notebook" size={22} />
+              <span>作品</span>
+            </button>
+          )}
           <span className="toolbar-divider" />
           <button
             className="tool"
@@ -428,6 +554,7 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
           {panel === "save" ? (
             <>
               <span className="eyebrow">{config.saveEyebrow}</span>
+              {scene === "library" && <RoomBackup room={room} />}
               <h2>{config.saveTitle}</h2>
               <p className="panel-copy">{sync}</p>
               <p className="tiny-note">
@@ -481,7 +608,7 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
                 onClick={room.exportWorld}
               >
                 <Download size={15} />
-                导出{config.short}存档
+                导出{config.short}布局（不含作品）
               </button>
               <button
                 className="small-button"
@@ -510,7 +637,7 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
               />
               <p className="tiny-note">
                 编辑停下 2
-                秒后自动保存；断网时保留本地草稿。导出仅包含当前场景。
+                秒后自动保存；断网时保留本地草稿。此处导出仅含当前场景布局；书屋作品请使用完整书屋备份。
               </p>
             </>
           ) : (
@@ -561,8 +688,7 @@ export default function SceneExperience({ scene, parent, quality, onExit }: Prop
               <strong className="weather-title">天气</strong>
               <div className="season-options">
                 {weatherChoices.map((choice) => {
-                  const current =
-                    parent.snapshot.environment.weather ?? "sun";
+                  const current = parent.snapshot.environment.weather ?? "sun";
                   return (
                     <button
                       key={choice.id}

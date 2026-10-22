@@ -10,8 +10,6 @@ import {
 
 describe("presence scene list stays in sync with subSceneIds", () => {
   it("accepts island plus every sub-scene", () => {
-    // The list is duplicated on purpose (TDZ, see content.ts); this test is
-    // the tripwire that forces an update when a scene is added.
     expect(presenceSceneSchema.options).toEqual(["island", ...subSceneIds]);
   });
 });

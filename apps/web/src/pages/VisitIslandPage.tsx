@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { landmarks } from "@island/world-core";
-import type { PlaceConfig } from "@island/contracts";
 import Island, { type Focus, type Tool } from "../Island";
 import { paths, visitScenePath } from "../routes";
 import { sceneByLandmark, sceneConfig } from "../sceneConfig";
@@ -11,7 +10,8 @@ import TalkPrompt from "../dialogue/TalkPrompt";
 import DialogueBox from "../dialogue/DialogueBox";
 import { emitGrowth } from "../progress/store";
 import { RequestError } from "../api";
-import { contentFeed } from "../contentStore";
+import { useContentFeed } from "../contentStore";
+import { cursorStyle, glyphForTool, ItemGlyph } from "../building/itemGlyphs";
 
 const PLANT_TOOLS: { id: Exclude<Tool, "explore">; label: string }[] = [
   { id: "tree", label: "种树" },
@@ -34,19 +34,8 @@ export default function VisitIslandPage() {
   const [asset, setAsset] = useState("idle");
   const [tool, setTool] = useState<Tool>("explore");
   const [note, setNote] = useState("");
-  const [places, setPlaces] = useState<PlaceConfig[]>([]);
+  const places = useContentFeed()?.places ?? [];
   const canPlant = island.plant;
-  // Published places are global read-only scenery — visitors may wander
-  // them just like the owner does.
-  useEffect(() => {
-    let alive = true;
-    void contentFeed()
-      .then((feed) => alive && setPlaces(feed.places))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const select = (id: string) => {
     const scene = sceneByLandmark[id],
@@ -125,13 +114,18 @@ export default function VisitIslandPage() {
               className={tool === t.id ? "active" : ""}
               onClick={() => setTool(t.id)}
             >
+              <ItemGlyph id={t.id} size={22} />
               {t.label}
             </button>
           ))}
         </nav>
       )}
       {note && <div className="visit-note" role="status">{note}</div>}
-      <div className={`scene tool-${tool}`} aria-label="朋友的主岛（参观）">
+      <div
+        className={`scene tool-${tool}`}
+        style={cursorStyle(glyphForTool(tool))}
+        aria-label="朋友的主岛（参观）"
+      >
         <Island
           world={island.world.snapshot}
           tool={tool}

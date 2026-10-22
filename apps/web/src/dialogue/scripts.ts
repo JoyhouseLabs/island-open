@@ -75,6 +75,11 @@ const smallTalk: Record<SpeakerKind, string[]> = {
     "读书就像点灯，一页一页，心里就慢慢亮了。",
     "有不懂的句子就来问我，我们一起想。",
   ],
+  sign: [
+    "你猜怎么着——路过的人里，数你读我读得最认真。",
+    "我站在这里看了好久的海，浪是一下一下数着拍过来的。",
+    "风念我身上的字给我听，念错了我就晃一晃。",
+  ],
 };
 const guestTalk = [
   "我最近喜欢在这里待着，看你走来走去。",
@@ -98,6 +103,7 @@ export function greeting(kind: SpeakerKind, name: string): DialogueNode {
     wolf: `${name}竖起耳朵，朝你轻轻点了点头。`,
     fox: pick([`${name}停下了脚步，尾巴摇了摇。`, `哟，${name}正巧路过，有话要跟你说。`]),
     tutor: `${name}合上手里的书，抬起头微笑。`,
+    sign: `${name}轻轻晃了一下，好像在跟你招手。`,
   };
   const opener = hello[kind] ?? `${name}转过头来，正好看见你。`;
   const choices = [

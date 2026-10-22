@@ -86,9 +86,18 @@ button:active:not(:disabled) {
   touch-action: none;
 }
 .scene.tool-tree,
+.scene.tool-tree canvas,
 .scene.tool-flower,
-.scene.tool-bench {
-  cursor: crosshair;
+.scene.tool-flower canvas,
+.scene.tool-bench,
+.scene.tool-bench canvas,
+.scene.tool-build,
+.scene.tool-build canvas,
+.scene.tool-device,
+.scene.tool-device canvas,
+.scene.tool-remove,
+.scene.tool-remove canvas {
+  cursor: var(--tool-cursor, crosshair);
 }
 .edge-fade {
   position: absolute;
@@ -2298,6 +2307,27 @@ a.place {
   color: var(--muted);
   font-size: 13px;
 }
+.visit-name {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  justify-content: center;
+}
+.visit-name label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  text-align: left;
+}
+.visit-name input {
+  min-width: 8rem;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+}
 .name-tag {
   padding: 3px 10px;
   border-radius: 12px;
@@ -2474,6 +2504,9 @@ a.place {
   background: #2c3a35d8;
 }
 .visit-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 7px 14px;
   border: none;
   border-radius: 11px;
@@ -3220,4 +3253,131 @@ a.place {
   left: 0;
   right: 0;
   height: 14px;
+}
+
+/* Building tools use explicit confirmation on touch and mouse alike. */
+.building-controls{position:absolute;right:24px;top:100px;z-index:16;width:280px;max-height:70vh;overflow:auto;padding:18px;border-radius:20px;background:#f8f7edee;color:#304c3e;box-shadow:0 8px 30px #304c3e20}
+.building-controls p,.room-backup p{font-size:13px;line-height:1.65}.building-controls label,.device-panel label{display:block;margin:10px 0}.building-controls select,.device-panel select,.device-panel input,.device-panel textarea{max-width:100%;font:inherit;background:#fffdf5;border:1px solid #b9c3ad;border-radius:8px;padding:10px;color:#304c3e}.building-controls button,.device-panel button,.room-backup button{min-height:44px;margin:4px;padding:8px 14px;border-radius:10px;border:1px solid #b9c3ad;cursor:pointer;background:#f1f2e6;color:#304c3e}.building-controls button:disabled,.device-panel button:disabled{opacity:.5;cursor:not-allowed}.device-label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:1px solid #a4b396;border-radius:12px;padding:4px 10px 4px 4px;background:#f5f4e9;color:#365044;cursor:pointer}
+.item-glyph{display:block;line-height:0}.item-glyph svg{width:100%;height:100%;display:block}
+.tool .item-glyph{background:#fffdf8;border-radius:7px;box-shadow:inset 0 0 0 1px #d5dcc8}
+.item-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+.field-label{display:block;margin:10px 0 0;font-size:13px}
+.item-slot,.building-controls button.item-slot{width:52px;height:52px;min-height:0;margin:0;display:grid;place-items:center;padding:4px;border-radius:10px;border:2px solid #d5dcc8;background:#fffdf8;cursor:pointer}
+.item-slot[aria-pressed="true"]{border-color:#39795d;background:#e5f0e2;box-shadow:0 0 0 1px #39795d}
+.device-panel h2{display:flex;align-items:center;gap:8px}
+.device-panel.panel{position:absolute;z-index:40;top:5vh;right:4vw;width:min(580px,92vw);max-height:86vh;overflow:auto;padding:26px;background:#f8f7ed;box-shadow:0 16px 80px #173c3d44;border-radius:24px}.device-panel textarea{display:block;width:100%;box-sizing:border-box}.scene-content-panel fieldset{border:1px solid #b9c3ad;border-radius:12px;margin:14px 0}.content-list{padding:0;list-style:none}.content-list button{width:100%;text-align:left}.content-list small{display:block;color:#687c69}.content-actions{display:flex;flex-wrap:wrap;gap:4px}.plain-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.room-backup{border:1px solid #b9c3ad;border-radius:12px;padding:12px;margin:12px 0}
+@media(max-width:699px){.building-controls{right:10px;top:80px;width:220px;max-height:48vh;padding:12px}.item-slot,.building-controls button.item-slot{width:44px;height:44px}.device-panel.panel{right:3vw;top:3vh;width:94vw;max-height:90vh;padding:18px;box-sizing:border-box}.scene-room .toolbar{max-width:96vw;overflow-x:auto}.scene-room .toolbar .tool{flex-shrink:0;min-width:44px}}
+/* Text stays readable and selectable in recovery/history panels. */
+.scene-content-panel aside {border:1px solid #bdc9b5;border-radius:14px;padding:14px;margin:14px 0;background:#fafbf6;}
+.scene-content-panel aside textarea {min-height:120px;width:100%;}
+.device-label-layer{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden;}
+.device-label-layer .device-label{position:absolute;pointer-events:auto;transform:translate(-50%,-50%);min-height:32px;white-space:nowrap;}
+/* Named choices and one shared 3D inspection view; confirmation stays reachable. */
+.building-controls button.item-slot{width:76px;height:72px;gap:3px;grid-template-rows:36px auto;padding:5px;}
+.item-slot-name{font-size:12px;line-height:1.2;max-width:66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.item-explanation{border-block:1px solid #d9dfcd;padding:10px 0;margin:8px 0;}
+.item-explanation p{margin:6px 0;}
+.item-preview{height:144px;position:relative;border-radius:12px;background:#e9eddf;overflow:hidden;}
+.item-preview>span{position:absolute;bottom:5px;left:0;right:0;text-align:center;font-size:11px;color:#566f60;pointer-events:none;}
+.building-controls .building-confirmation{position:sticky;bottom:-18px;background:#f8f7ed;padding:8px 0;margin-bottom:4px;border-top:1px solid #d9dfcd;z-index:1;}
+.building-controls .building-confirmation .primary-button{width:calc(100% - 8px);}
+.building-controls.is-compact{max-height:40vh;}
+.building-controls .item-row small{font-size:12px;line-height:1.5;color:#637767;}
+@media(max-width:699px){.building-controls button.item-slot{width:60px;height:66px;}.item-slot-name{max-width:52px;font-size:11px;}.item-preview{height:112px;}.building-controls .building-confirmation{bottom:-12px;}.building-controls.is-compact{top:70px;max-height:32vh;}}
+
+.building-controls{display:flex;flex-direction:column;overflow:hidden;}
+.building-controls>strong,.building-panel-actions,.building-controls>.building-confirmation,.building-controls>button{flex-shrink:0;}
+.building-panel-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0;}
+.building-panel-actions button{margin:0;padding:6px;font-size:12px;line-height:1.5;}
+.building-settings{overflow-y:auto;min-height:0;}
+.building-settings[hidden]{display:none;}
+.building-controls .building-confirmation{position:static;margin:0;padding:6px 0;}
+.building-controls .building-confirmation p{margin:6px 0;}
+.building-controls.is-compact{max-height:none;}
+@media(max-width:699px){.building-controls{max-height:67vh;}.building-controls.is-compact{max-height:none;}.building-controls>button{font-size:12px;min-height:32px;padding:4px 8px;}.building-settings>p{margin-top:4px;}}
+
+/* ---- knowledge cards (field notes) ---- */
+.card-modal {
+  position: relative;
+  background: #f9faf0;
+  border: 1px solid #fff8;
+  border-radius: 22px;
+  width: 400px;
+  max-width: 100%;
+  max-height: min(78vh, 620px);
+  overflow-y: auto;
+  padding: 32px 30px 26px;
+  box-shadow: 0 20px 100px #15372530;
+}
+.card-modal .eyebrow {
+  display: flex;
+  font-size: 7px;
+  letter-spacing: 1.3px;
+  color: #95a087;
+}
+.card-modal h2 {
+  font-family: "Noto Serif SC", serif;
+  font-size: 25px;
+  letter-spacing: 2px;
+  font-weight: 400;
+  margin: 14px 0 6px;
+  color: var(--ink, #344c3f);
+}
+.card-subtitle {
+  margin: 0 0 14px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #7d8f77;
+}
+.card-image {
+  display: block;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid #fff;
+  margin: 0 0 14px;
+  max-height: 210px;
+  object-fit: cover;
+}
+.card-facts {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+.card-fact {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  background: #eef1e3;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #4c5f49;
+}
+.card-fact strong {
+  flex: none;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #7d8f77;
+}
+.card-look {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #44543f;
+}
+.card-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pack-cell[role="button"] {
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.pack-cell[role="button"]:hover,
+.pack-cell[role="button"]:focus-visible {
+  transform: translateY(-2px);
+  background: #f2f4e6;
+  outline: none;
 }

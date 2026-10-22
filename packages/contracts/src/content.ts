@@ -1,28 +1,11 @@
 import { z } from "zod";
+import { sceneIds } from "./scenes.js";
 
 /**
  * Admin-managed content: books, animals and the NPC chat request shape.
  * These schemas are shared by the admin app (editing), the API (validation
  * and storage) and the game client (defensive parsing of published feeds).
- *
- * Small enums are duplicated from index.ts on purpose: importing them across
- * the index re-export would hit TDZ on module init. content.test.ts asserts
- * they stay in sync.
  */
-const sceneIds = [
-  "island",
-  "garden",
-  "home",
-  "meadow",
-  "forest",
-  "library",
-  "pond",
-  "lab",
-  "nursery",
-  "mountain",
-  "starlight",
-  "beach",
-] as const;
 export const contentSceneSchema = z.enum(sceneIds);
 export type ContentScene = (typeof sceneIds)[number];
 
@@ -164,9 +147,19 @@ export const placeSchema = z
 export type PlaceProp = z.infer<typeof placePropSchema>;
 export type PlaceConfig = z.infer<typeof placeSchema>;
 
+/** A deep-chat speaker: a legacy bare content slug, or a full subject id
+ *  ("resident:团团", "device:<uuid>"). Old clients keep sending slugs. */
+const speakerIdSchema = z
+  .string()
+  .min(1)
+  .max(80)
+  .refine(
+    (s) => /^([a-z0-9-]{2,40}|[a-z]+:\S{1,64})$/.test(s),
+    "speakerId 需为内容编号或 subject 标识",
+  );
 export const npcChatRequestSchema = z
   .object({
-    speakerId: slug,
+    speakerId: speakerIdSchema,
     message: z.string().trim().min(1).max(400),
     env: z
       .object({
@@ -176,6 +169,9 @@ export const npcChatRequestSchema = z
       })
       .strict()
       .optional(),
+    /** Device speakers live on a concrete island; visitors add the token. */
+    world: z.string().uuid().optional(),
+    token: z.string().min(1).max(200).optional(),
   })
   .strict();
 export type NpcChatRequest = z.infer<typeof npcChatRequestSchema>;
@@ -205,6 +201,8 @@ export const bookNoteCreateSchema = z
   .strict();
 export type BookNoteCreate = z.infer<typeof bookNoteCreateSchema>;
 export interface BookNote {
+  bookVersion?: number | null;
+  locationKind?: "page" | "legacy";
   id: string;
   bookId: string;
   page: number;

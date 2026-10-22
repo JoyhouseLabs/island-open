@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { forageCatalog, forageSpots, walkSpecs } from "./src/index";
+import { builtinItems, forageCatalog, forageSceneIds, forageSpots, walkSpecs } from "./src/index";
 import { subSceneIds } from "@island/contracts";
 
 describe("forageSpots", () => {
@@ -42,6 +42,14 @@ describe("forageSpots", () => {
       ))
         expect(Math.hypot(s.x / 150, s.z / 125)).toBeLessThan(0.86);
     }
+  });
+  it("has a forage patch and a backpack item for every registered scene", () => {
+    expect([...forageSceneIds].sort()).toEqual(["island", ...subSceneIds].sort());
+    const items = builtinItems();
+    expect(items.filter((item) => item.kind === "forage").map((item) => item.id).sort()).toEqual(
+      forageCatalog.map((item) => item.kind).sort(),
+    );
+    expect(items.find((item) => item.id === "hat-starcrown")?.stack).toBeNull();
   });
   it("only offers kinds from the catalog", () => {
     const kinds = new Set(forageCatalog.map((c) => c.kind));

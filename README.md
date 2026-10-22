@@ -35,6 +35,8 @@ pnpm test
 pnpm build
 ```
 
+推送到 `main` 或打开拉取请求时，GitHub Actions 会跑同样的三项检查。
+
 ## 内容与扩展
 
 用户可构建的物品以**数据内容包**形式提供（模型、贴图、参数与受支持的行为 ID），不加载任意 JS/React 代码。上传、审核、发布与售卖由官方服务端流程处理。
@@ -49,3 +51,7 @@ pnpm build
 | 名称与标识 | 不随代码授权，见 [商标说明](TRADEMARKS.md) |
 
 完整说明见 [LICENSING](LICENSING.md)。参与贡献前请阅读 [CONTRIBUTING](CONTRIBUTING.md) 并签署 [CLA](CLA.md)。
+
+## 官方 Web 与统一登录
+
+官方入口为 https://app.joyhouse.chat ，授权网关为 https://auth.joyhouse.chat 。生产后端启用统一授权后，界面提供「微信扫码登录」与「微信内授权登录」，完成授权后返回应用。客户端只接收 Island 会话，中央授权码交换和账号身份映射均由服务器处理。

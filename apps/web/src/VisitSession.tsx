@@ -11,6 +11,9 @@ import { useVisit } from "./useVisit";
 import { paths } from "./routes";
 import { loadAvatar, type AvatarConfig } from "./player/avatar";
 import { presence, usePresence } from "./presence/client";
+import { growth } from "./progress/store";
+import { IslandConfigProvider } from "./contentStore";
+import CardModal from "./cards/CardModal";
 import type { User, VisitIsland } from "@island/contracts";
 
 type Quality = "auto" | "low" | "high";
@@ -43,11 +46,15 @@ export default function VisitSession() {
   const sceneParam = location.pathname.split("/")[3] ?? "island";
   const visit = useVisit(worldId, token);
   const [walking, setWalking] = useState(true);
+  const [guestName, setGuestName] = useState("");
   const [quality] = useState<Quality>("auto");
   const [avatar] = useState<AvatarConfig>(() => loadAvatar());
 
   const island: VisitIsland | null = visit.island;
   const name: string = visit.user?.name ?? "旅人";
+  useEffect(() => {
+    growth.bind(visit.user?.id ?? null);
+  }, [visit.user?.id]);
   useEffect(() => {
     if (visit.status !== "ready" || !island) return;
     presence.connect({
@@ -84,9 +91,27 @@ export default function VisitSession() {
       <div className="scene-loading visit-gate">
         <h1>先留下名字，再上岛看看</h1>
         <p>参观别人的家园需要先登录，这样岛上的朋友才知道你是谁。</p>
-        <button className="small-button" onClick={() => void visit.guestLogin()}>
-          化名登录（试试看）
-        </button>
+        <form
+          className="visit-name"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const trimmed = guestName.trim();
+            if (trimmed) void visit.guestLogin(trimmed);
+          }}
+        >
+          <label>
+            你的名字
+            <input
+              value={guestName}
+              maxLength={12}
+              autoComplete="nickname"
+              onChange={(e) => setGuestName(e.target.value)}
+            />
+          </label>
+          <button className="small-button" disabled={!guestName.trim()}>
+            进去看看
+          </button>
+        </form>
         <Link to={paths.island}>返回我的家园</Link>
       </div>
     );
@@ -113,7 +138,14 @@ export default function VisitSession() {
         quality,
       }}
     >
-      <Outlet />
+      <IslandConfigProvider
+        userId={visit.user?.id ?? null}
+        worldId={worldId}
+        token={token}
+      >
+        <Outlet />
+        <CardModal />
+      </IslandConfigProvider>
     </Context.Provider>
   );
 }

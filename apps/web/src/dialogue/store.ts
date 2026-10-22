@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { NearSpeaker } from "./proximity";
 import { greeting, replyTo, type DialogueNode, type SpeakerKind } from "./scripts";
-import { intelligenceStatus, npcSpeakers } from "../contentStore";
+import { intelligenceStatus } from "../contentStore";
+import { personaFor, type SpeakerPersona } from "../animals/personas";
 
 type OpenDialogue = {
   speaker: NearSpeaker;
@@ -9,7 +10,7 @@ type OpenDialogue = {
   /** Reply text when the player just picked a choice (two-step reveal). */
   pending: string | null;
 };
-type NpcChat = { speakerId: string; name: string };
+type NpcChat = SpeakerPersona;
 /** Quick-phrase chat with another player (visitor agents). */
 type PlayerChatState = { id: string; name: string } | null;
 
@@ -58,9 +59,10 @@ class DialogueStore {
       return;
     }
     const node = greeting(speaker.kind as SpeakerKind, speaker.name ?? "朋友");
-    // Admin-configured companions with a persona offer the LLM deep chat.
-    const config = npcSpeakers.get(speaker.id);
-    if (config?.persona && this.llmOn)
+    // Anything with a persona — admin animals, built-in species, residents,
+    // talking signs — offers the LLM deep chat.
+    const persona = personaFor(speaker.id);
+    if (persona && this.llmOn)
       node.choices = [...(node.choices ?? []), { label: "再多聊聊" }];
     this.open = { speaker, node, pending: null };
     this.bump();
@@ -69,11 +71,11 @@ class DialogueStore {
   choose(label: string) {
     if (!this.open) return;
     if (label === "再多聊聊") {
-      const config = npcSpeakers.get(this.open.speaker.id);
-      if (config?.persona) {
+      const persona = personaFor(this.open.speaker.id);
+      if (persona) {
         this.npc = {
-          speakerId: config.id,
-          name: this.open.speaker.name ?? config.name,
+          ...persona,
+          name: this.open.speaker.name ?? persona.name,
         };
         this.open = null;
         this.bump();

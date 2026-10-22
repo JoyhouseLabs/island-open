@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./room-bundle": {
+      "types": "./dist/room-bundle.d.ts",
+      "default": "./dist/room-bundle.js"
     }
   },
   "scripts": {

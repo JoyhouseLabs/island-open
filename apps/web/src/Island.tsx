@@ -1,3 +1,4 @@
+import RendererCleanup from "./RendererCleanup";
 import {
   Component,
   useEffect,
@@ -713,7 +714,12 @@ function Scene(props: Props) {
       <Scenery />
       <Districts />
       <Fox onAsset={props.onAsset} />
-      <Residents scene="island" entities={props.world.entities} />
+      <Residents
+        scene="island"
+        entities={props.world.entities}
+        seed={props.world.seed}
+        season={props.world.environment.season}
+      />
       <Collectibles scene="island" seed={props.world.seed} />
       {props.onNote && <FoxNote onNote={props.onNote} />}
       {props.walk && props.avatar && props.onGate && (
@@ -808,6 +814,7 @@ export default function Island(props: Props) {
           {/* Remote players render in the canvas itself, so co-presence
               survives switching back to orbit (non-walking) view. */}
           <RemoteLayer scene="island" />
+          <RendererCleanup/>
         </Canvas>
         <div className="scene-labels">
           {labelPlaces.map((l, i) => (

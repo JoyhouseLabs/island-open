@@ -12,6 +12,7 @@ import { specFor } from "../places/specs";
 import { AnimalMesh, type AnimalAction, type AnimalAnim } from "./AnimalMesh";
 import { Emote, type EmoteKind } from "./Emote";
 import { nearbyAgents, playerAgent, reportAgent, dropAgent, agentById } from "./registry";
+import { activeEncounter } from "./ecologyStore";
 import { playVoice } from "./voices";
 import { emitGrowth } from "../progress/store";
 import { dialogue } from "../dialogue/store";
@@ -84,6 +85,9 @@ export function Animal({
     /** The companion this one is chatting or playing with, by agent id. */
     partnerId: null as string | null,
     action: "none" as AnimalAction,
+    /** The ecology encounter this animal is following, if the current
+     *  ten-minute slot scheduled one for it. */
+    ecoBehavior: null as "meet" | "chase" | "hide" | null,
     lastMeet: -30,
     lastPlayer: -30,
     followUntil: -1,
@@ -228,8 +232,35 @@ export function Animal({
           faceZ = player.z;
         }
       }
+      // The ecology slot plan comes first: a scheduled encounter walks both
+      // animals to the same spot for a chat, a chase or a hide-and-nap.
+      const eco = activeEncounter(id);
+      if (eco && (s.mode === "idle" || s.mode === "walk") && t > s.lastMeet + 12) {
+        s.lastMeet = t;
+        s.ecoBehavior = eco.behavior;
+        s.partnerId = eco.behavior === "hide" ? null : eco.partnerId;
+        if (eco.behavior === "hide") {
+          // Nap behind the nearest tree to the meeting point.
+          let best: { x: number; z: number; d: number } | null = null;
+          for (const e of entities)
+            if (e.kind === "tree") {
+              const d = Math.hypot(e.x - eco.at.x, e.z - eco.at.z);
+              if (!best || d < best.d) best = { x: e.x, z: e.z, d };
+            }
+          s.meetWith = null;
+          s.target = best
+            ? { x: best.x + 1.1, z: best.z + 1.1 }
+            : eco.at;
+        } else {
+          s.meetWith = eco.at;
+          s.target = eco.at;
+        }
+        s.mode = "walk";
+      }
+
       // Seek out a fellow resident for a little meeting.
       if (
+        !eco &&
         (s.mode === "idle" || s.mode === "walk") &&
         t > s.lastMeet + 24
       ) {
@@ -273,8 +304,11 @@ export function Animal({
             faceZ = s.meetWith.z;
           } else {
             s.mode = "act";
-            s.until = t + 2.6 + rng() * 2.4;
-            s.action = actionFor(resident.prefer, resident.species);
+            s.until = t + (s.ecoBehavior === "hide" ? 9 : 2.6 + rng() * 2.4);
+            s.action =
+              s.ecoBehavior === "hide"
+                ? "rest"
+                : actionFor(resident.prefer, resident.species);
             showEmote(emoteFor[s.action]);
             s.meetWith = null;
           }
@@ -317,8 +351,9 @@ export function Animal({
           showEmote(chatEmotes[Math.floor(rng() * chatEmotes.length)]!);
         }
         if (t > s.until) {
-          if (s.partnerId && rng() < 0.35) {
-            // Sometimes a chat turns into a game of chase.
+          if (s.partnerId && (s.ecoBehavior === "chase" || rng() < 0.35)) {
+            // Sometimes a chat turns into a game of chase; the ecology plan
+            // can schedule it directly.
             s.mode = "play";
             s.until = t + 6 + rng() * 2;
             s.voiceNext = t + 0.3;
@@ -330,6 +365,7 @@ export function Animal({
             s.until = t + 2 + rng() * 3;
             s.meetWith = null;
             s.partnerId = null;
+            s.ecoBehavior = null;
           }
         }
       }
@@ -360,12 +396,14 @@ export function Animal({
           s.until = t + 2 + rng() * 3;
           s.target = null;
           s.partnerId = null;
+          s.ecoBehavior = null;
         }
       }
       if (s.mode === "act" && t > s.until) {
         s.action = "none";
         s.mode = "idle";
         s.until = t + 2 + rng() * 4;
+        s.ecoBehavior = null;
       }
       if (s.mode === "follow" && (!s.target || s.followUntil < t)) {
         s.mode = "idle";
