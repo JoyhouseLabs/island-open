@@ -1,0 +1,136 @@
+/* Keep the working tools reachable while the catalogue is collapsed. */
+.building-controls .building-hotbar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.building-hotbar .item-slot[aria-pressed="true"] {
+  border-color: #39795d;
+  background: #deedda;
+  box-shadow: 0 0 0 2px #39795d22;
+}
+.building-quick-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.building-controls .building-quick-actions button {
+  flex: 1;
+  margin: 0;
+  padding: 5px 8px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.building-position {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+.building-controls .building-confirmation .primary-button {
+  background: #39795d;
+  color: #fff;
+  font-weight: 600;
+}
+@media (max-width: 699px) {
+  .building-controls.is-compact {
+    top: 76px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px 8px;
+    max-height: calc(100dvh - 260px);
+    overflow-y: auto;
+  }
+  .building-controls.is-compact > strong,
+  .building-controls.is-compact > button,
+  .building-controls.is-compact[data-mode="build"]
+    .building-confirmation
+    > strong {
+    display: none;
+  }
+  .building-controls.is-compact .building-panel-actions {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .building-controls.is-compact .building-hotbar {
+    align-self: center;
+    margin: 0;
+  }
+  .building-controls.is-compact .item-slot {
+    width: 48px;
+    height: 62px;
+  }
+  .building-controls.is-compact[data-mode="device"] .building-quick-actions,
+  .building-controls.is-compact[data-mode="remove"] .building-quick-actions {
+    grid-column: 1 / -1;
+  }
+  .building-controls.is-compact .building-confirmation > strong {
+    grid-column: 1;
+    font-size: 12px;
+  }
+  .building-controls.is-compact .building-quick-actions {
+    gap: 3px;
+  }
+  .building-controls.is-compact .building-quick-actions button {
+    padding: 3px;
+  }
+  .building-controls.is-compact .building-confirmation {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 90px;
+    column-gap: 5px;
+    align-items: center;
+    padding: 3px 0 0;
+  }
+  .building-controls.is-compact .building-confirmation p {
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 0;
+  }
+  .building-controls.is-compact .building-position {
+    font-size: 10px;
+  }
+  .building-controls.is-compact .building-confirmation .primary-button {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    width: 100%;
+    margin: 0;
+  }
+  .building-controls .building-panel-actions button {
+    min-height: 44px;
+  }
+}
+
+.building-remove-here {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 17;
+  min-height: 44px;
+  min-width: 88px;
+  border: 2px solid #a65f3e;
+  border-radius: 12px;
+  background: #fff8ec;
+  color: #7d432a;
+  box-shadow: 0 4px 14px #304c3e30;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+.building-remove-here:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 359px) {
+  .building-controls.is-compact {
+    grid-template-columns: 1fr;
+  }
+  .building-controls.is-compact .building-hotbar {
+    justify-content: center;
+  }
+}

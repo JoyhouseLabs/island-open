@@ -25,6 +25,9 @@ export function useBuilder(
 ) {
   const [enabled, setEnabled] = useState(false),
     [target, setTarget] = useState<BuildTarget | null>(null),
+    [targetScreen, setTargetScreen] = useState<{ x: number; y: number } | null>(
+      null,
+    ),
     [material, setMaterial] =
       useState<BlockValue["definitionId"]>("island:stone"),
     [kind, setKind] = useState<
@@ -39,6 +42,12 @@ export function useBuilder(
       .catch(() => {});
   }, []);
   useEffect(() => setTarget(null), [mode]);
+  const select = (picked: BuildTarget | null) => {
+    // Pointer movement within one grid cell must not revalidate the whole world.
+    setTarget((previous) =>
+      JSON.stringify(previous) === JSON.stringify(picked) ? previous : picked,
+    );
+  };
   const operations = (picked = target): WorldOp[] => {
     const target = picked;
     if (!target || !mode) return [];
@@ -65,6 +74,8 @@ export function useBuilder(
       );
     const cells = readCells(room.snapshot.construction),
       value = cells.get(cellKey(target.cell)) ?? null;
+    if (mode === "build" && value)
+      throw Error("这里已有方块，请指向它的表面继续搭建。");
     if (mode === "remove" && !value)
       throw Error("这里没有建筑方块，请点击要整理的物件或方块。");
     if (mode === "build" || mode === "remove")
@@ -182,7 +193,7 @@ export function useBuilder(
     [target, mode, room.snapshot, material, kind, rotation, storedId],
   );
   const previewError = preview.error;
-  const commit = (prepared = preview) => {
+  const commit = (prepared = preview, picked = target) => {
     const preview = prepared;
     if (!preview.snapshot) {
       room.notify(preview.error ?? "先点击场景选中位置或物件。");
@@ -194,19 +205,35 @@ export function useBuilder(
     }
     room.edit(() => preview.snapshot!);
     room.notify(mode === "remove" ? "已整理，可撤销。" : "已放好，等待保存。");
-    setTarget(null);
+    if (mode === "build" && picked && "cell" in picked) {
+      const n = picked.normal ?? { x: 0, y: 1, z: 0 };
+      setTarget({
+        ...picked,
+        cell: {
+          x: picked.cell.x + n.x,
+          y: picked.cell.y + n.y,
+          z: picked.cell.z + n.z,
+        },
+      });
+    } else setTarget(null);
     setStoredId("");
   };
   const editor: BuildingEditor | undefined = mode
     ? {
         mode,
         target,
-        select: setTarget,
+        select,
         place: (picked) => {
           if (mode === "remove") return;
           setTarget(picked);
-          commit(prepare(picked));
+          commit(prepare(picked), picked);
         },
+        reportTarget: (point) =>
+          setTargetScreen((previous) =>
+            previous?.x === point?.x && previous?.y === point?.y
+              ? previous
+              : point,
+          ),
         previewError,
         device:
           kind === "bench" || kind === "flower" ? "island:bookshelf" : kind,
@@ -224,6 +251,7 @@ export function useBuilder(
     enabled,
     editor,
     target,
+    targetScreen,
     material,
     setMaterial,
     kind,

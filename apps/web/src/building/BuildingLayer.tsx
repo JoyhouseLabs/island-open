@@ -22,29 +22,19 @@ import type { BuildingEditor, BuildTarget } from "./types";
 import { glyphForDevice } from "./itemGlyphs";
 import { blockMap } from "./blockTextures";
 import { ItemModel } from "./ItemModel";
-// Native mouse double-clicks and consecutive touch taps share placement validation.
+// Touch selects a stable target; the on-screen action commits it. Mouse clicks
+// commit directly, but camera drags and the second click of a double-click do not.
 function usePlacementPick(editor?: BuildingEditor) {
-  const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
-  useEffect(() => {
-    lastTap.current = null;
-  }, [editor?.mode, editor?.held]);
   return (target: BuildTarget, e: ThreeEvent<MouseEvent>) => {
     if (!editor) return;
-    const native = e.nativeEvent as PointerEvent;
-    const touch = native.pointerType === "touch";
-    const previous = lastTap.current;
-    const doubleTap =
-      touch &&
-      previous &&
-      native.timeStamp - previous.time < 350 &&
-      Math.hypot(native.clientX - previous.x, native.clientY - previous.y) < 12;
-    const place = touch ? doubleTap : native.detail === 2;
-    lastTap.current =
-      touch && !place
-        ? { time: native.timeStamp, x: native.clientX, y: native.clientY }
-        : null;
     editor.select(target);
-    if (place && editor.mode !== "remove") editor.place(target);
+    const native = e.nativeEvent as PointerEvent;
+    if (
+      native.pointerType !== "touch" &&
+      native.detail <= 1 &&
+      editor.mode !== "remove"
+    )
+      editor.place(target);
   };
 }
 const faceData = [
@@ -107,7 +97,10 @@ function geometries(
   entries: [string, BlockValue][],
   all: Map<string, BlockValue>,
 ) {
-  const groups = new Map<string, { pos: number[]; uv: number[] }>();
+  const groups = new Map<
+    string,
+    { pos: number[]; uv: number[]; color: number[] }
+  >();
   const corner: [number, number][] = [
     [0, 0],
     [0, 1],
@@ -136,7 +129,7 @@ function geometries(
       const key = `${v.definitionId}:${c.y >= 4 ? "high" : "low"}`;
       let data = groups.get(key);
       if (!data) {
-        data = { pos: [], uv: [] };
+        data = { pos: [], uv: [], color: [] };
         groups.set(key, data);
       }
       for (const index of [0, 1, 2, 0, 2, 3]) {
@@ -144,6 +137,10 @@ function geometries(
         const t = corner[index]!;
         data.pos.push(min.x + p[0]!, min.y + p[1]!, min.z + p[2]!);
         data.uv.push(t[0], t[1]);
+        // Subtle face contrast keeps volumes legible in the island's soft light.
+        const shade =
+          f.n[1] === 1 ? 1 : f.n[1] === -1 ? 0.65 : f.n[0] ? 0.86 : 0.94;
+        data.color.push(shade, shade, shade);
       }
     }
   }
@@ -154,6 +151,7 @@ function geometries(
       new T.Float32BufferAttribute(data.pos, 3),
     );
     geometry.setAttribute("uv", new T.Float32BufferAttribute(data.uv, 2));
+    geometry.setAttribute("color", new T.Float32BufferAttribute(data.color, 3));
     geometry.computeVertexNormals();
     return { key, geometry };
   });
@@ -176,31 +174,36 @@ const Chunk = memo(
       [meshes],
     );
     const select = usePlacementPick(editor);
-    const pick = (e: ThreeEvent<MouseEvent>) => {
-      if (!editor || e.delta > 5 || !e.face) return;
+    const pick = (e: ThreeEvent<MouseEvent | PointerEvent>, hover = false) => {
+      if (!editor || (!hover && e.delta > 5) || !e.face) return;
+      if (hover && (e.nativeEvent as PointerEvent).pointerType === "touch")
+        return;
+      if (hover && (e.nativeEvent.buttons || editor.mode === "remove")) return;
       e.stopPropagation();
-      select(
-        {
-          cell: hitCell(
-            e.point,
-            { x: e.face.normal.x, y: e.face.normal.y, z: e.face.normal.z },
-            editor.mode === "build",
-          ),
-          top: e.face.normal.y > 0.5,
-        },
-        e,
-      );
+      const target: BuildTarget = {
+        cell: hitCell(
+          e.point,
+          { x: e.face.normal.x, y: e.face.normal.y, z: e.face.normal.z },
+          editor.mode === "build",
+        ),
+        top: e.face.normal.y > 0.5,
+        normal: { x: e.face.normal.x, y: e.face.normal.y, z: e.face.normal.z },
+      };
+      if (hover) editor.select(target);
+      else select(target, e as ThreeEvent<MouseEvent>);
     };
     return (
       <>
         {meshes.map(({ key, geometry }) => {
           const glass = key.includes("glass"),
-            fade = (editor?.cutaway ?? true) && key.endsWith("high");
+            fade = (editor?.cutaway ?? false) && key.endsWith("high");
           return (
             <mesh
               key={key}
               geometry={geometry}
-              onClick={pick}
+              name={`building:${key}`}
+              onClick={(e) => pick(e)}
+              onPointerMove={(e) => pick(e, true)}
               castShadow
               receiveShadow
             >
@@ -208,6 +211,7 @@ const Chunk = memo(
                 map={blockMap(
                   glass ? "glass" : key.includes("wood") ? "wood" : "stone",
                 )}
+                vertexColors
                 roughness={glass ? 0.18 : 0.85}
                 transparent={glass || !!fade}
                 opacity={fade ? 0.14 : glass ? 0.55 : 1}
@@ -237,17 +241,45 @@ export default function BuildingLayer({
     { target: T.Vector3; update: () => void } | undefined;
   useEffect(() => {
     if (!editor) return;
-    const focus = () => {
-      camera.position.set(34, 42, 3);
-      controls?.target.set(21, 0, -13);
+    const focus = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          point?: { x: number; y: number; z: number };
+          view?: "near" | "top";
+        }>
+      ).detail;
+      const p = detail?.point ?? { x: 21, y: 0, z: -13 };
+      if (detail?.view === "top") camera.position.set(p.x, p.y + 30, p.z + 0.1);
+      else if (detail?.view === "near")
+        camera.position.set(p.x + 8, p.y + 9, p.z + 11);
+      else camera.position.set(p.x + 13, p.y + 30, p.z + 20);
+      camera.lookAt(p.x, p.y, p.z);
+      controls?.target.set(p.x, p.y, p.z);
       controls?.update();
     };
+    focus(new Event("island-focus-building"));
     window.addEventListener("island-focus-building", focus);
     return () => window.removeEventListener("island-focus-building", focus);
   }, [camera, controls, !!editor]);
   const lastProjection = useRef(""),
-    projectionElapsed = useRef(0);
-  useFrame(({ camera, gl, size }, dt) => {
+    projectionElapsed = useRef(0),
+    targetProjectionElapsed = useRef(0);
+  useFrame(({ camera, gl, size, scene }, dt) => {
+    targetProjectionElapsed.current += dt;
+    if (editor && targetProjectionElapsed.current > 0.1) {
+      targetProjectionElapsed.current = 0;
+      const v = removalPoint
+        ? new T.Vector3(...removalPoint).project(camera)
+        : null;
+      editor.reportTarget(
+        v && v.z >= -1 && v.z <= 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1
+          ? {
+              x: Math.round(((v.x + 1) * size.width) / 2),
+              y: Math.round(((1 - v.y) * size.height) / 2),
+            }
+          : null,
+      );
+    }
     projectionElapsed.current += dt;
     if (onDevicePositions && projectionElapsed.current > 0.1) {
       projectionElapsed.current = 0;
@@ -283,6 +315,21 @@ export default function BuildingLayer({
       programs: gl.info.programs?.length ?? 0,
       calls: gl.info.render.calls,
       triangles: gl.info.render.triangles,
+    };
+    probe.inspectBlocks = () => {
+      const values: { name: string; opacity: number; transparent: boolean }[] =
+        [];
+      scene.traverse((object) => {
+        if (object instanceof T.Mesh && object.name.startsWith("building:")) {
+          const material = object.material as T.MeshStandardMaterial;
+          values.push({
+            name: object.name,
+            opacity: material.opacity,
+            transparent: material.transparent,
+          });
+        }
+      });
+      return values;
     };
     probe.project = (x, y, z) => {
       const p = new T.Vector3(x, y, z).project(camera);
@@ -322,27 +369,69 @@ export default function BuildingLayer({
     preview && target && "cell" in target && cells.has(cellKey(target.cell))
       ? preview.y + 1
       : 0;
+  const groundPick = (
+    e: ThreeEvent<MouseEvent | PointerEvent>,
+    hover = false,
+  ) => {
+    if (!editor || (!hover && e.delta > 5)) return;
+    if (
+      hover &&
+      ((e.nativeEvent as PointerEvent).pointerType === "touch" ||
+        e.nativeEvent.buttons ||
+        editor.mode === "remove")
+    )
+      return;
+    e.stopPropagation();
+    const target: BuildTarget = {
+      cell: hitCell(
+        { x: e.point.x, y: 0, z: e.point.z },
+        { x: 0, y: 1, z: 0 },
+        true,
+      ),
+      top: true,
+      normal: { x: 0, y: 1, z: 0 },
+    };
+    if (hover) editor.select(target);
+    else select(target, e as ThreeEvent<MouseEvent>);
+  };
+  let removalPoint: [number, number, number] | null = null;
+  if (editor?.mode === "remove" && target) {
+    if (preview)
+      removalPoint = [preview.x + 0.5, preview.y + 1.2, preview.z + 0.5];
+    else if ("entityId" in target) {
+      const entity = world.entities.find((e) => e.id === target.entityId);
+      if (entity) {
+        const box = entityBox(
+          entity,
+          world.entityPlacements?.find((p) => p.entityId === entity.id)?.y ?? 0,
+        );
+        removalPoint = [entity.x, box.max.y + 0.2, entity.z];
+      }
+    } else if ("deviceId" in target) {
+      const d = world.devices?.find((d) => d.id === target.deviceId);
+      if (d?.placement.state === "placed")
+        removalPoint = [
+          d.placement.x,
+          d.placement.y + deviceDefinitions[d.definitionId].height + 0.2,
+          d.placement.z,
+        ];
+    }
+  }
+  const normal = target && "cell" in target ? target.normal : undefined;
+  const faceRotation = normal
+    ? new T.Quaternion().setFromUnitVectors(
+        new T.Vector3(0, 0, 1),
+        new T.Vector3(normal.x, normal.y, normal.z),
+      )
+    : undefined;
   return (
     <group>
       {editor && (
         <mesh
           position={[0, 0.065, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
-          onClick={(e) => {
-            if (e.delta > 5) return;
-            e.stopPropagation();
-            select(
-              {
-                cell: hitCell(
-                  { x: e.point.x, y: 0, z: e.point.z },
-                  { x: 0, y: 1, z: 0 },
-                  true,
-                ),
-                top: true,
-              },
-              e,
-            );
-          }}
+          onClick={(e) => groundPick(e)}
+          onPointerMove={(e) => groundPick(e, true)}
         >
           <planeGeometry args={[78, 66]} />
           <meshBasicMaterial
@@ -399,7 +488,9 @@ export default function BuildingLayer({
                   : "stone",
             )}
             transparent
-            opacity={0.78}
+            opacity={0.45}
+            color={editor.previewError ? "#e77c70" : "#b8efd2"}
+            depthWrite={false}
           />
         </mesh>
       )}
@@ -425,6 +516,49 @@ export default function BuildingLayer({
           <meshBasicMaterial
             wireframe
             color={editor?.previewError ? "#b34435" : "#39795d"}
+          />
+        </mesh>
+      )}
+      {preview && normal && (
+        <mesh
+          position={[
+            preview.x +
+              0.5 +
+              normal.x * (editor?.mode === "build" ? -0.495 : 0.505),
+            preview.y === 0 && normal.y === 1 && editor?.mode === "build"
+              ? 0.08
+              : preview.y +
+                0.5 +
+                normal.y * (editor?.mode === "build" ? -0.495 : 0.505),
+            preview.z +
+              0.5 +
+              normal.z * (editor?.mode === "build" ? -0.495 : 0.505),
+          ]}
+          quaternion={faceRotation}
+          raycast={() => null}
+          renderOrder={2}
+        >
+          <planeGeometry args={[0.96, 0.96]} />
+          <meshBasicMaterial
+            color={editor?.previewError ? "#dc584b" : "#36b88b"}
+            side={T.DoubleSide}
+            transparent
+            opacity={0.5}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+      {preview && preview.y > 0 && (
+        <mesh
+          position={[preview.x + 0.5, preview.y / 2, preview.z + 0.5]}
+          raycast={() => null}
+        >
+          <boxGeometry args={[0.035, preview.y, 0.035]} />
+          <meshBasicMaterial
+            color="#39795d"
+            transparent
+            opacity={0.7}
+            depthWrite={false}
           />
         </mesh>
       )}
@@ -484,9 +618,35 @@ export default function BuildingLayer({
                 e.stopPropagation();
                 if (editor?.mode === "remove")
                   editor.select({ deviceId: d.id });
-                else onDevice?.(d.id);
+                else if (!editor) onDevice?.(d.id);
               }}
             >
+              {editor?.mode === "remove" &&
+                target &&
+                "deviceId" in target &&
+                target.deviceId === d.id && (
+                  <mesh
+                    position={[
+                      0,
+                      deviceDefinitions[d.definitionId].height / 2,
+                      0,
+                    ]}
+                    raycast={() => null}
+                  >
+                    <boxGeometry
+                      args={[
+                        deviceDefinitions[d.definitionId].width + 0.04,
+                        deviceDefinitions[d.definitionId].height + 0.04,
+                        deviceDefinitions[d.definitionId].depth + 0.04,
+                      ]}
+                    />
+                    <meshBasicMaterial
+                      wireframe
+                      color="#ba6e4b"
+                      depthTest={false}
+                    />
+                  </mesh>
+                )}
               <ItemModel
                 kind={glyphForDevice(d.definitionId)}
                 occupied={

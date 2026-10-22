@@ -3,6 +3,8 @@ export const buildingDiagnostics = {
   player: null as { x: number; y: number; z: number } | null,
   frameMs: [] as number[],
   memory: { geometries: 0, textures: 0, programs: 0, calls: 0, triangles: 0 },
+  inspectBlocks: null as
+    null | (() => { name: string; opacity: number; transparent: boolean }[]),
   project: null as
     null | ((x: number, y: number, z: number) => { x: number; y: number }),
 };

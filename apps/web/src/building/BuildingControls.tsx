@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { cellMin } from "@island/world-core";
+import "./building-controls.css";
 import ItemPreview from "./ItemPreview";
 import { deviceDefinitions, type DeviceInstance } from "@island/contracts";
 import type { useBuilder } from "./useBuilder";
@@ -68,7 +70,66 @@ export default function BuildingControls({
   builder: ReturnType<typeof useBuilder>;
   room: ReturnType<typeof useWorld>;
 }) {
-  const [compact, setCompact] = useState(false);
+  const [compact, setCompact] = useState(true);
+  const focus = (view?: "near" | "top") => {
+    const min = b.target && "cell" in b.target ? cellMin(b.target.cell) : null;
+    window.dispatchEvent(
+      new CustomEvent("island-focus-building", {
+        detail: {
+          view,
+          point:
+            view && min
+              ? { x: min.x + 0.5, y: min.y + 0.5, z: min.z + 0.5 }
+              : undefined,
+        },
+      }),
+    );
+    setCompact(true);
+  };
+  const rotate = () => b.setRotation(((b.rotation + 1) % 4) as 0 | 1 | 2 | 3);
+  useEffect(() => {
+    if (!b.editor) return;
+    const key = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (
+        e.defaultPrevented ||
+        e.repeat ||
+        el?.closest(
+          "input, textarea, select, [contenteditable=true], [role=dialog]",
+        ) ||
+        document.querySelector("[aria-modal=true]")
+      )
+        return;
+      const k = e.key.toLowerCase();
+      if (e.altKey || e.shiftKey) return;
+      if (k === "z" && room.history.length) {
+        e.preventDefault();
+        room.undo();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey) return;
+      if (b.editor?.mode === "build" && ["1", "2", "3"].includes(k)) {
+        e.preventDefault();
+        b.setMaterial(materials[Number(k) - 1]!.id);
+      } else if (k === "r" && b.editor?.mode === "device") {
+        e.preventDefault();
+        rotate();
+      } else if (k === "f") {
+        e.preventDefault();
+        focus("near");
+      } else if (k === "escape") {
+        b.editor?.select(null);
+      } else if (
+        (k === "enter" || (b.editor?.mode === "remove" && k === "delete")) &&
+        !el?.closest("button, a")
+      ) {
+        e.preventDefault();
+        if (b.target && !b.previewError) b.commit();
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  });
   if (!b.editor) return null;
   const mode = b.editor.mode;
   const held =
@@ -103,162 +164,188 @@ export default function BuildingControls({
     </section>
   );
   return (
-    <aside
-      className={`building-controls${compact ? " is-compact" : ""}`}
-      aria-label="建造与整理"
-    >
-      <strong>
-        {mode === "build"
-          ? "搭一间自己的小屋"
-          : mode === "remove"
-            ? "整理这片空间"
-            : "布置小屋"}
-      </strong>
-      <div className="building-panel-actions">
-        <button type="button" onClick={() => setCompact(!compact)}>
-          {compact ? "展开物件与说明" : "收起面板选位置"}
-        </button>
+    <>
+      {mode === "remove" && b.target && b.targetScreen && (
         <button
-          type="button"
-          onClick={() => {
-            window.dispatchEvent(new Event("island-focus-building"));
-            setCompact(true);
-          }}
+          className="building-remove-here"
+          style={{ left: b.targetScreen.x, top: b.targetScreen.y }}
+          disabled={!!b.previewError}
+          onClick={b.commit}
         >
-          定位绿色建造区
+          整理此处
         </button>
-      </div>
-      <div className="building-settings" hidden={compact}>
-        <p>
+      )}
+      <aside
+        className={`building-controls${compact ? " is-compact" : ""}`}
+        aria-label="建造与整理"
+        data-mode={mode}
+      >
+        <strong>
           {mode === "build"
-            ? "先选材料，单击预览位置，双击绿色网格内的地面或方块表面即可放置。"
+            ? "搭一间自己的小屋"
             : mode === "remove"
-              ? "选中树花椅、方块或装置，再确认。收起装置会保留作品。"
-              : "先选物件，单击预览位置，双击绿色网格内的地面或建筑顶面即可放置。"}
-        </p>
+              ? "整理这片空间"
+              : "布置小屋"}
+        </strong>
+        <div className="building-panel-actions">
+          <button type="button" onClick={() => setCompact(!compact)}>
+            {compact ? "展开物件与说明" : "收起面板选位置"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              focus();
+            }}
+          >
+            定位绿色建造区
+          </button>
+        </div>
         {mode === "build" && (
-          <div>
-            <span className="field-label">材料</span>
-            <div className="item-row" role="group" aria-label="材料">
-              {materials.map((m) => (
-                <Slot
-                  key={m.id}
-                  label={m.name}
-                  glyph={m.glyph}
-                  pressed={b.material === m.id}
-                  onClick={() => b.setMaterial(m.id)}
-                />
-              ))}
-            </div>
+          <div
+            className="item-row building-hotbar"
+            role="group"
+            aria-label="材料"
+          >
+            {materials.map((m) => (
+              <Slot
+                key={m.id}
+                label={m.name}
+                glyph={m.glyph}
+                pressed={b.material === m.id}
+                onClick={() => b.setMaterial(m.id)}
+              />
+            ))}
           </div>
         )}
-        {mode === "build" && explanation}
-        {mode === "device" && (
-          <>
-            <div>
-              <span className="field-label">摆什么</span>
-              <div className="item-row" role="group" aria-label="摆什么">
-                {kinds.map((k) => (
-                  <Slot
-                    key={k.id}
-                    label={k.name}
-                    glyph={glyphForKind(k.id)}
-                    pressed={b.kind === k.id}
-                    onClick={() => {
-                      b.setKind(k.id);
-                      b.setStoredId("");
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-            {explanation}
-            <div>
-              <span className="field-label">新建或重新摆放</span>
-              <div className="item-row" role="group" aria-label="待摆放">
-                <Slot
-                  label="放一件新的"
-                  glyph={held}
-                  pressed={b.storedId === ""}
-                  onClick={() => b.setStoredId("")}
-                />
-                {stored.map((d) => (
-                  <Slot
-                    key={d.id}
-                    label={storedName(d)}
-                    glyph={glyphForDevice(d.definitionId)}
-                    pressed={b.storedId === d.id}
-                    onClick={() => b.setStoredId(d.id)}
-                  />
-                ))}
-                {stored.length === 0 && (
-                  <small>没有收起的{selectedName}，当前将放一件新的。</small>
-                )}
-              </div>
-            </div>
+        <div className="building-quick-actions">
+          <button type="button" onClick={() => focus("near")} title="F">
+            近看目标
+          </button>
+          <button type="button" onClick={() => focus("top")}>
+            俯视目标
+          </button>
+          {mode === "device" && (
             <button
               type="button"
-              onClick={() =>
-                b.setRotation(((b.rotation + 1) % 4) as 0 | 1 | 2 | 3)
-              }
+              onClick={rotate}
               aria-label={`旋转，当前朝向 ${b.rotation * 90} 度`}
             >
-              <span
-                style={{
-                  transform: `rotate(${b.rotation * 90}deg)`,
-                  display: "inline-block",
-                }}
-              >
-                <ItemGlyph id={held} size={28} />
-              </span>
-              旋转 90°
+              旋转 {b.rotation * 90}° · R
             </button>
-          </>
-        )}
-        {mode === "remove" && (
+          )}
+          <button
+            type="button"
+            disabled={!room.history.length}
+            onClick={room.undo}
+          >
+            撤销 · Z
+          </button>
+        </div>
+        <div className="building-settings" hidden={compact}>
           <p>
-            <ItemGlyph id="shovel" size={36} />
-            铲子会跟着鼠标走。点选要整理的东西，再确认。
-          </p>
-        )}
-        <label>
-          <input
-            type="checkbox"
-            checked={b.cutaway}
-            onChange={(e) => b.setCutaway(e.target.checked)}
-          />
-          淡化高处方块，看看屋里
-        </label>
-      </div>
-      <div className="building-confirmation">
-        {compact && mode !== "remove" && <strong>已选：{selectedName}</strong>}
-        <p role="status">
-          {b.previewError
-            ? `⚠ ${b.previewError}`
-            : b.target
-              ? mode === "remove"
-                ? "✓ 物件已选，可以整理。"
-                : "✓ 位置可用，双击此处放置。"
+            {mode === "build"
+              ? "鼠标移动预览，单击放置；拖动调整视角。手机点选位置，再点“放置”。按 1 / 2 / 3 切换材料。"
               : mode === "remove"
-                ? "点击要整理的物件或方块，再确认整理。"
-                : "单击预览，双击放置。找不到空地时点“定位绿色建造区”。"}
-        </p>
-        {mode === "remove" && (
+                ? "选中树花椅、方块或装置，再确认。收起装置会保留作品。"
+                : "选择物件后，鼠标指向预览、单击放置；手机点选位置再点“放置”。R 旋转，Z 撤销。"}
+          </p>
+          {mode === "build" && explanation}
+          {mode === "device" && (
+            <>
+              <div>
+                <span className="field-label">摆什么</span>
+                <div className="item-row" role="group" aria-label="摆什么">
+                  {kinds.map((k) => (
+                    <Slot
+                      key={k.id}
+                      label={k.name}
+                      glyph={glyphForKind(k.id)}
+                      pressed={b.kind === k.id}
+                      onClick={() => {
+                        b.setKind(k.id);
+                        b.setStoredId("");
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              {explanation}
+              <div>
+                <span className="field-label">新建或重新摆放</span>
+                <div className="item-row" role="group" aria-label="待摆放">
+                  <Slot
+                    label="放一件新的"
+                    glyph={held}
+                    pressed={b.storedId === ""}
+                    onClick={() => b.setStoredId("")}
+                  />
+                  {stored.map((d) => (
+                    <Slot
+                      key={d.id}
+                      label={storedName(d)}
+                      glyph={glyphForDevice(d.definitionId)}
+                      pressed={b.storedId === d.id}
+                      onClick={() => b.setStoredId(d.id)}
+                    />
+                  ))}
+                  {stored.length === 0 && (
+                    <small>没有收起的{selectedName}，当前将放一件新的。</small>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+          {mode === "remove" && (
+            <p>
+              <ItemGlyph id="shovel" size={36} />
+              铲子会跟着鼠标走。点选要整理的东西，再确认。
+            </p>
+          )}
+          <label>
+            <input
+              type="checkbox"
+              checked={b.cutaway}
+              onChange={(e) => b.setCutaway(e.target.checked)}
+            />
+            淡化高处方块，看看屋里
+          </label>
+        </div>
+        <div className="building-confirmation">
+          {compact && mode !== "remove" && (
+            <strong>已选：{selectedName}</strong>
+          )}
+          <p role="status">
+            {b.previewError
+              ? `⚠ ${b.previewError}`
+              : b.target
+                ? mode === "remove"
+                  ? "✓ 物件已选，可以整理。"
+                  : "✓ 位置可用，可单击或点“放置”。"
+                : mode === "remove"
+                  ? "点击要整理的物件或方块，再确认整理。"
+                  : "鼠标指向预览、单击放置；手机点选位置后点“放置”。"}
+          </p>
+          {b.target && "cell" in b.target && (
+            <small className="building-position">
+              网格 {b.target.cell.x + 1}, {b.target.cell.z + 1} · 第{" "}
+              {b.target.cell.y + 1} 层
+            </small>
+          )}
           <button
             className="primary-button"
             disabled={!b.target || !!b.previewError}
             onClick={b.commit}
           >
-            确认整理
+            {mode === "remove" ? "确认整理" : "放置"}
           </button>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={() => window.dispatchEvent(new Event("island-safe-entry"))}
-      >
-        回到安全入口
-      </button>
-    </aside>
+        </div>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("island-safe-entry"))}
+        >
+          回到安全入口
+        </button>
+      </aside>
+    </>
   );
 }

@@ -446,11 +446,11 @@ export default function SceneExperience({
       <div className="bottom-center">
         <div className="tool-hint">
           {tool === "build"
-            ? "单击预览，双击地面或方块表面放置。"
+            ? "鼠标指向预览、单击放置；手机点选后点“放置”。"
             : tool === "remove"
               ? "选中物件后整理；撤销可恢复上一步。"
               : tool === "device"
-                ? "单击预览，双击地面或完整支撑的顶面摆放装置。"
+                ? "在地面或完整支撑的顶面摆放；R 旋转，Z 撤销。"
                 : tool === "explore"
                   ? editing
                     ? "选择下面的工具布置场景 · 完成后继续探索"
@@ -532,7 +532,6 @@ export default function SceneExperience({
                     onClick={() => {
                       setTool(mode);
                       setWalking(false);
-                      setReset((n) => n + 1);
                     }}
                   >
                     <ItemGlyph
