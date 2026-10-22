@@ -199,7 +199,12 @@ export const shopPurchaseSchema = z
   .strict();
 export interface ShopState {
   credits: number;
-  items: { id: string; itemId: FurnitureId; worldId: string | null }[];
+  items: {
+    id: string;
+    itemId: FurnitureId;
+    worldId: string | null;
+    physicsSceneId?: string | null;
+  }[];
 }
 export interface ShopPurchaseResult {
   state: ShopState;

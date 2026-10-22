@@ -20,10 +20,12 @@ export default function CreditPanel({
   userId,
   guest,
   onBalance,
+  refreshKey,
 }: {
   userId: string;
   guest: boolean;
   onBalance: () => void;
+  refreshKey?: number;
 }) {
   const [options, setOptions] = useState<RechargeOptions | null>(null),
     [history, setHistory] = useState<ShopHistory | null>(null);
@@ -77,7 +79,7 @@ export default function CreditPanel({
   }, []);
   useEffect(() => {
     void loadHistory();
-  }, [page]);
+  }, [page, refreshKey]);
   useEffect(() => {
     let cancelled = false;
     setQr("");
@@ -256,7 +258,13 @@ export default function CreditPanel({
             current.channel === "h5" && (
               <a
                 className="credit-pay-link"
-                href={`${current.payUrl}&redirect_url=${encodeURIComponent(`${location.origin}/island?creditRecharge=${current.id}`)}`}
+                href={`${current.payUrl}&redirect_url=${encodeURIComponent(
+                  (() => {
+                    const target = new URL(location.href);
+                    target.searchParams.set("creditRecharge", current.id);
+                    return target.href;
+                  })(),
+                )}`}
               >
                 打开微信支付
               </a>

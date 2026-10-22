@@ -65,5 +65,11 @@ export function editedPhysicsScene(
       object.rotation = operation.rotation;
     }
   }
+  const used = new Set(
+    next.objects.map((o) => `${o.definitionId}@${o.definitionVersion}`),
+  );
+  next.definitions = next.definitions.filter((d) =>
+    used.has(`${d.id}@${d.version}`),
+  );
   return physicsSceneSchema.parse(next);
 }

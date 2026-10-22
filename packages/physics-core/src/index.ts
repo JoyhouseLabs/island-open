@@ -528,3 +528,4 @@ export class PhysicsRuntime {
     this.world.free();
   }
 }
+export * from "./furniture.js";

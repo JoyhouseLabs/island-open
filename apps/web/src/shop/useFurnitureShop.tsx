@@ -366,7 +366,8 @@ export function useFurnitureShop(world: World, stopWalking: () => void) {
                     (f) => f.id === item.id,
                   );
                   const elsewhere =
-                    item.worldId && item.worldId !== world.record?.id;
+                    item.physicsSceneId ||
+                    (item.worldId && item.worldId !== world.record?.id);
                   return (
                     <article className="shop-bag-item" key={item.id}>
                       <span className="shop-bag-icon">{d.icon}</span>

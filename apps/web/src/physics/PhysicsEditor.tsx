@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import {
   identityQuaternion,
+  physicsPartsBounds,
   type ObjectDefinition,
   type ObjectInstance,
   type Vector3,
+  type User,
+  type PhysicsAssetCatalog,
 } from "@island/contracts";
 import { api } from "../api";
+import PhysicsShop from "./PhysicsShop";
+import PhysicsWorkshop from "./PhysicsWorkshop";
 import { PhysicsConnection } from "./PhysicsConnection";
 
 export interface PhysicsDraft {
@@ -14,23 +19,7 @@ export interface PhysicsDraft {
   existing: boolean;
 }
 export function bottomOf(definition: ObjectDefinition) {
-  return Math.min(
-    ...definition.parts
-      .filter((p) => !p.sensor)
-      .map((p) => {
-        const s = p.shape;
-        return (
-          p.position.y -
-          (s.kind === "box"
-            ? s.halfExtents.y
-            : s.kind === "ball"
-              ? s.radius
-              : s.kind === "convex"
-                ? Math.max(...s.vertices.map((v) => -v.y))
-                : s.halfHeight + (s.kind === "capsule" ? s.radius : 0))
-        );
-      }),
-  );
+  return physicsPartsBounds(definition.parts.filter((p) => !p.sensor)).min.y;
 }
 export function previewError(
   conn: PhysicsConnection,
@@ -54,22 +43,33 @@ export default function PhysicsEditor({
   draft,
   setDraft,
   clearKeys,
+  user,
 }: {
   conn: PhysicsConnection;
+  user: User;
   selected: string | null;
   draft: PhysicsDraft | null;
   setDraft: (draft: PhysicsDraft | null) => void;
   clearKeys: () => void;
 }) {
-  const [catalog, setCatalog] = useState<ObjectDefinition[]>([]),
+  const [catalog, setCatalog] = useState<PhysicsAssetCatalog>({
+      items: [],
+      shop: [],
+      creations: [],
+      inventory: [],
+    }),
     [error, setError] = useState("");
+  const [panel, setPanel] = useState<"shop" | "workshop" | null>(() =>
+    new URLSearchParams(location.search).has("creditRecharge") ? "shop" : null,
+  );
+  const [refreshKey, refresh] = useState(0);
   const [definitionId, setDefinitionId] = useState("core:block");
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void api<{ items: ObjectDefinition[] }>("/physics/catalog")
+    void api<PhysicsAssetCatalog>("/physics/catalog")
       .then((r) => {
-        if (!cancelled) setCatalog(r.items);
+        if (!cancelled) setCatalog(r);
       })
       .catch((e) => {
         if (!cancelled) setError(e.message);
@@ -77,35 +77,59 @@ export default function PhysicsEditor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
   const revision = conn.buffer.latest?.layoutRevision;
   useEffect(() => {
     // Keep a rejected draft for correction; remove only a confirmed new layout.
-    if (
-      submittedId &&
-      !conn.editPending &&
-      conn.message.startsWith("布置已保存")
-    ) {
+    if (submittedId && conn.lastEditedCommandId === submittedId) {
       setDraft(null);
       setSubmittedId(null);
     }
-  }, [revision, conn.editPending, conn.message, submittedId]);
+  }, [revision, conn.lastEditedCommandId, submittedId]);
+  useEffect(() => {
+    refresh((value) => value + 1);
+  }, [revision]);
   const active = conn.editing;
-  const selectedObject = conn.scene?.objects.find((o) => o.id === selected);
-  const editable =
-    selectedObject &&
-    !["core:floor", "core:platform"].includes(selectedObject.definitionId);
-  const invalid = previewError(conn, draft);
-  const blocked = conn.editBusy || !!conn.editPending;
-  function start() {
-    const definition = catalog.find((d) => d.id === definitionId);
-    if (!definition) return;
+  const choices = [
+    ...catalog.items.map((definition) => ({
+      key: definition.id,
+      definition,
+      instanceId: undefined as string | undefined,
+      label: definition.name,
+    })),
+    ...catalog.creations.map((r) => ({
+      key: `${r.definition.id}@${r.version}`,
+      definition: r.definition,
+      instanceId: undefined as string | undefined,
+      label: `作品 · ${r.definition.name} · v${r.version}`,
+    })),
+    ...catalog.inventory
+      .filter((i) => !i.worldId && !i.physicsSceneId)
+      .flatMap((i) => {
+        const item = catalog.shop.find((d) => d.itemId === i.itemId);
+        return item
+          ? [
+              {
+                key: i.id,
+                instanceId: i.id,
+                definition: item.definition,
+                label: `家具 · ${item.definition.name} · ${i.id.slice(-4)}`,
+              },
+            ]
+          : [];
+      }),
+  ];
+  useEffect(() => {
+    if (!choices.some((c) => c.key === definitionId))
+      setDefinitionId("core:block");
+  }, [catalog, definitionId]);
+  function startDefinition(definition: ObjectDefinition, instanceId?: string) {
     const p = conn.me?.position ?? { x: 0, y: 0, z: 7 };
     setDraft({
       definition,
       existing: false,
       object: {
-        id: crypto.randomUUID(),
+        id: instanceId ?? crypto.randomUUID(),
         definitionId: definition.id,
         definitionVersion: definition.version,
         position: {
@@ -116,6 +140,16 @@ export default function PhysicsEditor({
         rotation: identityQuaternion,
       },
     });
+  }
+  const selectedObject = conn.scene?.objects.find((o) => o.id === selected);
+  const editable =
+    selectedObject &&
+    !["core:floor", "core:platform"].includes(selectedObject.definitionId);
+  const invalid = previewError(conn, draft);
+  const blocked = conn.editBusy || !!conn.editPending;
+  function start() {
+    const choice = choices.find((d) => d.key === definitionId);
+    if (choice) startDefinition(choice.definition, choice.instanceId);
   }
   function move() {
     if (!selectedObject) return;
@@ -175,6 +209,14 @@ export default function PhysicsEditor({
             >
               布置家园
             </button>
+            <button
+              onClick={() => {
+                clearKeys();
+                setPanel(panel === "shop" ? null : "shop");
+              }}
+            >
+              岛屿小铺
+            </button>
             {conn.lease.holder && conn.lease.holder !== conn.you && (
               <button
                 onClick={() => {
@@ -207,11 +249,46 @@ export default function PhysicsEditor({
           </button>
         )}
       </div>
+      {panel === "shop" && (
+        <PhysicsShop
+          user={user}
+          catalog={catalog}
+          onChanged={() => refresh((v) => v + 1)}
+          onClose={() => setPanel(null)}
+        />
+      )}
       {active && (
         <>
           <p>
             选择物品，点击场景定位；确认后保存。接管会结束另一设备的编辑占用。
           </p>
+          <div className="physics-editor-row">
+            <button
+              disabled={blocked}
+              onClick={() => setPanel(panel === "shop" ? null : "shop")}
+            >
+              岛屿小铺
+            </button>
+            <button
+              disabled={blocked}
+              onClick={() => setPanel(panel === "workshop" ? null : "workshop")}
+            >
+              物品工坊
+            </button>
+            <button onClick={() => refresh((v) => v + 1)}>刷新物品库</button>
+          </div>
+          {panel === "workshop" && (
+            <PhysicsWorkshop
+              userId={user.id}
+              items={catalog.creations}
+              onSaved={() => refresh((v) => v + 1)}
+              onPlace={(definition) => {
+                startDefinition(definition);
+                setPanel(null);
+              }}
+              onClose={() => setPanel(null)}
+            />
+          )}
           <div className="physics-editor-row">
             <label>
               新增物品
@@ -221,14 +298,17 @@ export default function PhysicsEditor({
                 disabled={blocked}
                 onChange={(e) => setDefinitionId(e.target.value)}
               >
-                {catalog.map((d) => (
-                  <option key={`${d.id}@${d.version}`} value={d.id}>
-                    {d.name}
+                {choices.map((d) => (
+                  <option key={d.key} value={d.key}>
+                    {d.label}
                   </option>
                 ))}
               </select>
             </label>
-            <button disabled={blocked || !catalog.length} onClick={start}>
+            <button
+              disabled={blocked || !choices.some((c) => c.key === definitionId)}
+              onClick={start}
+            >
               预览新物品
             </button>
             <button disabled={blocked || !editable} onClick={move}>

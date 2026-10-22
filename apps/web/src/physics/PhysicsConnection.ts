@@ -26,6 +26,7 @@ export class PhysicsConnection {
   lease = { holder: null as string | null, expiresAt: 0 };
   editPending: PhysicsLayoutEdit | null = null;
   editBusy = false;
+  lastEditedCommandId: string | null = null;
   private editTimer: ReturnType<typeof setTimeout> | undefined;
   private leaseTimer: ReturnType<typeof setInterval> | undefined;
   get editing() {
@@ -196,6 +197,7 @@ export class PhysicsConnection {
         this.lease = message.lease;
         this.changed();
       } else if (message.type === "edited") {
+        this.lastEditedCommandId = message.commandId;
         if (this.editPending?.commandId === message.commandId) {
           this.editPending = null;
           this.editBusy = false;

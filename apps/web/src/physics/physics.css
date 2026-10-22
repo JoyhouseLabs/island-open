@@ -249,3 +249,105 @@
   max-height: 52dvh;
   overflow-y: auto;
 }
+.physics-workshop,
+.physics-shop {
+  border: 1px solid #c5d3c0;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+  background: #edf1e6;
+}
+.physics-workshop h2,
+.physics-shop h2 {
+  font-size: 18px;
+  margin: 0 8px 0 0;
+}
+.physics-workshop-preview {
+  height: 260px;
+  width: min(100%, 520px);
+  border-radius: 12px;
+  overflow: hidden;
+  touch-action: none;
+}
+.physics-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.physics-shop-grid article {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 10px;
+}
+.physics-shop-grid button,
+.physics-shop > button {
+  min-height: 44px;
+  border: 1px solid #bccaba;
+  border-radius: 8px;
+  background: #eef1e8;
+  color: #294336;
+}
+.physics-shop-grid button:disabled {
+  opacity: 0.5;
+}
+.physics-workshop input[type="color"] {
+  width: 48px;
+  padding: 3px;
+}
+dialog.physics-workshop {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(1100px, calc(100vw - 32px));
+  height: 90dvh;
+  max-height: 90dvh;
+  box-sizing: border-box;
+  color: #294336;
+  overflow: hidden;
+}
+dialog.physics-workshop[open] {
+  display: flex;
+  flex-direction: column;
+}
+dialog.physics-workshop::backdrop {
+  background: #15291eb0;
+}
+.physics-workshop-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.physics-workshop-body .physics-workshop-preview {
+  width: 100%;
+  height: 100%;
+}
+.physics-workshop-fields {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 8px;
+}
+dialog.physics-workshop .physics-actions {
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  dialog.physics-workshop {
+    width: calc(100vw - 16px);
+    height: 96dvh;
+    max-height: 96dvh;
+    padding: 10px;
+  }
+  .physics-workshop-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(160px, 30dvh) minmax(0, 1fr);
+    gap: 8px;
+  }
+  dialog.physics-workshop > .physics-editor-row {
+    margin: 0 0 8px;
+  }
+}

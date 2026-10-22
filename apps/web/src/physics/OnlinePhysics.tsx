@@ -276,6 +276,8 @@ export default function OnlinePhysics() {
             </div>
             {world?.owner && (
               <PhysicsEditor
+                key={`${user.id}:${conn.sceneId}`}
+                user={user}
                 conn={conn}
                 selected={selected}
                 draft={draft}

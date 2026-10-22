@@ -3,6 +3,8 @@ import { z } from "zod";
 export const PHYSICS_RULES_VERSION = "1.0.0" as const;
 export const physicsBudgets = Object.freeze({
   players: 4,
+  creations: 16,
+  shopObjects: 100,
   dynamicBodies: 32,
   partsPerObject: 24,
   staticColliders: 4096,
@@ -158,6 +160,8 @@ export const physicsSceneSchema = z
       ctx.addIssue({ code: "custom", message: "定义版本重复" });
     if (new Set(s.objects.map((o) => o.id)).size !== s.objects.length)
       ctx.addIssue({ code: "custom", message: "物体编号重复" });
+    let creations = 0,
+      shopObjects = 0;
     let dynamic = 0,
       staticParts = 0;
     for (const o of s.objects) {
@@ -171,9 +175,16 @@ export const physicsSceneSchema = z
         (d.bodyType !== "kinematic" || !d.abilities.includes("platform"))
       )
         ctx.addIssue({ code: "custom", message: "移动轨迹只适用于运动平台" });
+      if (d.source === "creation") creations++;
+      if (d.source === "shop") shopObjects++;
       if (d.bodyType === "dynamic") dynamic++;
       else staticParts += d.parts.length;
     }
+    if (
+      creations > physicsBudgets.creations ||
+      shopObjects > physicsBudgets.shopObjects
+    )
+      ctx.addIssue({ code: "custom", message: "作品或家具超过房间预算" });
     if (dynamic > physicsBudgets.dynamicBodies)
       ctx.addIssue({ code: "custom", message: "活动物体超过房间预算" });
     if (staticParts > physicsBudgets.staticColliders)
