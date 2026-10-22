@@ -1,3 +1,4 @@
+import { FurnitureLayer, type FurnitureEditor } from "./shop/Furniture";
 import RendererCleanup from "./RendererCleanup";
 import {
   Component,
@@ -54,6 +55,7 @@ export type Tool = "explore" | "tree" | "flower" | "bench";
 export type Focus = { x: number; z: number; stamp: number } | null;
 type Props = {
   world: WorldSnapshot;
+  furnitureEditor?: FurnitureEditor;
   tool: Tool;
   focus: Focus;
   cameraReset?: number;
@@ -151,7 +153,7 @@ function roadGeometry() {
   g.computeVertexNormals();
   return g;
 }
-function Ground({ world, tool, onPlace, onSelect }: Props) {
+function Ground({ world, tool, onPlace, onSelect, furnitureEditor }: Props) {
   const geometry = useMemo(
       () => terrain(world.environment.season),
       [world.environment.season],
@@ -166,6 +168,7 @@ function Ground({ world, tool, onPlace, onSelect }: Props) {
         receiveShadow
         onClick={(e: ThreeEvent<MouseEvent>) => {
           if (e.delta > 5) return;
+          if (furnitureEditor?.active) { e.stopPropagation(); furnitureEditor.onPoint(e.point.x, e.point.z); return; }
           if (tool === "explore") {
             if (playerIntent.active) {
               e.stopPropagation();
@@ -683,6 +686,7 @@ function Scene(props: Props) {
       <WeatherFx weather={weather} low={low} span={150} />
       <Water night={night} />
       <Ground {...props} />
+      <FurnitureLayer items={props.world.furniture} editor={props.furnitureEditor} />
       <Water pond night={night} />
       {/* Wild grass: clumped around the island's trees, scattered over
           the inner wilds — never on the shore ring or near buildings. */}
@@ -723,7 +727,7 @@ function Scene(props: Props) {
       <Collectibles scene="island" seed={props.world.seed} />
       {props.onNote && <FoxNote onNote={props.onNote} />}
       {props.walk && props.avatar && props.onGate && (
-        <PlayerRig scene="island" avatar={props.avatar} entities={props.world.entities} onGate={props.onGate} />
+        <PlayerRig scene="island" world={props.world} avatar={props.avatar} entities={props.world.entities} onGate={props.onGate} />
       )}
       {night && !wet && (
         <Stars

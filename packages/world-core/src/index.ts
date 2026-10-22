@@ -1,3 +1,5 @@
+import { furniturePlacementError } from "./shop.js";
+export * from "./shop.js";
 export {
   createGarden,
   gardenPlacementError,
@@ -415,6 +417,10 @@ export function createWorld(
   };
 }
 export function validatePlacement(snapshot: WorldSnapshot) {
+  for (const f of snapshot.furniture ?? []) {
+    const error = furniturePlacementError(snapshot, f);
+    if (error) return error;
+  }
   const rule =
     snapshot.scene === "island"
       ? placementError

@@ -14,6 +14,7 @@ import type {
   WorldSnapshot,
 } from "@island/contracts";
 import {
+  furnitureObstacles,
   readCells,
   deviceBox,
   entityCollisionBoxes,
@@ -92,15 +93,17 @@ export function PlayerRig({
 }) {
   const spec = specFor(scene);
   const obstacles = useMemo<Obstacle[]>(
-    () =>
-      obstaclesFor(
+    () => [
+      ...furnitureObstacles(world?.furniture ?? []),
+      ...obstaclesFor(
         scene,
         entities.filter(
           (e) => !world?.entityPlacements?.some((p) => p.entityId === e.id),
         ),
         place,
       ),
-    [scene, entities, place, world?.entityPlacements],
+    ],
+    [scene, entities, place, world?.entityPlacements, world?.furniture],
   );
   const cells = useMemo(
     () => readCells(world?.construction),

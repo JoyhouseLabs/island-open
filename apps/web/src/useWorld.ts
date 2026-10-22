@@ -22,6 +22,7 @@ import {
   subScenes,
   terrainScale,
   validatePlacement,
+  furniturePlacementError,
   hasBuilding,
   validateBuilding,
 } from "@island/world-core";
@@ -54,7 +55,7 @@ function buildSave(
     baseRevision: revision,
     deviceId,
     idempotencyKey,
-    capabilities: [...BUILDING_CAPABILITIES],
+    capabilities: [...BUILDING_CAPABILITIES, "furnitureV1"],
     operations,
     ...(terrain && leaseToken !== undefined ? { leaseToken } : {}),
   };
@@ -331,7 +332,7 @@ export function useWorld(scope?: SceneScope) {
       }
       const next = update(c.snapshot);
       if (next === c.snapshot) return;
-      const problem = validateBuilding(next, c.snapshot);
+      const problem = validateBuilding(next, c.snapshot) || (next.furniture ?? []).map(f => furniturePlacementError(next, f)).find(Boolean);
       if (problem) {
         notify(problem);
         return;

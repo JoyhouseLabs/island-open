@@ -28,6 +28,7 @@ export function operationTargets(ops: WorldOp[]) {
     if (op.op === "replace") targets.add("*");
     else if (op.op === "block.set") targets.add(`cell:${cellKey(op.cell)}`);
     else if (op.op === "device.put") targets.add(`device:${op.device.id}`);
+    else if (op.op === "furniture.put") targets.add(`furniture:${op.id}`);
     else if (op.op === "place") targets.add(`entity:${op.entity.id}`);
     else if (
       op.op === "remove" ||
@@ -151,6 +152,11 @@ export function diffWorld(base: WorldSnapshot, next: WorldSnapshot): WorldOp[] {
   for (const id of new Set([...ap.keys(), ...bp.keys()]))
     if (JSON.stringify(ap.get(id)) !== JSON.stringify(bp.get(id)))
       ops.push({ op: "entity.support", id, value: bp.get(id) ?? null });
+  const af = new Map((a.furniture ?? []).map(f => [f.id, f]));
+  const bf = new Map((b.furniture ?? []).map(f => [f.id, f]));
+  for (const id of new Set([...af.keys(), ...bf.keys()]))
+    if (JSON.stringify(af.get(id)) !== JSON.stringify(bf.get(id)))
+      ops.push({ op: "furniture.put", id, value: bf.get(id) ?? null });
   return ops;
 }
 
@@ -171,6 +177,7 @@ export function applyWorldOps(
       return { ok: false, code: "INVALID" };
     return { ok: true, snapshot: ops[0].snapshot };
   }
+  let furniture = [...(start.furniture ?? [])];
   let entities = start.entities.map((e) => ({ ...e }));
   const cells = readCells(start.construction);
   let devices = [...(start.devices ?? [])],
@@ -179,7 +186,11 @@ export function applyWorldOps(
   let name = start.name;
   let environment = { ...start.environment };
   for (const op of ops) {
-    if (op.op === "block.set") {
+    if (op.op === "furniture.put") {
+      if (op.value && op.value.id !== op.id) return { ok: false, code: "INVALID" };
+      furniture = furniture.filter(f => f.id !== op.id);
+      if (op.value) furniture.push(op.value);
+    } else if (op.op === "block.set") {
       const key = cellKey(op.cell);
       if (!sameValue(cells.get(key), op.expected))
         return { ok: false, code: "CONFLICT" };
@@ -245,6 +256,7 @@ export function applyWorldOps(
       name,
       environment,
       entities,
+      ...(start.furniture || furniture.length ? { furniture } : {}),
       ...(buildingTouched ? { construction: packCells(cells) } : {}),
       ...(start.devices || devices.length ? { devices } : {}),
       ...(start.entityPlacements || placements.length

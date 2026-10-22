@@ -1,5 +1,6 @@
 import {
   worldSchema,
+  furniturePlacementSchema,
   constructionSchema,
   deviceSchema,
   entityPlacementSchema,
@@ -11,6 +12,7 @@ export function readSnapshot(raw: WorldSnapshot) {
   if (parsed.success) return { snapshot: parsed.data, supported: true };
   const snapshot = worldSchema.parse({
     ...raw,
+    furniture: Array.isArray(raw.furniture) ? raw.furniture.filter(f => furniturePlacementSchema.safeParse(f).success) : [],
     construction: constructionSchema.safeParse(raw.construction).success
       ? raw.construction
       : undefined,

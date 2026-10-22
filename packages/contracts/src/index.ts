@@ -1,3 +1,5 @@
+import { furniturePlacementSchema } from "./shop.js";
+export * from "./shop.js";
 import { z } from "zod";
 import { constructionSchema, deviceSchema, entityPlacementSchema, buildingOps, BUILDING_CAPABILITIES } from "./building.js";
 export * from "./building.js";
@@ -42,6 +44,7 @@ export const worldSchema = z
       })
       .strict(),
     entities: z.array(entitySchema).max(800),
+    furniture: z.array(furniturePlacementSchema).max(100).optional(),
     construction: constructionSchema.optional(),
     devices: z.array(deviceSchema).max(64).optional(),
     entityPlacements: z.array(entityPlacementSchema).max(800).optional(),
@@ -49,6 +52,8 @@ export const worldSchema = z
   })
   .strict()
   .superRefine((w, ctx) => {
+    if (new Set((w.furniture ?? []).map((f) => f.id)).size !== (w.furniture ?? []).length)
+      ctx.addIssue({ code: "custom", message: "家具 ID 不能重复", path: ["furniture"] });
     if (new Set(w.entities.map((e) => e.id)).size !== w.entities.length)
       ctx.addIssue({
         code: "custom",
@@ -66,8 +71,8 @@ export function sameWorld(a: WorldSnapshot, b: WorldSnapshot): boolean {
       x:c.cx*16+v.index%16,y:c.cy*16+Math.floor(v.index/256),z:c.cz*16+Math.floor(v.index/16)%16,
       value:p.construction!.blockPalette[v.palette],
     }))).sort((a,b)=>a.x-b.x||a.y-b.y||a.z-b.z);
-    const {construction,devices,entityPlacements,...core}=p;
-    return {...core, construction:cells, devices:[...(p.devices??[])].sort((a,b)=>a.id.localeCompare(b.id)), entityPlacements:[...(p.entityPlacements??[])].sort((a,b)=>a.entityId.localeCompare(b.entityId))};
+    const {construction,devices,entityPlacements,furniture,...core}=p;
+    return {...core, furniture:[...(furniture??[])].sort((a,b)=>a.id.localeCompare(b.id)), construction:cells, devices:[...(p.devices??[])].sort((a,b)=>a.id.localeCompare(b.id)), entityPlacements:[...(p.entityPlacements??[])].sort((a,b)=>a.entityId.localeCompare(b.entityId))};
   };
   return JSON.stringify(normalized(a))===JSON.stringify(normalized(b));
 }
@@ -84,6 +89,7 @@ const entityId = z.string().min(1).max(100);
 /** One structural edit. A `replace` is a whole checkpoint and must be sent alone. */
 export const worldOpSchema = z.discriminatedUnion("op", [
   ...buildingOps,
+  z.object({ op: z.literal("furniture.put"), id: z.string().uuid(), value: furniturePlacementSchema.nullable() }).strict(),
   z.object({ op: z.literal("place"), entity: entitySchema }).strict(),
   z.object({ op: z.literal("remove"), id: entityId }).strict(),
   z
@@ -125,7 +131,7 @@ export const worldOpSchema = z.discriminatedUnion("op", [
 export type WorldOp = z.infer<typeof worldOpSchema>;
 export const saveWorldSchema = z
   .object({
-    capabilities: z.array(z.enum(BUILDING_CAPABILITIES)).optional(),
+    capabilities: z.array(z.enum([...BUILDING_CAPABILITIES, "furnitureV1"])).optional(),
     baseRevision: z.number().int().min(1),
     /** Required only when the patch is terrain-scale (a replace, or many entities). */
     leaseToken: z.number().int().positive().optional(),

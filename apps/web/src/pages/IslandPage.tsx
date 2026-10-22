@@ -1,3 +1,4 @@
+import { useFurnitureShop } from "../shop/useFurnitureShop";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { cursorStyle, glyphForTool } from "../building/itemGlyphs";
 import {
@@ -345,7 +346,9 @@ export default function IslandPage() {
       : world.status === "conflict"
         ? "请先处理右上角的存档冲突，再继续布置"
         : "";
+  const shop = useFurnitureShop(world, () => { setTool("explore"); setWalking(false); setPinnedDock(null); setHoverDock(null); });
   const changeTool = (t: Tool) => {
+    shop.cancel();
     if (editReason) return;
     setTool(t);
     beginDecorating();
@@ -368,6 +371,7 @@ export default function IslandPage() {
         >
           <SceneBoundary label="主岛">
             <Island
+              furnitureEditor={shop.editor}
               world={world.snapshot}
               tool={tool}
               focus={focus}
@@ -376,12 +380,13 @@ export default function IslandPage() {
               onPlace={(x, z, kind) => {
                 if (!editReason) world.place(x, z, kind);
               }}
-              onSelect={select}
+              onSelect={(id) => { if (!shop.editor.active) select(id); }}
               onAsset={setAsset}
               onNote={() => setNoteOpen(true)}
               walk={walking}
               avatar={avatar}
               onGate={(dest) => {
+                if (shop.editor.active) return;
                 const landmark =
                   dest === "island" ? "home" : sceneConfig[dest].landmark;
                 select(landmark);
@@ -390,6 +395,7 @@ export default function IslandPage() {
           </SceneBoundary>
         </Suspense>
       </div>
+      {shop.ui}
       <div className="edge-fade" />
       <header className="topbar">
         <a
@@ -765,6 +771,7 @@ export default function IslandPage() {
               </nav>
             </div>
             <span className="toolbar-line" />
+            {shop.button}
             <BackpackButton tool label="我的发现" />
           </nav>
         </div>
