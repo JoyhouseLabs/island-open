@@ -8,6 +8,7 @@ export type AvatarAnim = {
   moving: boolean;
   /** Optional pose: wave, spin, or sit (driven by the player controller). */
   action?: "wave" | "spin" | "sit";
+  creationSeat?: boolean;
   /** Mid-jump: the face makes a little "o" of delight. */
   airborne?: boolean;
 };
@@ -438,7 +439,7 @@ export function AvatarMesh({
     if (body.current) {
       const sitting = anim.action === "sit";
       body.current.position.y = sitting
-        ? -0.3
+        ? (anim.creationSeat ? -0.65 : -0.3)
         : anim.moving
           ? Math.abs(Math.sin(anim.phase * (hop ? 7 : 9))) * (hop ? 0.16 : 0.05)
           : Math.sin(anim.phase * 2) * 0.008;

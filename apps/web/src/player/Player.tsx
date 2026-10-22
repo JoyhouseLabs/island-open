@@ -1,3 +1,4 @@
+import { creationSeatPrompt } from "./creationSeatPrompt";
 import { learningTravel } from "../learning/travel";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -16,6 +17,9 @@ import type {
 import {
   furnitureObstacles,
   creationObstacles,
+  creationCollisionBoxes,
+  creationSeats,
+  approachCreationSeat,
   readCells,
   deviceBox,
   entityCollisionBoxes,
@@ -105,14 +109,41 @@ export function PlayerRig({
         place,
       ),
     ],
-    [scene, entities, place, world?.entityPlacements, world?.furniture, world?.creations],
+    [
+      scene,
+      entities,
+      place,
+      world?.entityPlacements,
+      world?.furniture,
+      world?.creations,
+    ],
   );
   const cells = useMemo(
     () => readCells(world?.construction),
     [world?.construction],
   );
+  const customBoxes = useMemo(
+    () => creationCollisionBoxes(world?.creations ?? []),
+    [world?.creations],
+  );
+  const customSeats = useMemo(
+    () => creationSeats(world?.creations ?? []),
+    [world?.creations],
+  );
+  const customTops = useMemo(
+    () =>
+      customBoxes.map((b) => ({
+        x: (b.min.x + b.max.x) / 2,
+        z: (b.min.z + b.max.z) / 2,
+        r: 0,
+        halfSize: { x: (b.max.x - b.min.x) / 2, z: (b.max.z - b.min.z) / 2 },
+        standY: b.max.y,
+      })),
+    [customBoxes],
+  );
   const boxes = useMemo(
     () => [
+      ...customBoxes,
       ...(world?.devices ?? []).flatMap((d) => {
         const b = deviceBox(d);
         return b ? [b] : [];
@@ -122,7 +153,7 @@ export function PlayerRig({
         return e ? entityCollisionBoxes(e, p.y) : [];
       }),
     ],
-    [world?.devices, world?.entityPlacements, entities],
+    [customBoxes, world?.devices, world?.entityPlacements, entities],
   );
   const raisedSeats = useMemo(
     () =>
@@ -171,6 +202,9 @@ export function PlayerRig({
     mantled = useRef(false),
     pose = useRef<{ kind: "wave" | "spin"; until: number } | null>(null),
     sitting = useRef(false),
+    customSitting = useRef<ReturnType<typeof creationSeats>[number] | null>(
+      null,
+    ),
     fpYaw = useRef(Math.PI),
     fpPitch = useRef(-0.04);
   const scratch = useMemo(
@@ -192,7 +226,15 @@ export function PlayerRig({
     const back = learningTravel.pending;
     if (back?.scene === scene && back.worldId === learningTravel.worldId) {
       if (back.position) {
-        const p = safeBody({ x: back.position.x, y: spec.height(back.position.x, back.position.z), z: back.position.z }, cells, boxes);
+        const p = safeBody(
+          {
+            x: back.position.x,
+            y: spec.height(back.position.x, back.position.z),
+            z: back.position.z,
+          },
+          cells,
+          boxes,
+        );
         pos.current.set(p.x, p.y, p.z);
         yaw.current = back.position.yaw;
         fpYaw.current = yaw.current;
@@ -200,13 +242,30 @@ export function PlayerRig({
       }
       learningTravel.pending = null;
     }
-    return () => { if (learningTravel.current?.scene === scene) learningTravel.current = null; };
+    return () => {
+      if (learningTravel.current?.scene === scene)
+        learningTravel.current = null;
+    };
   }, [scene]);
 
   useEffect(() => {
+    if (
+      customSitting.current &&
+      !customSeats.some(
+        (s) =>
+          s.id === customSitting.current!.id &&
+          s.x === customSitting.current!.x &&
+          s.z === customSitting.current!.z &&
+          s.standY === customSitting.current!.standY &&
+          s.yaw === customSitting.current!.yaw,
+      )
+    ) {
+      customSitting.current = null;
+      sitting.current = false;
+    }
     const p = safeBody(pos.current, cells, boxes);
     pos.current.set(p.x, p.y, p.z);
-  }, [cells, boxes]);
+  }, [cells, boxes, customSeats]);
   useEffect(() => {
     const reset = () => {
       pos.current.set(
@@ -302,6 +361,7 @@ export function PlayerRig({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", clear);
+      creationSeatPrompt.report(null);
       dropAgent("player");
       proximity.setSpeaker(null);
       // One final standing frame: visitors keep seeing the avatar at rest
@@ -366,6 +426,27 @@ export function PlayerRig({
       }
     }
 
+    const nearbySeat = customSeats
+      .filter(
+        (s) => Math.hypot(s.x - pos.current.x, s.z - pos.current.z) <= 2.5,
+      )
+      .sort(
+        (a, b) =>
+          Math.hypot(a.x - pos.current.x, a.z - pos.current.z) -
+          Math.hypot(b.x - pos.current.x, b.z - pos.current.z),
+      )[0];
+    const seatApproach = nearbySeat
+      ? approachCreationSeat(pos.current, nearbySeat, cells, boxes, obstacles)
+      : null;
+    creationSeatPrompt.report(
+      customSitting.current && sitting.current
+        ? "sitting"
+        : nearbySeat
+          ? seatApproach
+            ? "ready"
+            : "blocked"
+          : null,
+    );
     // Actions from the bus: panel buttons, number keys, the mobile jump.
     let explicitJump = false;
     for (;;) {
@@ -375,8 +456,23 @@ export function PlayerRig({
         wantJump.current = true;
         explicitJump = true;
       } else if (action === "sit") {
-        if (sitting.current) sitting.current = false;
-        else {
+        if (sitting.current) {
+          sitting.current = false;
+          customSitting.current = null;
+        } else if (nearbySeat) {
+          if (seatApproach) {
+            pos.current.set(seatApproach.x, seatApproach.y, seatApproach.z);
+            Object.assign(frameStart, seatApproach);
+            target.current = null;
+            vx = 0;
+            vz = 0;
+            sitting.current = true;
+            customSitting.current = nearbySeat;
+            grounded.current = true;
+            vy.current = 0;
+            yaw.current = nearbySeat.yaw;
+          }
+        } else {
           const seat = raisedSeats.find(
             (s) =>
               Math.hypot(s.x - pos.current.x, s.z - pos.current.z) < 1.8 &&
@@ -444,8 +540,10 @@ export function PlayerRig({
         };
     }
     // Any move input stands you back up.
-    if (sitting.current && (kx || kz || target.current))
+    if (sitting.current && (kx || kz || target.current || wantJump.current)) {
       sitting.current = false;
+      customSitting.current = null;
+    }
     if (sitting.current) {
       vx = 0;
       vz = 0;
@@ -552,7 +650,7 @@ export function PlayerRig({
         pos.current.x,
         pos.current.z,
         pos.current.y,
-        obstacles,
+        [...obstacles, ...customTops],
         mantled.current,
       );
       vy.current = boost.vy;
@@ -592,7 +690,14 @@ export function PlayerRig({
     }
     pos.current.set(motion.position.x, motion.position.y, motion.position.z);
     if (measuringBuilding)
-      probe.player = { x: pos.current.x, y: pos.current.y, z: pos.current.z };
+      probe.player = {
+        x: pos.current.x,
+        y: pos.current.y,
+        z: pos.current.z,
+        sitting: sitting.current,
+        seat: customSitting.current?.id ?? null,
+      };
+    anim.current.creationSeat = !!customSitting.current && sitting.current;
     anim.current.moving = moved && !sitting.current;
     anim.current.airborne = !grounded.current;
     anim.current.phase += dt * (moved ? (k.has("shift") ? 2 : 1.2) : 1);
@@ -602,7 +707,12 @@ export function PlayerRig({
       ? "sit"
       : (pose.current?.kind ?? undefined);
     group.current.position.copy(pos.current);
-    learningTravel.current = { scene, x: pos.current.x, z: pos.current.z, yaw: yaw.current };
+    learningTravel.current = {
+      scene,
+      x: pos.current.x,
+      z: pos.current.z,
+      yaw: yaw.current,
+    };
     group.current.rotation.y = yaw.current;
     reportAgent("player", {
       kind: "player",

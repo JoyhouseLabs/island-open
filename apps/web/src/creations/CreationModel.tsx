@@ -1,3 +1,10 @@
+import { useEffect } from "react";
+import { useThree } from "@react-three/fiber";
+import type { PointLight } from "three";
+import {
+  buildingDiagnostics as probe,
+  measuringBuilding,
+} from "../building/diagnostics";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
   creationSize,
@@ -31,6 +38,7 @@ export function CreationModel({
       {blueprint.parts.map((p) => (
         <mesh
           key={p.id}
+          name={`creation-part-${p.id}`}
           position={[p.x, p.y, p.z]}
           rotation={[0, (p.rotation * Math.PI) / 2, 0]}
           scale={[p.width, p.height, p.depth]}
@@ -57,14 +65,58 @@ export function CreationModel({
           <meshStandardMaterial
             color={ghost ? (invalid ? "#df7468" : "#68c9b1") : p.color}
             roughness={0.75}
-            emissive={selected === p.id ? "#365c51" : "#000000"}
-            emissiveIntensity={0.5}
+            emissive={
+              !ghost && p.light
+                ? p.light.color
+                : selected === p.id
+                  ? "#365c51"
+                  : "#000000"
+            }
+            emissiveIntensity={!ghost && p.light ? 1.5 : 0.5}
             transparent={ghost}
             opacity={ghost ? 0.55 : 1}
             depthWrite={!ghost}
           />
         </mesh>
       ))}
+      {!ghost &&
+        blueprint.parts
+          .filter((p) => p.light)
+          .map((p) => (
+            <pointLight
+              key={`light-${p.id}`}
+              name={`creation-light-${p.id}`}
+              position={[p.x, p.y, p.z]}
+              color={p.light!.color}
+              intensity={p.light!.intensity}
+              distance={p.light!.distance}
+              decay={2}
+              castShadow={false}
+            />
+          ))}
+      {!!selected &&
+        blueprint.parts
+          .filter((p) => p.seat)
+          .map((p) => (
+            <group
+              key={`seat-${p.id}`}
+              position={[p.x, p.y + p.height / 2 + 0.02, p.z]}
+              rotation={[0, (p.rotation * Math.PI) / 2, 0]}
+            >
+              <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
+                <ringGeometry args={[0.32, 0.38, 24]} />
+                <meshBasicMaterial color="#497eae" />
+              </mesh>
+              <mesh
+                position={[0, 0.02, 0.55]}
+                rotation={[Math.PI / 2, 0, 0]}
+                raycast={() => null}
+              >
+                <coneGeometry args={[0.12, 0.3, 3]} />
+                <meshBasicMaterial color="#497eae" />
+              </mesh>
+            </group>
+          ))}
     </group>
   );
 }
@@ -75,6 +127,28 @@ export function CreationLayer({
   items?: CreationPlacement[];
   editor?: CreationEditor;
 }) {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    if (!measuringBuilding) return;
+    probe.creationLights = () => {
+      const lights: { name: string; intensity: number; distance: number }[] =
+        [];
+      scene.traverse((o) => {
+        if (o.name.startsWith("creation-light-")) {
+          const l = o as PointLight;
+          lights.push({
+            name: l.name,
+            intensity: l.intensity,
+            distance: l.distance,
+          });
+        }
+      });
+      return lights;
+    };
+    return () => {
+      probe.creationLights = null;
+    };
+  }, [scene]);
   const render = (f: CreationPlacement, ghost = false) => (
     <group
       key={ghost ? "preview" : f.id}

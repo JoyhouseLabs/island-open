@@ -374,7 +374,7 @@ export default function IslandPage() {
         >
           <SceneBoundary label="主岛">
             <Island
-              creationEditor={creations.editor}
+              creationEditor={walking ? undefined : creations.editor}
               furnitureEditor={creations.editor.active ? undefined : shop.editor}
               world={world.snapshot}
               tool={tool}

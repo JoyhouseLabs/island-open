@@ -1,3 +1,4 @@
+import { creationTemplate } from "./templates";
 import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
@@ -32,7 +33,7 @@ const newPart = (shape: CreationPart["shape"]): CreationPart => ({
 const newDraft = (): CreationDraft => ({
   id: crypto.randomUUID(),
   version: 0,
-  blueprint: { name: "我的小造物", parts: [newPart("box")] },
+  blueprint: { name: "我的小造物", parts: [newPart("box")], physics: "parts" },
 });
 export function Workshop({
   userId,
@@ -55,6 +56,7 @@ export function Workshop({
 }) {
   const draftKey = `island-creation-draft:${userId ?? "visitor"}`,
     pendingKey = `island-creation-pending:${userId ?? "visitor"}`;
+  const [nightPreview, setNightPreview] = useState(false);
   const [items, setItems] = useState<CreationDefinition[]>([]),
     [draft, setDraft] = useState<CreationDraft | null>(null),
     [selected, setSelected] = useState("");
@@ -217,6 +219,7 @@ export function Workshop({
         id: draft.id,
         expectedVersion: draft.version,
         blueprint: draft.blueprint,
+        capabilities: ["creationInteractionsV1"],
         idempotencyKey: crypto.randomUUID(),
       },
     );
@@ -343,11 +346,14 @@ export function Workshop({
                   frameloop="demand"
                   aria-label="造物三维预览"
                 >
-                  <color attach="background" args={["#e9f0e9"]} />
-                  <ambientLight intensity={1.5} />
+                  <color
+                    attach="background"
+                    args={[nightPreview ? "#182c35" : "#e9f0e9"]}
+                  />
+                  <ambientLight intensity={nightPreview ? 0.2 : 1.5} />
                   <directionalLight
                     position={[5, 9, 6]}
-                    intensity={2}
+                    intensity={nightPreview ? 0.15 : 2}
                     castShadow
                   />
                   <CreationModel
@@ -373,11 +379,41 @@ export function Workshop({
                   />
                   <RendererCleanup />
                 </Canvas>
+                <button
+                  className="creation-night-preview"
+                  aria-pressed={nightPreview}
+                  onClick={() => setNightPreview((v) => !v)}
+                >
+                  {nightPreview ? "切换白天预览" : "切换夜晚预览"}
+                </button>
                 <p>拖动旋转视角 · 点击部件选中 · 底座 6 × 6</p>
               </div>
               <div className="creation-properties">
                 <fieldset disabled={!!pending || busy}>
                   <legend>组合部件 · {draft.blueprint.parts.length}/24</legend>
+                  <label className="creation-toggle">
+                    <input
+                      type="checkbox"
+                      checked={draft.blueprint.physics === "parts"}
+                      onChange={(e) =>
+                        change({
+                          ...draft,
+                          blueprint: {
+                            ...draft.blueprint,
+                            physics: e.target.checked ? "parts" : undefined,
+                            parts: draft.blueprint.parts.map((p) => ({
+                              ...p,
+                              seat: e.target.checked ? p.seat : undefined,
+                            })),
+                          },
+                        })
+                      }
+                    />
+                    按部件碰撞，可以站上顶面
+                  </label>
+                  <small>
+                    桌腿之间可以通过。球体、圆柱采用外接方盒碰撞，做站面推荐方块。
+                  </small>
                   <div className="creation-shapes">
                     {(["box", "sphere", "cylinder"] as const).map((shape) => (
                       <button
@@ -429,6 +465,123 @@ export function Workshop({
                       onChange={(e) => update({ color: e.target.value })}
                     />
                   </label>
+                  <label className="creation-toggle">
+                    <input
+                      type="checkbox"
+                      disabled={
+                        part.shape !== "box" ||
+                        draft.blueprint.physics !== "parts"
+                      }
+                      checked={!!part.seat}
+                      onChange={(e) =>
+                        change({
+                          ...draft,
+                          blueprint: {
+                            ...draft.blueprint,
+                            parts: draft.blueprint.parts.map((p) => ({
+                              ...p,
+                              seat:
+                                p.id === part.id && e.target.checked
+                                  ? true
+                                  : undefined,
+                            })),
+                          },
+                        })
+                      }
+                    />
+                    将此方块设为座面
+                  </label>
+                  {part.seat && (
+                    <small>
+                      蓝色箭头是座位正面。靠近后点击坐下，或按
+                      2；移动、跳跃或再次点击即可起身。
+                    </small>
+                  )}
+                  <label className="creation-toggle">
+                    <input
+                      type="checkbox"
+                      checked={!!part.light}
+                      onChange={(e) =>
+                        change({
+                          ...draft,
+                          blueprint: {
+                            ...draft.blueprint,
+                            parts: draft.blueprint.parts.map((p) => ({
+                              ...p,
+                              light:
+                                p.id === part.id && e.target.checked
+                                  ? {
+                                      color: p.color,
+                                      intensity: 4,
+                                      distance: 6,
+                                    }
+                                  : undefined,
+                            })),
+                          },
+                        })
+                      }
+                    />
+                    将此部件设为光源
+                  </label>
+                  {part.light && (
+                    <div className="creation-light-controls">
+                      <label>
+                        灯光颜色
+                        <input
+                          type="color"
+                          aria-label="灯光颜色"
+                          value={part.light.color}
+                          onChange={(e) =>
+                            update({
+                              light: { ...part.light!, color: e.target.value },
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        亮度 · {part.light.intensity}
+                        <input
+                          aria-label="灯光亮度"
+                          type="range"
+                          min="1"
+                          max="8"
+                          step="1"
+                          value={part.light.intensity}
+                          onChange={(e) =>
+                            update({
+                              light: {
+                                ...part.light!,
+                                intensity: Number(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        照明范围 · {part.light.distance}
+                        <input
+                          aria-label="照明范围"
+                          type="range"
+                          min="2"
+                          max="8"
+                          step="1"
+                          value={part.light.distance}
+                          onChange={(e) =>
+                            update({
+                              light: {
+                                ...part.light!,
+                                distance: Number(e.target.value),
+                              },
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                  )}
+                  <small>
+                    每件造物一个座面、一个光源；再次指定会转移到当前部件。主岛最多摆放
+                    4 件发光造物。
+                  </small>
                   <div className="creation-numbers">
                     {(
                       [
@@ -486,7 +639,12 @@ export function Workshop({
                     <button
                       disabled={draft.blueprint.parts.length >= 24}
                       onClick={() => {
-                        const p = { ...part, id: crypto.randomUUID() };
+                        const p = {
+                          ...part,
+                          id: crypto.randomUUID(),
+                          seat: undefined,
+                          light: undefined,
+                        };
                         change({
                           ...draft,
                           blueprint: {
@@ -594,6 +752,20 @@ export function Workshop({
               >
                 <Plus size={18} />
                 开始创作
+              </button>
+            </div>
+            <div
+              className="creation-row creation-starters"
+              aria-label="造物起点"
+            >
+              <button onClick={() => open(creationTemplate("table"))}>
+                从桌子开始
+              </button>
+              <button onClick={() => open(creationTemplate("chair"))}>
+                从椅子开始
+              </button>
+              <button onClick={() => open(creationTemplate("lamp"))}>
+                从灯开始
               </button>
             </div>
             {!loaded ? (

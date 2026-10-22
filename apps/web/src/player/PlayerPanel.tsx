@@ -1,3 +1,4 @@
+import { useCreationSeatPrompt } from "./creationSeatPrompt";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
@@ -71,8 +72,7 @@ const AWAY_CLOSE_MS = 1500;
 /** Hover-capable pointer: buttons open their panel on hover and clicks are
  *  left to touch screens (a tap would otherwise open-then-toggle-close). */
 const canHover =
-  typeof window !== "undefined" &&
-  window.matchMedia("(hover: hover)").matches;
+  typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches;
 /** The invoking buttons count as panel territory: resting the mouse on the
  *  backpack button must not time the panel out. */
 let packInvoker: HTMLElement | null = null;
@@ -122,7 +122,13 @@ function useAwayClose(
 /** Backpack entry in a page's view-controls cluster. */
 /** `tool` renders the island toolbar style with a label; the default is the
  *  round side-button used by sub-scene pages. */
-export function BackpackButton({ tool = false, label = "背包" }: { tool?: boolean; label?: string }) {
+export function BackpackButton({
+  tool = false,
+  label = "背包",
+}: {
+  tool?: boolean;
+  label?: string;
+}) {
   const isOpen = usePackOpen();
   return (
     <button
@@ -144,23 +150,45 @@ export function BackpackButton({ tool = false, label = "背包" }: { tool?: bool
 }
 
 /** Touch-friendly jump, shown while the avatar walks. */
-export function JumpButton({  visible,
+export function JumpButton({
+  visible,
   tool = false,
 }: {
   visible: boolean;
   tool?: boolean;
 }) {
+  const seat = useCreationSeatPrompt();
   if (!visible) return null;
+  const seatLabel =
+    seat === "sitting"
+      ? "从造物起身"
+      : seat === "ready"
+        ? "坐在造物上"
+        : "请绕到座面前方并留出空间";
   return (
-    <button
-      className={tool ? "tool" : "circle-button"}
-      title="跳跃"
-      aria-label="跳跃"
-      onClick={() => playerAction.trigger("jump")}
-    >
-      <ChevronUp size={20} />
-      {tool && <span>跳跃</span>}
-    </button>
+    <>
+      {seat && (
+        <button
+          className={tool ? "tool" : "circle-button"}
+          aria-label={seatLabel}
+          title={seatLabel}
+          disabled={seat === "blocked"}
+          onClick={() => playerAction.trigger("sit")}
+        >
+          <Sparkles size={20} />
+          {tool && <span>{seat === "sitting" ? "起身" : "坐下"}</span>}
+        </button>
+      )}
+      <button
+        className={tool ? "tool" : "circle-button"}
+        title="跳跃"
+        aria-label="跳跃"
+        onClick={() => playerAction.trigger("jump")}
+      >
+        <ChevronUp size={20} />
+        {tool && <span>跳跃</span>}
+      </button>
+    </>
   );
 }
 
@@ -235,7 +263,7 @@ function Dressing() {
   return (
     <>
       {/* Live preview: every form, colour and hat change shows right here.
- *          Mirrors the picker's stage (AvatarPreview needs a Canvas). */}
+       *          Mirrors the picker's stage (AvatarPreview needs a Canvas). */}
       <div className="avatar-stage pack-stage">
         <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0.95, 3.3], fov: 38 }}>
           <ambientLight intensity={1.1} />
@@ -285,7 +313,9 @@ function Dressing() {
             >
               {!owned && <Lock size={11} />}
               {h.name}
-              {!owned && cost !== undefined && <span className="pack-cost">{cost}★</span>}
+              {!owned && cost !== undefined && (
+                <span className="pack-cost">{cost}★</span>
+              )}
             </button>
           );
         })}
@@ -393,8 +423,8 @@ export default function PlayerPanel() {
           </div>
           {nextTask && (
             <p className="tiny-note">
-              下一个小目标：「{nextTask.title}」—{" "}
-              {progress(nextTask.id)} / {nextTask.goal.count}
+              下一个小目标：「{nextTask.title}」— {progress(nextTask.id)} /{" "}
+              {nextTask.goal.count}
             </p>
           )}
         </>
@@ -414,8 +444,8 @@ export default function PlayerPanel() {
             ))}
           </div>
           <p className="tiny-note">
-            W/A/S/D 或方向键走路 · Shift 疾跑 · 空格跳跃（靠近伙伴时空格是交谈）·
-            长椅可以跳上去坐 · B 关闭背包
+            W/A/S/D 或方向键走路 · Shift 疾跑 ·
+            空格跳跃（靠近伙伴时空格是交谈）· 长椅可以跳上去坐 · B 关闭背包
           </p>
         </>
       )}

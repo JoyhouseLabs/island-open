@@ -56,7 +56,7 @@ function buildSave(
     baseRevision: revision,
     deviceId,
     idempotencyKey,
-    capabilities: [...BUILDING_CAPABILITIES, "furnitureV1", "creationsV1"],
+    capabilities: [...BUILDING_CAPABILITIES, "furnitureV1", "creationsV1", "creationInteractionsV1"],
     operations,
     ...(terrain && leaseToken !== undefined ? { leaseToken } : {}),
   };

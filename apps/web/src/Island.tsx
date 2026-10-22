@@ -553,7 +553,11 @@ function Snow() {
     </points>
   );
 }
-function Camera({ focus, reset }: { focus: Focus; reset?: number }) {
+function Camera({ focus, reset, walking }: {
+  focus: Focus;
+  reset?: number;
+  walking: boolean;
+}) {
   const viewportWidth = useThree((s) => s.size.width);
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null),
     camera = useThree((s) => s.camera),
@@ -561,6 +565,11 @@ function Camera({ focus, reset }: { focus: Focus; reset?: number }) {
     destination = useRef(new T.Vector3()),
     moving = useRef(false);
   useEffect(() => {
+    // The player owns the camera while walking; stop any overview transition.
+    if (walking) {
+      moving.current = false;
+      return;
+    }
     target.current.set(
       focus?.x ?? 0,
       focus ? groundHeight(focus.x, focus.z) + 4 : 6,
@@ -576,9 +585,9 @@ function Camera({ focus, reset }: { focus: Focus; reset?: number }) {
             : new T.Vector3(220, 210, 285),
       );
     moving.current = true;
-  }, [focus, viewportWidth, reset]);
+  }, [focus, viewportWidth, reset, walking]);
   useFrame((_, dt) => {
-    if (!moving.current || !controls.current) return;
+    if (walking || !moving.current || !controls.current) return;
     const t = 1 - Math.exp(-dt * 4);
     camera.position.lerp(destination.current, t);
     controls.current.target.lerp(target.current, t);
@@ -744,7 +753,11 @@ function Scene(props: Props) {
         />
       )}{" "}
       {props.world.environment.season === "winter" && <Snow />}
-      <Camera focus={props.focus} reset={props.cameraReset} />
+      <Camera
+        focus={props.focus}
+        reset={props.cameraReset}
+        walking={!!(props.walk && props.avatar)}
+      />
     </>
   );
 }

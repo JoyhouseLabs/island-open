@@ -1,7 +1,15 @@
 /** Local development measurements; production builds never populate this probe. */
 export const buildingDiagnostics = {
-  player: null as { x: number; y: number; z: number } | null,
+  player: null as {
+    x: number;
+    y: number;
+    z: number;
+    sitting?: boolean;
+    seat?: string | null;
+  } | null,
   frameMs: [] as number[],
+  creationLights: null as
+    null | (() => { name: string; intensity: number; distance: number }[]),
   memory: { geometries: 0, textures: 0, programs: 0, calls: 0, triangles: 0 },
   inspectBlocks: null as
     null | (() => { name: string; opacity: number; transparent: boolean }[]),

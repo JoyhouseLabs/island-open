@@ -137,7 +137,7 @@ export const worldOpSchema = z.discriminatedUnion("op", [
 export type WorldOp = z.infer<typeof worldOpSchema>;
 export const saveWorldSchema = z
   .object({
-    capabilities: z.array(z.enum([...BUILDING_CAPABILITIES, "furnitureV1", "creationsV1"])).optional(),
+    capabilities: z.array(z.enum([...BUILDING_CAPABILITIES, "furnitureV1", "creationsV1", "creationInteractionsV1"])).optional(),
     baseRevision: z.number().int().min(1),
     /** Required only when the patch is terrain-scale (a replace, or many entities). */
     leaseToken: z.number().int().positive().optional(),
