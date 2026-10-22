@@ -1,0 +1,10 @@
+{
+  "name": "@island/physics-core",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": { "build": "tsc" },
+  "dependencies": { "@island/contracts": "workspace:*", "@dimforge/rapier3d-compat": "0.19.2" }
+}

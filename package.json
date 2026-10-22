@@ -5,7 +5,7 @@
   "private": true,
   "packageManager": "pnpm@10.24.0",
   "scripts": {
-    "build:shared": "pnpm --filter @island/contracts build && pnpm --filter @island/world-core build",
+    "build:shared": "pnpm --filter @island/contracts build && pnpm --filter @island/world-core build && pnpm --filter @island/physics-core build",
     "build": "pnpm build:shared && pnpm --filter @island/web build",
     "dev": "pnpm build:shared && pnpm --filter @island/web dev",
     "typecheck": "pnpm build:shared && pnpm --filter @island/web typecheck",

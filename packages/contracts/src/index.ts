@@ -1,3 +1,4 @@
+export * from "./physics.js";
 import { creationPlacementSchema } from "./creations.js";
 export * from "./creations.js";
 import { furniturePlacementSchema } from "./shop.js";

@@ -19,6 +19,7 @@ export const paths: { island: string; books: string; studio: string; wilderness:
 };
 
 export const pageTitles: Record<string, string> = {
+  "/physics": "物理游乐场 · 心灵家园",
   [paths.wilderness]: "外围探索 · 心灵家园",
   [paths.books]: "共读书架 · 心灵家园",
   [paths.studio]: "AI 工坊 · 心灵家园",

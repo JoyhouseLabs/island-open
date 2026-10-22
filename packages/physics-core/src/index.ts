@@ -1,0 +1,316 @@
+import RAPIER from "@dimforge/rapier3d-compat";
+import { PhysicsCharacter } from "./character.js";
+import {
+  physicsSceneSchema,
+  physicsBudgets,
+  physicsMaterials,
+  physicsCheckpointSchema,
+  type PhysicsScene,
+  type ColliderShape,
+  type BodyState,
+  type Vector3,
+} from "@island/contracts";
+export { RAPIER };
+export * from "./playground.js";
+export * from "./character.js";
+export * from "./grab.js";
+
+let initialization: Promise<void> | undefined;
+export function initializePhysics(): Promise<void> {
+  return (initialization ??= RAPIER.init().catch((error: unknown) => {
+    initialization = undefined;
+    throw error;
+  }));
+}
+export const PHYSICS_DT = 1 / physicsBudgets.tickRate;
+
+export function colliderDescription(shape: ColliderShape): RAPIER.ColliderDesc {
+  switch (shape.kind) {
+    case "box":
+      return RAPIER.ColliderDesc.cuboid(
+        shape.halfExtents.x,
+        shape.halfExtents.y,
+        shape.halfExtents.z,
+      );
+    case "ball":
+      return RAPIER.ColliderDesc.ball(shape.radius);
+    case "cylinder":
+      return RAPIER.ColliderDesc.cylinder(shape.halfHeight, shape.radius);
+    case "capsule":
+      return RAPIER.ColliderDesc.capsule(shape.halfHeight, shape.radius);
+    case "convex": {
+      const desc = RAPIER.ColliderDesc.convexHull(
+        new Float32Array(shape.vertices.flatMap((v) => [v.x, v.y, v.z])),
+      );
+      if (!desc) throw new Error("凸体顶点无法形成有效的立体碰撞形状");
+      return desc;
+    }
+  }
+}
+
+/** One clock and one world for both browser and headless simulations. */
+export class PhysicsRuntime {
+  readonly world: RAPIER.World;
+  readonly scene: PhysicsScene;
+  readonly bodies = new Map<string, RAPIER.RigidBody>();
+  private characters = new Map<string, PhysicsCharacter>();
+  private previous = new Map<string, BodyState>();
+  private ccdThresholds = new Map<string, number>();
+  private recoveryAnchors = new Map<string, BodyState>();
+  private accumulator = 0;
+  private disposed = false;
+  tick = 0;
+  droppedSeconds = 0;
+  recoveries = 0;
+  private constructor(input: PhysicsScene) {
+    this.scene = physicsSceneSchema.parse(input);
+    this.world = new RAPIER.World({ x: 0, y: -22, z: 0 });
+    this.world.timestep = PHYSICS_DT;
+    try {
+      const definitions = new Map(
+        this.scene.definitions.map((d) => [`${d.id}@${d.version}`, d]),
+      );
+      for (const instance of this.scene.objects) {
+        const def = definitions.get(
+          `${instance.definitionId}@${instance.definitionVersion}`,
+        )!;
+        const desc =
+          def.bodyType === "dynamic"
+            ? RAPIER.RigidBodyDesc.dynamic()
+            : def.bodyType === "kinematic"
+              ? RAPIER.RigidBodyDesc.kinematicPositionBased()
+              : RAPIER.RigidBodyDesc.fixed();
+        const body = this.world.createRigidBody(
+          desc
+            .setTranslation(
+              instance.position.x,
+              instance.position.y,
+              instance.position.z,
+            )
+            .setRotation(instance.rotation)
+            .setLinearDamping(0.15)
+            .setAngularDamping(0.25)
+            .setCanSleep(true),
+        );
+        const material = physicsMaterials[def.material];
+        for (const part of def.parts) {
+          this.world.createCollider(
+            colliderDescription(part.shape)
+              .setTranslation(part.position.x, part.position.y, part.position.z)
+              .setRotation(part.rotation)
+              .setFriction(material.friction)
+              .setRestitution(material.restitution)
+              .setDensity(part.sensor ? 0 : material.density)
+              .setSensor(part.sensor),
+            body,
+          );
+        }
+        this.bodies.set(instance.id, body);
+        const minimum = Math.min(
+          ...def.parts
+            .filter((p) => !p.sensor)
+            .map((p) =>
+              p.shape.kind === "box"
+                ? Math.min(
+                    p.shape.halfExtents.x,
+                    p.shape.halfExtents.y,
+                    p.shape.halfExtents.z,
+                  )
+                : p.shape.kind === "convex"
+                  ? 0.025
+                  : p.shape.radius,
+            ),
+        );
+        this.ccdThresholds.set(instance.id, minimum / PHYSICS_DT);
+      }
+      this.capturePrevious();
+      for (const state of this.states())
+        this.recoveryAnchors.set(state.id, state);
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
+  }
+  static async create(scene: PhysicsScene): Promise<PhysicsRuntime> {
+    await initializePhysics();
+    return new PhysicsRuntime(scene);
+  }
+  private checkAlive() {
+    if (this.disposed) throw new Error("物理场景已经关闭");
+  }
+  createCharacter(id: string, spawn = this.scene.spawn): PhysicsCharacter {
+    this.checkAlive();
+    if (this.characters.has(id)) throw new Error("角色已经存在");
+    const character = new PhysicsCharacter(this.world, spawn);
+    this.characters.set(id, character);
+    return character;
+  }
+  removeCharacter(id: string) {
+    this.characters.get(id)?.dispose();
+    this.characters.delete(id);
+  }
+  state(id: string): BodyState {
+    this.checkAlive();
+    const body = this.bodies.get(id);
+    if (!body) throw new Error("物体不存在");
+    return {
+      id,
+      position: { ...body.translation() },
+      rotation: { ...body.rotation() },
+      sleeping: body.isSleeping(),
+    };
+  }
+  states(): BodyState[] {
+    return [...this.bodies.keys()].map((id) => this.state(id));
+  }
+  private capturePrevious() {
+    for (const id of this.bodies.keys()) this.previous.set(id, this.state(id));
+  }
+  previousState(id: string) {
+    return this.previous.get(id) ?? this.state(id);
+  }
+  get alpha() {
+    return this.accumulator / PHYSICS_DT;
+  }
+  /** Simulation authority calls this with a fixed clock. */
+  step(beforeStep?: (dt: number) => void) {
+    this.checkAlive();
+    this.capturePrevious();
+    for (const instance of this.scene.objects) {
+      if (!instance.motion) continue;
+      const phase =
+        ((this.tick + 1) % instance.motion.periodTicks) /
+        instance.motion.periodTicks;
+      const factor = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+      this.bodies.get(instance.id)!.setNextKinematicTranslation({
+        x: instance.position.x + instance.motion.offset.x * factor,
+        y: instance.position.y + instance.motion.offset.y * factor,
+        z: instance.position.z + instance.motion.offset.z * factor,
+      });
+    }
+    beforeStep?.(PHYSICS_DT);
+    for (const [id, body] of this.bodies) {
+      if (!body.isDynamic()) continue;
+      const v = body.linvel(),
+        speed = Math.hypot(v.x, v.y, v.z);
+      body.enableCcd(
+        speed + 22 * PHYSICS_DT > (this.ccdThresholds.get(id) ?? Infinity),
+      );
+      if (speed > 20)
+        body.setLinvel(
+          {
+            x: (v.x * 20) / speed,
+            y: (v.y * 20) / speed,
+            z: (v.z * 20) / speed,
+          },
+          true,
+        );
+      const a = body.angvel(),
+        spin = Math.hypot(a.x, a.y, a.z);
+      if (spin > 20)
+        body.setAngvel(
+          { x: (a.x * 20) / spin, y: (a.y * 20) / spin, z: (a.z * 20) / spin },
+          true,
+        );
+    }
+    this.world.step();
+    for (const [id, body] of this.bodies) {
+      if (!body.isDynamic()) continue;
+      const state = this.state(id);
+      const out = (["x", "y", "z"] as const).some(
+        (axis) =>
+          !Number.isFinite(state.position[axis]) ||
+          state.position[axis] < this.scene.bounds.min[axis] ||
+          state.position[axis] > this.scene.bounds.max[axis],
+      );
+      if (out) {
+        const anchor = this.recoveryAnchors.get(id)!;
+        body.setTranslation(anchor.position, true);
+        body.setRotation(anchor.rotation, true);
+        body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        this.previous.set(id, anchor);
+        this.recoveries++;
+      } else if (body.isSleeping()) this.recoveryAnchors.set(id, state);
+    }
+    this.tick++;
+  }
+  /** Render clock: bounded catch-up, never variable physical timesteps. */
+  advance(seconds: number, beforeStep?: (dt: number) => void): number {
+    this.checkAlive();
+    if (!Number.isFinite(seconds) || seconds < 0)
+      throw new Error("无效时间间隔");
+    const max = PHYSICS_DT * physicsBudgets.maxCatchUpSteps;
+    const total = this.accumulator + seconds;
+    this.accumulator = Math.min(total, max);
+    this.droppedSeconds += Math.max(0, total - max);
+    let steps = 0;
+    while (
+      this.accumulator + 1e-10 >= PHYSICS_DT &&
+      steps < physicsBudgets.maxCatchUpSteps
+    ) {
+      this.step(beforeStep);
+      this.accumulator = Math.max(0, this.accumulator - PHYSICS_DT);
+      steps++;
+    }
+    return steps;
+  }
+  pauseClock() {
+    this.accumulator = 0;
+    this.capturePrevious();
+  }
+  impulse(id: string, impulse: Vector3) {
+    this.checkAlive();
+    const body = this.bodies.get(id);
+    if (!body?.isDynamic()) throw new Error("只能推动活动物体");
+    const length = Math.hypot(impulse.x, impulse.y, impulse.z);
+    if (!Number.isFinite(length) || length > 20)
+      throw new Error("推动力度超出范围");
+    body.applyImpulse(impulse, true);
+  }
+  restore(input: unknown) {
+    this.checkAlive();
+    const checkpoint = physicsCheckpointSchema.parse(input);
+    if (
+      checkpoint.states.length !== this.bodies.size ||
+      checkpoint.states.some((s) => !this.bodies.has(s.id))
+    )
+      throw new Error("检查点不属于当前布局");
+    if (
+      checkpoint.states.some((state) =>
+        (["x", "y", "z"] as const).some(
+          (axis) =>
+            state.position[axis] < this.scene.bounds.min[axis] ||
+            state.position[axis] > this.scene.bounds.max[axis],
+        ),
+      )
+    )
+      throw new Error("检查点超出场景边界");
+    for (const state of checkpoint.states) {
+      const body = this.bodies.get(state.id)!;
+      body.setTranslation(state.position, true);
+      body.setRotation(state.rotation, true);
+      if (body.isKinematic()) {
+        body.setNextKinematicTranslation(state.position);
+        body.setNextKinematicRotation(state.rotation);
+      }
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      if (state.sleeping && body.isDynamic()) body.sleep();
+      this.recoveryAnchors.set(state.id, state);
+    }
+    this.tick = checkpoint.tick;
+    this.pauseClock();
+  }
+  dispose() {
+    if (this.disposed) return;
+    for (const character of this.characters.values()) character.dispose();
+    this.characters.clear();
+    this.disposed = true;
+    this.bodies.clear();
+    this.previous.clear();
+    this.ccdThresholds.clear();
+    this.recoveryAnchors.clear();
+    this.world.free();
+  }
+}

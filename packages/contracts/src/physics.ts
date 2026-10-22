@@ -1,0 +1,211 @@
+import { z } from "zod";
+
+export const PHYSICS_RULES_VERSION = "1.0.0" as const;
+export const physicsBudgets = Object.freeze({
+  players: 4,
+  dynamicBodies: 32,
+  partsPerObject: 24,
+  staticColliders: 4096,
+  behaviorNodes: 64,
+  behaviorLinks: 128,
+  signalsPerTick: 256,
+  tickRate: 60,
+  maxCatchUpSteps: 4,
+  frameRate: 15,
+});
+export const physicsMaterials = {
+  wood: { density: 0.6, friction: 0.65, restitution: 0.05 },
+  stone: { density: 2.4, friction: 0.8, restitution: 0.02 },
+  rubber: { density: 1.1, friction: 0.9, restitution: 0.65 },
+  ice: { density: 0.9, friction: 0.03, restitution: 0.02 },
+} as const;
+export const vector3Schema = z
+  .object({
+    x: z.number().finite().min(-100000).max(100000),
+    y: z.number().finite().min(-10000).max(10000),
+    z: z.number().finite().min(-100000).max(100000),
+  })
+  .strict();
+export const quaternionSchema = z
+  .object({
+    x: z.number().finite().min(-1).max(1),
+    y: z.number().finite().min(-1).max(1),
+    z: z.number().finite().min(-1).max(1),
+    w: z.number().finite().min(-1).max(1),
+  })
+  .strict()
+  .refine(
+    (q) => Math.abs(Math.hypot(q.x, q.y, q.z, q.w) - 1) < 0.0001,
+    "旋转必须是单位四元数",
+  );
+export const identityQuaternion = { x: 0, y: 0, z: 0, w: 1 };
+const extent = z.number().finite().min(0.025).max(256);
+const localVector = z
+  .object({
+    x: z.number().finite().min(-256).max(256),
+    y: z.number().finite().min(-256).max(256),
+    z: z.number().finite().min(-256).max(256),
+  })
+  .strict();
+export const colliderShapeSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("box"),
+      halfExtents: z.object({ x: extent, y: extent, z: extent }).strict(),
+    })
+    .strict(),
+  z.object({ kind: z.literal("ball"), radius: extent }).strict(),
+  z
+    .object({ kind: z.literal("cylinder"), radius: extent, halfHeight: extent })
+    .strict(),
+  z
+    .object({ kind: z.literal("capsule"), radius: extent, halfHeight: extent })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("convex"),
+      vertices: z.array(localVector).min(4).max(64),
+    })
+    .strict(),
+]);
+export const objectPartSchema = z
+  .object({
+    id: z.string().min(1).max(48),
+    shape: colliderShapeSchema,
+    position: localVector,
+    rotation: quaternionSchema,
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    sensor: z.boolean().default(false),
+  })
+  .strict();
+export const objectDefinitionSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9][a-z0-9:._-]{0,95}$/),
+    version: z.number().int().positive(),
+    name: z.string().trim().min(1).max(60),
+    source: z.enum(["official", "shop", "creation"]),
+    bodyType: z.enum(["fixed", "dynamic", "kinematic"]),
+    material: z.enum(["wood", "stone", "rubber", "ice"]),
+    parts: z.array(objectPartSchema).min(1).max(physicsBudgets.partsPerObject),
+    abilities: z
+      .array(
+        z.enum([
+          "grabbable",
+          "seat",
+          "light",
+          "switch",
+          "pressure",
+          "door",
+          "platform",
+          "content",
+        ]),
+      )
+      .max(8),
+  })
+  .strict()
+  .superRefine((d, ctx) => {
+    if (new Set(d.parts.map((p) => p.id)).size !== d.parts.length)
+      ctx.addIssue({ code: "custom", message: "部件编号不能重复" });
+    if (new Set(d.abilities).size !== d.abilities.length)
+      ctx.addIssue({ code: "custom", message: "能力不能重复" });
+    if (d.bodyType !== "dynamic" && d.abilities.includes("grabbable"))
+      ctx.addIssue({ code: "custom", message: "只有活动物体可以搬动" });
+    if (d.bodyType === "dynamic" && d.parts.every((p) => p.sensor))
+      ctx.addIssue({ code: "custom", message: "活动物体需要实体碰撞" });
+  });
+export const objectInstanceSchema = z
+  .object({
+    id: z.string().uuid(),
+    definitionId: z.string(),
+    definitionVersion: z.number().int().positive(),
+    position: vector3Schema,
+    rotation: quaternionSchema,
+    motion: z
+      .object({
+        offset: localVector,
+        periodTicks: z.number().int().min(120).max(3600),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export const physicsSceneSchema = z
+  .object({
+    schemaVersion: z.literal(4),
+    physicsVersion: z.literal(PHYSICS_RULES_VERSION),
+    id: z.string().min(1).max(96),
+    name: z.string().min(1).max(60),
+    definitions: z.array(objectDefinitionSchema).max(512),
+    objects: z.array(objectInstanceSchema).max(4096),
+    spawn: vector3Schema,
+    bounds: z.object({ min: vector3Schema, max: vector3Schema }).strict(),
+  })
+  .strict()
+  .superRefine((s, ctx) => {
+    const definitions = new Map(
+      s.definitions.map((d) => [`${d.id}@${d.version}`, d]),
+    );
+    for (const axis of ["x", "y", "z"] as const) {
+      if (s.bounds.min[axis] >= s.bounds.max[axis])
+        ctx.addIssue({ code: "custom", message: "场景边界无效" });
+      if (
+        s.spawn[axis] < s.bounds.min[axis] ||
+        s.spawn[axis] > s.bounds.max[axis]
+      )
+        ctx.addIssue({ code: "custom", message: "出生点超出场景" });
+    }
+    if (definitions.size !== s.definitions.length)
+      ctx.addIssue({ code: "custom", message: "定义版本重复" });
+    if (new Set(s.objects.map((o) => o.id)).size !== s.objects.length)
+      ctx.addIssue({ code: "custom", message: "物体编号重复" });
+    let dynamic = 0,
+      staticParts = 0;
+    for (const o of s.objects) {
+      const d = definitions.get(`${o.definitionId}@${o.definitionVersion}`);
+      if (!d) {
+        ctx.addIssue({ code: "custom", message: "物体引用不存在的定义版本" });
+        continue;
+      }
+      if (
+        o.motion &&
+        (d.bodyType !== "kinematic" || !d.abilities.includes("platform"))
+      )
+        ctx.addIssue({ code: "custom", message: "移动轨迹只适用于运动平台" });
+      if (d.bodyType === "dynamic") dynamic++;
+      else staticParts += d.parts.length;
+    }
+    if (dynamic > physicsBudgets.dynamicBodies)
+      ctx.addIssue({ code: "custom", message: "活动物体超过房间预算" });
+    if (staticParts > physicsBudgets.staticColliders)
+      ctx.addIssue({ code: "custom", message: "静态碰撞超过房间预算" });
+  });
+export const bodyStateSchema = z
+  .object({
+    id: z.string().uuid(),
+    position: vector3Schema,
+    rotation: quaternionSchema,
+    sleeping: z.boolean(),
+  })
+  .strict();
+export const physicsCheckpointSchema = z
+  .object({
+    schemaVersion: z.literal(4),
+    physicsVersion: z.literal(PHYSICS_RULES_VERSION),
+    layoutRevision: z.number().int().nonnegative(),
+    revision: z.number().int().nonnegative(),
+    tick: z.number().int().nonnegative(),
+    states: z.array(bodyStateSchema).max(4096),
+  })
+  .strict()
+  .refine(
+    (s) => new Set(s.states.map((o) => o.id)).size === s.states.length,
+    "检查点物体编号重复",
+  );
+export type PhysicsScene = z.infer<typeof physicsSceneSchema>;
+export type ObjectDefinition = z.infer<typeof objectDefinitionSchema>;
+export type ObjectInstance = z.infer<typeof objectInstanceSchema>;
+export type ObjectPart = z.infer<typeof objectPartSchema>;
+export type ColliderShape = z.infer<typeof colliderShapeSchema>;
+export type Vector3 = z.infer<typeof vector3Schema>;
+export type Quaternion = z.infer<typeof quaternionSchema>;
+export type BodyState = z.infer<typeof bodyStateSchema>;
