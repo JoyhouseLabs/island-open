@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import type { AuthConfig, User } from "@island/contracts";
 import { api, RequestError } from "../api";
 import { PhysicsConnection } from "./PhysicsConnection";
+import PhysicsEditor, { bottomOf, type PhysicsDraft } from "./PhysicsEditor";
 import OnlineScene from "./OnlineScene";
 import "./physics.css";
 
@@ -33,6 +34,7 @@ export default function OnlinePhysics() {
   const [conn, setConn] = useState<PhysicsConnection | null>(null),
     [, update] = useState(0),
     [selected, select] = useState<string | null>(null);
+  const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +65,7 @@ export default function OnlinePhysics() {
   }, []);
   useEffect(() => {
     setWorld(null);
+    setDraft(null);
     select(null);
     setError("");
     if (!user || !enabled) return;
@@ -165,7 +168,7 @@ export default function OnlinePhysics() {
     ? `${window.location.origin}/physics/online/${world.id}?t=${world.shareToken}`
     : "";
   const connected = conn?.status === "connected",
-    canInteract = connected && !!conn?.me?.canInteract;
+    canInteract = connected && !conn?.editing && !!conn?.me?.canInteract;
   return (
     <main
       className={`physics-playground ${conn?.scene ? "" : "physics-lobby"}`}
@@ -174,7 +177,7 @@ export default function OnlinePhysics() {
         <Link to="/physics/online">← 我的世界</Link>
         <div>
           <h1>{world?.name ?? "在线物理世界"}</h1>
-          <p>一起滚动、搬动和探索</p>
+          <p>一起布置、搬动和探索</p>
         </div>
         <Link to="/physics">本地试验</Link>
       </header>
@@ -237,9 +240,28 @@ export default function OnlinePhysics() {
               keys={keys}
               selected={selected}
               select={select}
+              draft={conn.editing ? draft : null}
+              placeAt={(point) => {
+                if (!draft || !conn.editing || conn.editPending) return;
+                setDraft({
+                  ...draft,
+                  object: {
+                    ...draft.object,
+                    position: {
+                      x: Math.round(point.x * 4) / 4,
+                      y:
+                        Math.round((point.y - bottomOf(draft.definition)) * 4) /
+                        4,
+                      z: Math.round(point.z * 4) / 4,
+                    },
+                  },
+                });
+              }}
             />
             <div className="physics-hint">
-              方向键/按钮移动 · 点选物品 · E 拿起或放下
+              {conn.editing
+                ? "布置中 · 点击场景定位 · 确认后保存"
+                : "方向键/按钮移动 · 点选物品 · E 拿起或放下"}
             </div>
           </section>
           <section className="physics-controls">
@@ -252,6 +274,15 @@ export default function OnlinePhysics() {
               <p role="status">{conn.message}</p>
               <p data-testid="physics-save-status">{conn.saved}</p>
             </div>
+            {world?.owner && (
+              <PhysicsEditor
+                conn={conn}
+                selected={selected}
+                draft={draft}
+                setDraft={setDraft}
+                clearKeys={() => keys.clear()}
+              />
+            )}
             <label className="physics-select">
               观察物品
               <select
@@ -261,12 +292,14 @@ export default function OnlinePhysics() {
               >
                 <option value="">选择物品</option>
                 {conn.scene.objects
-                  .filter((object) =>
-                    conn
-                      .scene!.definitions.find(
-                        (d) => d.id === object.definitionId,
-                      )
-                      ?.abilities.includes("grabbable"),
+                  .filter(
+                    (object) =>
+                      conn.editing ||
+                      conn
+                        .scene!.definitions.find(
+                          (d) => d.id === object.definitionId,
+                        )
+                        ?.abilities.includes("grabbable"),
                   )
                   .map((object) => (
                     <option key={object.id} value={object.id}>
@@ -313,7 +346,7 @@ export default function OnlinePhysics() {
                 <button onClick={() => conn.connect()}>重新连接</button>
               )}
             </div>
-            {!canInteract && connected && (
+            {!canInteract && connected && !conn.editing && (
               <p>当前仅参观，岛主可在分享设置中开放物品互动。</p>
             )}
             {conn.me?.held && <p>{conn.me.dropPreview?.reason}</p>}
@@ -327,7 +360,7 @@ export default function OnlinePhysics() {
               ].map(([label, key]) => (
                 <button
                   key={key}
-                  disabled={!connected}
+                  disabled={!connected || conn.editing}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.currentTarget.setPointerCapture(e.pointerId);
@@ -388,6 +421,8 @@ export default function OnlinePhysics() {
                   lastActionMs: conn.lastActionMs,
                   correction: conn.prediction?.lastCorrection,
                   you: conn.you,
+                  scene: conn.scene,
+                  lease: conn.lease,
                   frame: conn.buffer.latest,
                   predicted: conn.prediction?.player.snapshot(),
                 })}

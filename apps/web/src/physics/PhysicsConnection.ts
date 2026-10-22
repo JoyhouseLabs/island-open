@@ -4,6 +4,8 @@ import {
   type PhysicsScene,
   type PhysicsRoomCommand,
   type PhysicsServerMessage,
+  type PhysicsLayoutEdit,
+  type PhysicsLayoutOperation,
 } from "@island/contracts";
 import {
   PhysicsFrameBuffer,
@@ -16,10 +18,54 @@ export class PhysicsConnection {
   scene: PhysicsScene | null = null;
   you = "";
   canEdit = false;
+  private layoutRevision = 0;
   status: "connecting" | "connected" | "disconnected" = "connecting";
   message = "正在连接世界…";
   saved = "尚未确认保存";
   pending = false;
+  lease = { holder: null as string | null, expiresAt: 0 };
+  editPending: PhysicsLayoutEdit | null = null;
+  editBusy = false;
+  private editTimer: ReturnType<typeof setTimeout> | undefined;
+  private leaseTimer: ReturnType<typeof setInterval> | undefined;
+  get editing() {
+    return (
+      this.status === "connected" &&
+      this.lease.holder === this.you &&
+      this.lease.expiresAt > Date.now()
+    );
+  }
+  editLease(action: "acquire" | "renew" | "release", takeover = false) {
+    if (!this.canEdit || this.status !== "connected") return;
+    this.send({
+      type: "editLease",
+      requestId: crypto.randomUUID(),
+      action,
+      takeover,
+    });
+  }
+  edit(operation: PhysicsLayoutOperation) {
+    if (!this.editing || this.editBusy || this.editPending) return;
+    this.editPending = {
+      commandId: crypto.randomUUID(),
+      expectedRevision: this.buffer.latest!.layoutRevision,
+      operation,
+    };
+    this.retryEdit();
+  }
+  retryEdit() {
+    if (!this.editPending || this.status !== "connected" || this.editBusy)
+      return;
+    this.editBusy = true;
+    this.message = "正在保存布置…";
+    this.send({ type: "edit", edit: this.editPending });
+    this.changed();
+    this.editTimer = setTimeout(() => {
+      this.editBusy = false;
+      this.message = "布置结果尚未确认，请核对并重试";
+      this.changed();
+    }, 8000);
+  }
   lastActionMs: number | null = null;
   lastVisibleActionMs: number | null = null;
   private visiblePending: {
@@ -56,6 +102,9 @@ export class PhysicsConnection {
     private changed: () => void,
   ) {
     this.connect();
+    this.leaseTimer = setInterval(() => {
+      if (this.editing) this.editLease("renew");
+    }, 10000);
   }
   get me() {
     return this.buffer.latest?.players.find((player) => player.id === this.you);
@@ -78,7 +127,8 @@ export class PhysicsConnection {
     if (this.token) url.searchParams.set("t", this.token);
     const socket = new WebSocket(url);
     this.socket = socket;
-    let initializing = true;
+    let initializing = true,
+      generation = 0;
     const queued: Array<{ frame: PhysicsFrame; at: number }> = [];
     socket.onmessage = (event) => {
       if (this.disposed || this.socket !== socket) return;
@@ -92,12 +142,20 @@ export class PhysicsConnection {
         socket.close(4400, "INVALID_SERVER_MESSAGE");
         return;
       }
-      if (message.type === "welcome") {
+      if (message.type === "welcome" || message.type === "layout") {
         const welcome = message;
-        void PhysicsPrediction.create(welcome.scene, welcome.you)
+        const currentGeneration = ++generation;
+        initializing = true;
+        queued.length = 0;
+        this.status = "connecting";
+        this.clearPending();
+        this.visiblePending = null;
+        const you = welcome.type === "welcome" ? welcome.you : this.you;
+        void PhysicsPrediction.create(welcome.scene, you)
           .then((prediction) => {
             if (
               this.disposed ||
+              currentGeneration !== generation ||
               this.socket !== socket ||
               socket.readyState !== WebSocket.OPEN
             ) {
@@ -107,20 +165,24 @@ export class PhysicsConnection {
             this.prediction?.dispose();
             this.prediction = prediction;
             this.scene = welcome.scene;
-            this.you = welcome.you;
-            this.canEdit = welcome.canEdit;
+            this.layoutRevision = welcome.frame.layoutRevision;
+            this.you = you;
+            if (welcome.type === "welcome") this.canEdit = welcome.canEdit;
             this.buffer = new PhysicsFrameBuffer();
-            this.actionSequence = 0;
+            if (welcome.type === "welcome") this.actionSequence = 0;
             this.frame(
               welcome.frame,
               queued.length ? queued[0]!.at - 1 : performance.now(),
             );
-            for (const entry of queued) this.frame(entry.frame, entry.at);
+            for (const entry of queued)
+              if (entry.frame.layoutRevision === welcome.frame.layoutRevision)
+                this.frame(entry.frame, entry.at);
             initializing = false;
             queued.length = 0;
             this.status = "connected";
             this.retryCount = 0;
-            this.message = "已连接，和朋友一起试试物理互动";
+            if (welcome.type === "welcome")
+              this.message = "已连接，和朋友一起试试物理互动";
             this.saved = welcome.checkpointRevision
               ? `已恢复保存 ${welcome.checkpointRevision}`
               : "等待首次保存";
@@ -130,6 +192,17 @@ export class PhysicsConnection {
             this.message = "物理引擎加载失败，请重新连接";
             socket.close(4400, "PHYSICS_INIT_FAILED");
           });
+      } else if (message.type === "editLease") {
+        this.lease = message.lease;
+        this.changed();
+      } else if (message.type === "edited") {
+        if (this.editPending?.commandId === message.commandId) {
+          this.editPending = null;
+          this.editBusy = false;
+          clearTimeout(this.editTimer);
+          this.message = `布置已保存 · 版本 ${message.revision}`;
+          this.changed();
+        }
       } else if (message.type === "frame") {
         if (initializing) {
           queued.push({ frame: message.frame, at: performance.now() });
@@ -164,6 +237,12 @@ export class PhysicsConnection {
         this.changed();
       } else {
         this.message = message.message;
+        if (message.requestId === this.editPending?.commandId) {
+          clearTimeout(this.editTimer);
+          this.editBusy = false;
+          // An explicit rejection is safe to edit and resubmit with a new ID.
+          this.editPending = null;
+        }
         if (message.requestId === this.saveId) {
           this.saveId = null;
           clearTimeout(this.saveTimer);
@@ -176,6 +255,9 @@ export class PhysicsConnection {
     socket.onclose = (event) => {
       if (this.socket !== socket || this.disposed) return;
       this.status = "disconnected";
+      this.lease = { holder: null, expiresAt: 0 };
+      this.editBusy = false;
+      clearTimeout(this.editTimer);
       this.prediction?.pause();
       const hadPending = this.pending;
       this.clearPending();
@@ -205,6 +287,10 @@ export class PhysicsConnection {
     };
   }
   private frame(frame: PhysicsFrame, at: number) {
+    if (frame.layoutRevision !== this.layoutRevision) {
+      this.sync();
+      return;
+    }
     const hadBaseline = !!this.buffer.latest;
     if (!this.buffer.accept(frame, at)) {
       if (frame.sequence > (this.buffer.latest?.sequence ?? -1)) this.sync();
@@ -288,7 +374,7 @@ export class PhysicsConnection {
       return;
     this.syncRequestedAt = performance.now();
     this.prediction?.pause();
-    this.send({ type: "sync" });
+    this.send({ type: "sync", layoutRevision: this.layoutRevision });
   }
   save() {
     if (this.status !== "connected" || !this.canEdit || this.saveId) return;
@@ -306,6 +392,8 @@ export class PhysicsConnection {
     this.disposed = true;
     clearTimeout(this.retry);
     clearTimeout(this.saveTimer);
+    clearTimeout(this.editTimer);
+    clearInterval(this.leaseTimer);
     this.clearPending();
     this.socket?.close();
     this.prediction?.dispose();

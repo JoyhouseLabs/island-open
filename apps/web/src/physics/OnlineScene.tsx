@@ -7,7 +7,9 @@ import type {
   ObjectInstance,
   PhysicsFrame,
   BodyState,
+  Vector3 as Position,
 } from "@island/contracts";
+import { previewError, type PhysicsDraft } from "./PhysicsEditor";
 import { PhysicsPart } from "./PhysicsPart";
 import type { PhysicsConnection } from "./PhysicsConnection";
 
@@ -26,12 +28,14 @@ function Body({
   definition,
   selected,
   select,
+  placeAt,
 }: {
   conn: PhysicsConnection;
   object: ObjectInstance;
   definition: ObjectDefinition;
   selected: boolean;
   select: (id: string) => void;
+  placeAt?: (position: Position) => void;
 }) {
   const mesh = useRef<Group>(null),
     q = useMemo(() => new Quaternion(), []),
@@ -66,7 +70,8 @@ function Body({
       ref={mesh}
       onClick={(event) => {
         event.stopPropagation();
-        select(object.id);
+        if (placeAt) placeAt(event.point);
+        else select(object.id);
       }}
     >
       {definition.parts.map((part) => (
@@ -115,11 +120,15 @@ function Contents({
   keys,
   selected,
   select,
+  draft,
+  placeAt,
 }: {
   conn: PhysicsConnection;
   keys: Set<string>;
   selected: string | null;
   select: (id: string) => void;
+  draft: PhysicsDraft | null;
+  placeAt: (position: Position) => void;
 }) {
   const { camera, controls } = useThree();
   const forward = useMemo(() => new Vector3(), []),
@@ -142,7 +151,8 @@ function Contents({
         (event.target as HTMLElement)?.closest(
           "input,textarea,select,button,a",
         ) ||
-        conn.status !== "connected"
+        conn.status !== "connected" ||
+        conn.editing
       )
         return;
       const key = event.key.toLowerCase();
@@ -225,9 +235,9 @@ function Contents({
     conn.prediction.advance(
       delta,
       {
-        x: direction.x,
-        z: direction.z,
-        jump: keys.has(" "),
+        x: conn.editing ? 0 : direction.x,
+        z: conn.editing ? 0 : direction.z,
+        jump: !conn.editing && keys.has(" "),
         yaw: facing.current,
         layoutRevision: conn.buffer.latest!.layoutRevision,
       },
@@ -255,6 +265,7 @@ function Contents({
   const heldDefinition = held
     ? definitions.get(`${held.definitionId}@${held.definitionVersion}`)
     : null;
+  const invalidDraft = previewError(conn, draft);
   return (
     <>
       <color attach="background" args={["#e5eee5"]} />
@@ -279,6 +290,7 @@ function Contents({
           )!}
           selected={object.id === selected}
           select={select}
+          placeAt={draft ? placeAt : undefined}
         />
       ))}
       {conn.buffer.latest?.players.map((player) => (
@@ -308,6 +320,30 @@ function Contents({
           ))}
         </group>
       )}
+      {draft && (
+        <group
+          position={[
+            draft.object.position.x,
+            draft.object.position.y,
+            draft.object.position.z,
+          ]}
+          quaternion={[
+            draft.object.rotation.x,
+            draft.object.rotation.y,
+            draft.object.rotation.z,
+            draft.object.rotation.w,
+          ]}
+        >
+          {draft.definition.parts.map((part) => (
+            <PhysicsPart
+              key={part.id}
+              part={part}
+              selected={false}
+              ghost={invalidDraft ? "#e16e63" : "#42bb78"}
+            />
+          ))}
+        </group>
+      )}
       <OrbitControls
         makeDefault
         target={target}
@@ -323,6 +359,8 @@ export default function OnlineScene(props: {
   keys: Set<string>;
   selected: string | null;
   select: (id: string) => void;
+  draft: PhysicsDraft | null;
+  placeAt: (position: Position) => void;
 }) {
   const scene = props.conn.scene!;
   return (

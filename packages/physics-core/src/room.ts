@@ -7,7 +7,10 @@ import {
   type PhysicsScene,
   type PhysicsFrame,
   type PhysicsPlayerState,
+  type PhysicsLayoutOperation,
+  type ObjectDefinition,
 } from "@island/contracts";
+import { editedPhysicsScene } from "./editing.js";
 import { PhysicsRuntime } from "./index.js";
 import { PhysicsCharacter } from "./character.js";
 import { PhysicsGrab } from "./grab.js";
@@ -36,7 +39,8 @@ export class PhysicsRoomError extends Error {
       | "ROOM_FULL"
       | "FORBIDDEN"
       | "STALE_COMMAND"
-      | "STALE_LAYOUT",
+      | "STALE_LAYOUT"
+      | "EDIT_CONFLICT",
     message: string,
   ) {
     super(message);
@@ -48,10 +52,87 @@ export class PhysicsRoom {
   private sentBodies = new Map<string, string>();
   private sequence = 0;
   private lastDeltaSequence = -1;
+  private prepared: {
+    id: string;
+    scene: PhysicsScene;
+    changedId: string;
+  } | null = null;
+  prepareEdit(
+    id: string,
+    expectedRevision: number,
+    operation: PhysicsLayoutOperation,
+    definition?: ObjectDefinition,
+  ) {
+    if (this.prepared)
+      throw new PhysicsRoomError("EDIT_CONFLICT", "另一项布置正在提交");
+    if (expectedRevision !== this.layoutRevision)
+      throw new PhysicsRoomError("STALE_LAYOUT", "布局已更新，请重新布置");
+    const scene = editedPhysicsScene(this.runtime.scene, operation, definition);
+    const changedId =
+      operation.type === "place" ? operation.object.id : operation.objectId;
+    if (operation.type !== "remove") {
+      if (
+        [...this.players.keys()].some(
+          (id) => this.playerState(id).held === changedId,
+        )
+      )
+        throw new PhysicsRoomError("EDIT_CONFLICT", "请先放下正在拿着的物品");
+      const object = scene.objects.find((o) => o.id === changedId)!;
+      const def = scene.definitions.find(
+        (d) =>
+          d.id === object.definitionId &&
+          d.version === object.definitionVersion,
+      )!;
+      this.runtime.validatePlacement(
+        object,
+        def,
+        operation.type === "move" ? changedId : undefined,
+      );
+    }
+    const checkpoint = this.checkpoint(0);
+    checkpoint.layoutRevision++;
+    checkpoint.states = checkpoint.states
+      .filter((s) => s.id !== changedId)
+      .map((s) => ({ ...s, sleeping: false }));
+    const object = scene.objects.find((o) => o.id === changedId);
+    if (object)
+      checkpoint.states.push({
+        id: object.id,
+        position: object.position,
+        rotation: object.rotation,
+        sleeping: false,
+      });
+    this.prepared = { id, scene, changedId };
+    return { scene, checkpoint };
+  }
+  abortEdit(id: string) {
+    if (this.prepared?.id === id) this.prepared = null;
+  }
+  commitEdit(id: string) {
+    const pending = this.prepared;
+    if (!pending || pending.id !== id)
+      throw new PhysicsRoomError("EDIT_CONFLICT", "布置提交已失效");
+    for (const player of this.players.values()) {
+      if (player.grab.body === this.runtime.bodies.get(pending.changedId))
+        player.grab.release();
+      player.input = {
+        ...player.input,
+        x: 0,
+        z: 0,
+        jump: false,
+        layoutRevision: this.layoutRevision + 1,
+      };
+    }
+    this.runtime.applyLayout(pending.scene, pending.changedId);
+    this.layoutRevision++;
+    this.prepared = null;
+    this.sentBodies.clear();
+    return this.frame(true);
+  }
   private constructor(
     readonly runtime: PhysicsRuntime,
     readonly epoch: string,
-    readonly layoutRevision: number,
+    public layoutRevision: number,
   ) {}
   static async create(
     scene: PhysicsScene,
@@ -125,6 +206,8 @@ export class PhysicsRoom {
     return player;
   }
   command(id: string, input: unknown): CommandReceipt | null {
+    if (this.prepared)
+      throw new PhysicsRoomError("EDIT_CONFLICT", "布置正在提交，请稍候");
     const player = this.player(id),
       parsed = physicsRoomCommandSchema.safeParse(input);
     if (!parsed.success)
@@ -191,6 +274,7 @@ export class PhysicsRoom {
     return receipt;
   }
   step() {
+    if (this.prepared) return;
     this.runtime.step((dt) => {
       for (const player of this.players.values()) {
         const idle = this.runtime.tick - player.inputTick > 15;

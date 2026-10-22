@@ -11,6 +11,7 @@ import {
   type BodyState,
   type Vector3,
   type ObjectDefinition,
+  type ObjectInstance,
 } from "@island/contracts";
 export interface PhysicsImpact {
   id: string;
@@ -21,6 +22,7 @@ export interface PhysicsImpact {
 }
 export { RAPIER };
 export * from "./playground.js";
+export * from "./editing.js";
 export * from "./character.js";
 export * from "./grab.js";
 
@@ -91,65 +93,7 @@ export class PhysicsRuntime {
         const def = definitions.get(
           `${instance.definitionId}@${instance.definitionVersion}`,
         )!;
-        const desc =
-          def.bodyType === "dynamic"
-            ? RAPIER.RigidBodyDesc.dynamic()
-            : def.bodyType === "kinematic"
-              ? RAPIER.RigidBodyDesc.kinematicPositionBased()
-              : RAPIER.RigidBodyDesc.fixed();
-        const body = this.world.createRigidBody(
-          desc
-            .setTranslation(
-              instance.position.x,
-              instance.position.y,
-              instance.position.z,
-            )
-            .setRotation(instance.rotation)
-            .setLinearDamping(0.15)
-            .setAngularDamping(0.25)
-            .setCanSleep(true),
-        );
-        const material = physicsMaterials[def.material];
-        for (const part of def.parts) {
-          const collider = this.world.createCollider(
-            colliderDescription(part.shape)
-              .setTranslation(part.position.x, part.position.y, part.position.z)
-              .setRotation(part.rotation)
-              .setFriction(material.friction)
-              .setRestitution(material.restitution)
-              .setDensity(part.sensor ? 0 : material.density)
-              .setCollisionGroups(
-                def.bodyType === "dynamic"
-                  ? collisionGroups.dynamic
-                  : collisionGroups.fixed,
-              )
-              .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
-              .setContactForceEventThreshold(1)
-              .setSensor(part.sensor),
-            body,
-          );
-          this.colliderObjects.set(collider.handle, {
-            id: instance.id,
-            material: def.material,
-          });
-        }
-        this.bodies.set(instance.id, body);
-        const minimum = Math.min(
-          ...def.parts
-            .filter((p) => !p.sensor)
-            .map((p) =>
-              p.shape.kind === "box"
-                ? Math.min(
-                    p.shape.halfExtents.x,
-                    p.shape.halfExtents.y,
-                    p.shape.halfExtents.z,
-                  )
-                : p.shape.kind === "convex"
-                  ? 0.025
-                  : p.shape.radius,
-            ),
-        );
-        this.ccdThresholds.set(instance.id, minimum / PHYSICS_DT);
+        this.addBody(instance, def);
       }
       this.capturePrevious();
       for (const state of this.states())
@@ -158,6 +102,68 @@ export class PhysicsRuntime {
       this.dispose();
       throw error;
     }
+  }
+  private addBody(instance: ObjectInstance, def: ObjectDefinition) {
+    const desc =
+      def.bodyType === "dynamic"
+        ? RAPIER.RigidBodyDesc.dynamic()
+        : def.bodyType === "kinematic"
+          ? RAPIER.RigidBodyDesc.kinematicPositionBased()
+          : RAPIER.RigidBodyDesc.fixed();
+    const body = this.world.createRigidBody(
+      desc
+        .setTranslation(
+          instance.position.x,
+          instance.position.y,
+          instance.position.z,
+        )
+        .setRotation(instance.rotation)
+        .setLinearDamping(0.15)
+        .setAngularDamping(0.25)
+        .setCanSleep(true),
+    );
+    const material = physicsMaterials[def.material];
+    for (const part of def.parts) {
+      const collider = this.world.createCollider(
+        colliderDescription(part.shape)
+          .setTranslation(part.position.x, part.position.y, part.position.z)
+          .setRotation(part.rotation)
+          .setFriction(material.friction)
+          .setRestitution(material.restitution)
+          .setDensity(part.sensor ? 0 : material.density)
+          .setCollisionGroups(
+            def.bodyType === "dynamic"
+              ? collisionGroups.dynamic
+              : collisionGroups.fixed,
+          )
+          .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+          .setContactForceEventThreshold(1)
+          .setSensor(part.sensor),
+        body,
+      );
+      this.colliderObjects.set(collider.handle, {
+        id: instance.id,
+        material: def.material,
+      });
+    }
+    this.bodies.set(instance.id, body);
+    const minimum = Math.min(
+      ...def.parts
+        .filter((p) => !p.sensor)
+        .map((p) =>
+          p.shape.kind === "box"
+            ? Math.min(
+                p.shape.halfExtents.x,
+                p.shape.halfExtents.y,
+                p.shape.halfExtents.z,
+              )
+            : p.shape.kind === "convex"
+              ? 0.025
+              : p.shape.radius,
+        ),
+    );
+    this.ccdThresholds.set(instance.id, minimum / PHYSICS_DT);
+    this.recoveryAnchors.set(instance.id, this.state(instance.id));
   }
   static async create(scene: PhysicsScene): Promise<PhysicsRuntime> {
     await initializePhysics();
@@ -368,6 +374,109 @@ export class PhysicsRuntime {
     if (!Number.isFinite(length) || length > 20)
       throw new Error("推动力度超出范围");
     body.applyImpulse(impulse, true);
+  }
+  /** Validate at a frozen tick against actual bodies and every connected capsule. */
+  validatePlacement(
+    instance: ObjectInstance,
+    definition: ObjectDefinition,
+    excluding?: string,
+  ) {
+    const temporary = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(
+          instance.position.x,
+          instance.position.y,
+          instance.position.z,
+        )
+        .setRotation(instance.rotation),
+    );
+    try {
+      const shapes: RAPIER.Collider[] = [];
+      for (const part of definition.parts) {
+        if (part.sensor) continue;
+        const collider = this.world.createCollider(
+          colliderDescription(part.shape)
+            .setTranslation(part.position.x, part.position.y, part.position.z)
+            .setRotation(part.rotation),
+          temporary,
+        );
+        shapes.push(collider);
+      }
+      this.world.propagateModifiedBodyPositionsToColliders();
+      for (const shape of shapes) {
+        // Conservative enclosing radius also accounts for rotated local offsets.
+        const p = shape.translation();
+        const part = definition.parts.filter((p) => !p.sensor)[
+          shapes.indexOf(shape)
+        ]!;
+        const sh = part.shape;
+        const radius =
+          sh.kind === "box"
+            ? Math.hypot(sh.halfExtents.x, sh.halfExtents.y, sh.halfExtents.z)
+            : sh.kind === "ball"
+              ? sh.radius
+              : sh.kind === "convex"
+                ? Math.max(...sh.vertices.map((v) => Math.hypot(v.x, v.y, v.z)))
+                : sh.radius + sh.halfHeight;
+        if (
+          (["x", "y", "z"] as const).some(
+            (axis) =>
+              p[axis] - radius < this.scene.bounds.min[axis] ||
+              p[axis] + radius > this.scene.bounds.max[axis],
+          )
+        )
+          throw new Error("物品超出可布置范围");
+        for (const [id, body] of this.bodies) {
+          if (id === excluding) continue;
+          for (let i = 0; i < body.numColliders(); i++) {
+            const other = body.collider(i);
+            if (
+              !other.isSensor() &&
+              (shape.contactCollider(other, 0)?.distance ?? 0) < -0.02
+            )
+              throw new Error("物品与现有物体重叠，请换一个位置");
+          }
+        }
+        for (const character of this.characters.values())
+          if (
+            (shape.contactCollider(character.collider, 0)?.distance ?? 0) <
+            -0.005
+          )
+            throw new Error("这里有人，请让开后再放置");
+      }
+    } finally {
+      this.world.removeRigidBody(temporary);
+    }
+  }
+  /** Called only after durable commit, between simulation steps. Unchanged bodies keep velocity. */
+  applyLayout(next: PhysicsScene, changedId: string) {
+    const existing = this.bodies.get(changedId);
+    if (existing) {
+      for (let i = 0; i < existing.numColliders(); i++)
+        this.colliderObjects.delete(existing.collider(i).handle);
+      this.world.removeRigidBody(existing);
+      this.bodies.delete(changedId);
+      this.previous.delete(changedId);
+      this.recoveryAnchors.delete(changedId);
+      this.ccdThresholds.delete(changedId);
+    }
+    this.scene.objects = next.objects;
+    this.scene.definitions = next.definitions;
+    const instance = next.objects.find((o) => o.id === changedId);
+    if (instance)
+      this.addBody(
+        instance,
+        next.definitions.find(
+          (d) =>
+            d.id === instance.definitionId &&
+            d.version === instance.definitionVersion,
+        )!,
+      );
+    // Supporting geometry can disappear under sleeping objects.
+    for (const body of this.bodies.values())
+      if (body.isDynamic()) body.wakeUp();
+    this.world.propagateModifiedBodyPositionsToColliders();
+    this.pauseClock();
   }
   restore(input: unknown) {
     this.checkAlive();

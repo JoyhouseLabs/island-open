@@ -171,11 +171,81 @@
   }
 }
 
-.physics-lobby { display: block; min-height: 100dvh; height: auto; }
-.physics-login { max-width: 640px; padding: 24px; margin: 24px auto; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
-.physics-login button, .physics-login input { font: inherit; padding: 10px 16px; border: 1px solid #bccaba; border-radius: 10px; }
-.physics-login a { color: #294336; }
-.physics-login h2, .physics-login p { margin: 0; }
-.physics-share label { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px 8px 0; }
-.physics-share input[readonly] { width: min(65vw, 460px); padding: 8px; }
-.physics-error { color: #8f3c2e; padding: 12px; margin: 0; }
+.physics-lobby {
+  display: block;
+  min-height: 100dvh;
+  height: auto;
+}
+.physics-login {
+  max-width: 640px;
+  padding: 24px;
+  margin: 24px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+.physics-login button,
+.physics-login input {
+  font: inherit;
+  padding: 10px 16px;
+  border: 1px solid #bccaba;
+  border-radius: 10px;
+}
+.physics-login a {
+  color: #294336;
+}
+.physics-login h2,
+.physics-login p {
+  margin: 0;
+}
+.physics-share label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 0;
+}
+.physics-share input[readonly] {
+  width: min(65vw, 460px);
+  padding: 8px;
+}
+.physics-error {
+  color: #8f3c2e;
+  padding: 12px;
+  margin: 0;
+}
+.physics-editor {
+  width: 100%;
+  border-top: 1px solid #d6dece;
+  padding-top: 10px;
+}
+.physics-editor-row {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.physics-editor-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.physics-editor-row input {
+  width: 90px;
+}
+.physics-editor-row input,
+.physics-editor-row select,
+.physics-editor-row button {
+  min-height: 40px;
+  border: 1px solid #bccaba;
+  border-radius: 8px;
+  background: #fff;
+  color: #294336;
+  padding: 6px 10px;
+}
+.physics-controls:has(.physics-editor) {
+  max-height: 52dvh;
+  overflow-y: auto;
+}

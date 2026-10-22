@@ -32,6 +32,7 @@ export function PhysicsPart({
         part.rotation.z,
         part.rotation.w,
       ]}
+      raycast={ghost ? () => {} : undefined}
       castShadow={!ghost}
       receiveShadow={!ghost}
     >

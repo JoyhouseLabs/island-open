@@ -314,14 +314,80 @@ export const physicsSharingSchema = z
     (value) => value.sharing === "link" || !value.interactive,
     "私有世界不能开放互动",
   );
+/** Clients reference a server-resolved immutable definition; never submit geometry. */
+export const physicsLayoutOperationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("place"), object: objectInstanceSchema }).strict(),
+  z
+    .object({
+      type: z.literal("move"),
+      objectId: z.string().uuid(),
+      position: vector3Schema,
+      rotation: quaternionSchema,
+    })
+    .strict(),
+  z.object({ type: z.literal("remove"), objectId: z.string().uuid() }).strict(),
+]);
+export const physicsLayoutEditSchema = z
+  .object({
+    commandId: z.string().uuid(),
+    expectedRevision: z.number().int().positive(),
+    operation: physicsLayoutOperationSchema,
+  })
+  .strict();
+export type PhysicsLayoutOperation = z.infer<
+  typeof physicsLayoutOperationSchema
+>;
+export type PhysicsLayoutEdit = z.infer<typeof physicsLayoutEditSchema>;
+export const physicsEditLeaseSchema = z
+  .object({
+    holder: z.string().uuid().nullable(),
+    expiresAt: z.number().nonnegative(),
+  })
+  .strict();
 export const physicsClientMessageSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("editLease"),
+      requestId: z.string().uuid(),
+      action: z.enum(["acquire", "renew", "release"]),
+      takeover: z.boolean().default(false),
+    })
+    .strict(),
+  z.object({ type: z.literal("edit"), edit: physicsLayoutEditSchema }).strict(),
   z
     .object({ type: z.literal("command"), command: physicsRoomCommandSchema })
     .strict(),
-  z.object({ type: z.literal("sync") }).strict(),
+  z
+    .object({
+      type: z.literal("sync"),
+      layoutRevision: z.number().int().positive().optional(),
+    })
+    .strict(),
   z.object({ type: z.literal("save"), requestId: z.string().uuid() }).strict(),
 ]);
 export const physicsServerMessageSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("editLease"),
+      lease: physicsEditLeaseSchema,
+      requestId: z.string().uuid().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("layout"),
+      scene: physicsSceneSchema,
+      frame: physicsFrameSchema,
+      checkpointRevision: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("edited"),
+      commandId: z.string().uuid(),
+      revision: z.number().int().positive(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal("welcome"),
