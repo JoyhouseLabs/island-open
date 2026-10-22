@@ -479,3 +479,18 @@ dialog.physics-workshop .physics-actions {
   background: white;
   color: #294336;
 }
+
+.physics-library-activities {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #e8eddf;
+}
+.physics-library-activities .physics-actions {
+  margin: 0;
+}
+.physics-library-activities small {
+  max-width: 32em;
+  line-height: 1.5;
+}

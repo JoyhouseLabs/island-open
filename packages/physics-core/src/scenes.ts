@@ -4,11 +4,22 @@ import {
   type PhysicsScene,
   type PhysicsSceneTemplateRef,
 } from "@island/contracts";
-import { createIslandPhysicsScene } from "@island/world-core";
+import {
+  createIslandPhysicsScene,
+  createLibraryPhysicsScene,
+} from "@island/world-core";
 import { createPlayground } from "./playground.js";
 
 /** Registered, versioned scene identities. Each template owns its canonical infrastructure. */
 export const physicsSceneDefinitions = [
+  {
+    key: "library",
+    id: "core:library",
+    version: 1,
+    name: "林间书屋",
+    description: "读书、学习，在木台与书亭间探索",
+    environment: { sky: "#e3eadb", ambient: 1.3, sun: 2 },
+  },
   {
     key: "island",
     id: "core:island",
@@ -50,6 +61,7 @@ export function createPhysicsScene(
   if (!d) throw new Error("这个场景尚未开放");
   let scene: PhysicsScene;
   if (d.key === "playground") scene = createPlayground();
+  else if (d.key === "library") scene = createLibraryPhysicsScene();
   else if (d.key === "island") scene = createIslandPhysicsScene();
   else
     scene = physicsSceneSchema.parse({

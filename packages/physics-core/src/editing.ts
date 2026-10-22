@@ -1,3 +1,4 @@
+import { libraryBookDefinition } from "@island/world-core";
 import { officialBehaviorObjects } from "./behaviors.js";
 import {
   physicsSceneSchema,
@@ -21,6 +22,7 @@ export function officialPhysicsObjects(): ObjectDefinition[] {
   return [
     ...definitions,
     ...officialBehaviorObjects(),
+    libraryBookDefinition(),
     ...(["sign", "bookshelf"] as const).map((kind): ObjectDefinition => ({
       id: `core:${kind}`,
       version: 1,

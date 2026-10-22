@@ -2,7 +2,7 @@ import PhysicsMechanisms from "./PhysicsMechanisms";
 import { snapBlockPosition } from "@island/physics-core";
 import PhysicsTransfer from "./PhysicsTransfer";
 import PhysicsContent from "./PhysicsContent";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import type { AuthConfig, User } from "@island/contracts";
 import { api, RequestError } from "../api";
@@ -10,6 +10,9 @@ import { PhysicsConnection } from "./PhysicsConnection";
 import PhysicsEditor, { bottomOf, type PhysicsDraft } from "./PhysicsEditor";
 import OnlineScene from "./OnlineScene";
 import "./physics.css";
+import { IslandConfigProvider } from "../contentStore";
+import { rememberReturn } from "../learning/travel";
+const Bookshelf = lazy(() => import("../Bookshelf"));
 
 interface World {
   id: string;
@@ -43,6 +46,8 @@ export default function OnlinePhysics() {
   const [conn, setConn] = useState<PhysicsConnection | null>(null),
     [, update] = useState(0),
     [selected, select] = useState<string | null>(null);
+  const [reading, setReading] = useState<null | "books" | "tutor">(null);
+  const [learningEnabled, setLearningEnabled] = useState(false);
   const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
@@ -58,13 +63,15 @@ export default function OnlinePhysics() {
         if (e instanceof RequestError && e.status === 401) return null;
         throw e;
       }),
+      api<{ features?: { learning?: boolean } }>("/capabilities"),
     ])
-      .then(([caps, config, account]) => {
+      .then(([caps, config, account, features]) => {
         if (!cancelled) {
           setEnabled(caps.enabled);
           setSceneChoices(caps.scenes);
           setAuth(config);
           setUser(account);
+          setLearningEnabled(!!features.features?.learning);
         }
       })
       .catch((e) => {
@@ -114,6 +121,7 @@ export default function OnlinePhysics() {
     setDraft(null);
     select(null);
     setNight(false);
+    setReading(null);
     keys.clear();
     if (!sceneId || !user) {
       setConn(null);
@@ -152,6 +160,46 @@ export default function OnlinePhysics() {
       const next = new URLSearchParams(location.search);
       next.set("scene", key);
       navigate({ pathname: location.pathname, search: next.toString() });
+    } catch (e) {
+      if (generation === switchGeneration.current)
+        setError((e as Error).message);
+    } finally {
+      if (generation === switchGeneration.current) setBusy(false);
+    }
+  }
+  function openReading(mode: "books" | "tutor") {
+    if (busy || conn?.editing || conn?.editPending || conn?.pending) return;
+    keys.clear();
+    setReading(mode);
+  }
+  async function visitLearning() {
+    if (
+      !world?.owner ||
+      !user ||
+      !conn?.scene ||
+      busy ||
+      conn.editing ||
+      conn.editPending ||
+      conn.pending
+    )
+      return;
+    const generation = ++switchGeneration.current;
+    keys.clear();
+    setBusy(true);
+    setError("");
+    try {
+      await conn.saveBeforeLeave();
+      if (generation !== switchGeneration.current) return;
+      rememberReturn(
+        {
+          destination: "physics",
+          worldId: world.id,
+          scene: "library",
+          position: null,
+        },
+        user.id,
+      );
+      navigate("/learn");
     } catch (e) {
       if (generation === switchGeneration.current)
         setError((e as Error).message);
@@ -227,7 +275,7 @@ export default function OnlinePhysics() {
     <main
       className={`physics-playground ${world ? "physics-has-scenes" : ""} ${conn?.scene ? "" : "physics-lobby"}`}
     >
-      <header className="physics-header">
+      <header className="physics-header" inert={!!reading}>
         <Link to="/physics/online">← 我的世界</Link>
         <div>
           <h1>{world?.name ?? "在线物理世界"}</h1>
@@ -239,6 +287,7 @@ export default function OnlinePhysics() {
         <nav
           className="physics-actions physics-scene-nav"
           aria-label="切换场景"
+          inert={!!reading}
         >
           {sceneChoices
             .filter(
@@ -318,14 +367,23 @@ export default function OnlinePhysics() {
         </section>
       ) : conn?.scene ? (
         <>
-          <section className="physics-viewport">
+          <section className="physics-viewport" inert={!!reading}>
             <OnlineScene
-              paused={busy}
+              paused={busy || !!reading}
               night={night}
               conn={conn}
               keys={keys}
               selected={selected}
-              select={select}
+              select={(id) => {
+                select(id);
+                const object = conn.scene?.objects.find((o) => o.id === id);
+                if (
+                  !conn.editing &&
+                  conn.scene?.template.id === "core:library" &&
+                  object?.infrastructureKey?.startsWith("shelf-")
+                )
+                  openReading("books");
+              }}
               draft={conn.editing ? draft : null}
               placeAt={(point, normal) => {
                 if (!draft || !conn.editing || conn.editPending) return;
@@ -354,7 +412,47 @@ export default function OnlinePhysics() {
                 : "方向键/按钮移动 · E 搬动或坐下 · F 坐下/起身"}
             </div>
           </section>
-          <section className="physics-controls" inert={busy}>
+          <section className="physics-controls" inert={busy || !!reading}>
+            {conn.scene.template.id === "core:library" && (
+              <section
+                className="physics-library-activities"
+                aria-label="书屋活动"
+              >
+                <strong>在书屋做些什么</strong>
+                <div className="physics-actions">
+                  <button
+                    disabled={
+                      !!conn.editing || !!conn.editPending || !!conn.pending
+                    }
+                    onClick={() => openReading("books")}
+                  >
+                    读书
+                  </button>
+                  <button
+                    disabled={
+                      !!conn.editing || !!conn.editPending || !!conn.pending
+                    }
+                    onClick={() => openReading("tutor")}
+                  >
+                    小墨老师
+                  </button>
+                  {learningEnabled && world?.owner && (
+                    <button
+                      disabled={
+                        !connected ||
+                        !!conn.editing ||
+                        !!conn.editPending ||
+                        !!conn.pending
+                      }
+                      onClick={() => void visitLearning()}
+                    >
+                      学习中心
+                    </button>
+                  )}
+                </div>
+                <small>阅读自己的书架；桌边读本可以拿起，坐垫可以坐下。</small>
+              </section>
+            )}
             <label>
               <input
                 type="checkbox"
@@ -374,7 +472,7 @@ export default function OnlinePhysics() {
             </div>
             {world?.owner && (
               <PhysicsEditor
-                key={`${user.id}:${conn.sceneId}`}
+                key={`editor:${user.id}:${conn.sceneId}`}
                 user={user}
                 conn={conn}
                 selected={selected}
@@ -385,14 +483,14 @@ export default function OnlinePhysics() {
             )}
             {world?.owner && (
               <PhysicsTransfer
-                key={`${user.id}:${conn.sceneId}`}
+                key={`transfer:${user.id}:${conn.sceneId}`}
                 conn={conn}
                 userId={user.id}
                 clearKeys={() => keys.clear()}
               />
             )}
             <PhysicsContent
-              key={`${user.id}:${conn.sceneId}`}
+              key={`content:${user.id}:${conn.sceneId}`}
               conn={conn}
               selected={selected}
               userId={user.id}
@@ -620,6 +718,27 @@ export default function OnlinePhysics() {
               ? "这个场景尚未开辟或未开放，请选择上方场景"
               : "正在连接世界…"}
         </p>
+      )}
+      {reading && user && (
+        <IslandConfigProvider userId={user.id}>
+          <Suspense
+            fallback={
+              <div className="modal-backdrop" role="status">
+                正在翻开书架…
+              </div>
+            }
+          >
+            <Bookshelf
+              key={user.id}
+              userId={user.id}
+              focusChat={reading === "tutor"}
+              onClose={() => {
+                keys.clear();
+                setReading(null);
+              }}
+            />
+          </Suspense>
+        </IslandConfigProvider>
       )}
       {error && (
         <p role="alert" className="physics-error">

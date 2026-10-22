@@ -33,7 +33,10 @@ export default function LearningPlayer() {
   useEffect(load, [sessionId, user.id]);
   const exit = () => {
     if (session) {
-      learningTravel.pending = session.returnContext;
+      learningTravel.pending =
+        session.returnContext.destination === "physics"
+          ? null
+          : session.returnContext;
       void navigate(returnUrl(session.returnContext));
     }
   };

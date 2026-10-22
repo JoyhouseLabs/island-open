@@ -267,3 +267,5 @@ export * from "./wilderness.js";
 export * from "./wilderness-geometry.js";
 
 export * from "./physics-island.js";
+
+export * from "./physics-library.js";

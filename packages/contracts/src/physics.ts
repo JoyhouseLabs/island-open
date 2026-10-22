@@ -280,7 +280,12 @@ export const objectInstanceSchema = z
       .optional(),
   })
   .strict();
-export const physicsSceneKeys = ["playground", "building-yard", "island"] as const;
+export const physicsSceneKeys = [
+  "playground",
+  "building-yard",
+  "island",
+  "library",
+] as const;
 export const physicsSceneKeySchema = z.enum(physicsSceneKeys);
 export const physicsSceneTemplateRefSchema = z
   .object({

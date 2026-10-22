@@ -24,7 +24,7 @@ export default function LearningHome() {
   const active =
     data?.sessions.find((s) => s.id === search.get("active")) ??
     data?.sessions.find((s) => s.status === "active");
-  async function start(id: string) {
+  async function start(id: string, resume = false) {
     setBusy(true);
     setError("");
     try {
@@ -33,7 +33,9 @@ export default function LearningHome() {
         body: JSON.stringify({ returnContext: readReturn(user.id) }),
       });
       load();
-      void navigate(`/learn?active=${s.id}`);
+      void navigate(
+        resume ? `/learn/sessions/${s.id}` : `/learn?active=${s.id}`,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "任务暂时无法开始。");
     } finally {
@@ -53,7 +55,18 @@ export default function LearningHome() {
         </div>
         <CatPicture />
       </section>
-      {adaptiveLearning && !lessonId && <section className="learn-current"><div><span className="learn-eyebrow">新的学习方式</span><h2>选一个目标，开始系统练习</h2><p>学生几何与成人回应练习 · 个人计划、每次反馈、补练与回顾</p></div><Link className="learn-primary" to="/learn/programs">打开训练中心 →</Link></section>}
+      {adaptiveLearning && !lessonId && (
+        <section className="learn-current">
+          <div>
+            <span className="learn-eyebrow">新的学习方式</span>
+            <h2>选一个目标，开始系统练习</h2>
+            <p>学生几何与成人回应练习 · 个人计划、每次反馈、补练与回顾</p>
+          </div>
+          <Link className="learn-primary" to="/learn/programs">
+            打开训练中心 →
+          </Link>
+        </section>
+      )}
       {error && (
         <div className="learn-error" role="alert">
           {error} <button onClick={load}>重新读取</button>
@@ -72,7 +85,15 @@ export default function LearningHome() {
               个活动 · 进度已保存在云端
             </p>
           </div>
-          <Link className="learn-primary" to={`/learn/sessions/${active.id}`}>
+          <Link
+            className="learn-primary"
+            to={`/learn/sessions/${active.id}`}
+            aria-disabled={busy}
+            onClick={(event) => {
+              event.preventDefault();
+              if (!busy) void start(active.lessonId, true);
+            }}
+          >
             {active.status === "completed" ? "查看作品与纪念章" : "继续学习 →"}
           </Link>
         </section>
@@ -118,7 +139,11 @@ export default function LearningHome() {
           .map(({ lesson, locked }) => {
             const session = data.sessions.find((s) => s.lessonId === lesson.id);
             return (
-              <article className="learn-card" key={lesson.id}>
+              <article
+                className="learn-card"
+                key={lesson.id}
+                data-lesson-id={lesson.id}
+              >
                 <span className="learn-eyebrow">
                   {lesson.trigger === "library" ? "林间书屋的邀请" : "自由探索"}{" "}
                   · 约 {lesson.minutes} 分钟

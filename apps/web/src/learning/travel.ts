@@ -26,5 +26,7 @@ export function readReturn(userId: string): LearningReturn {
   return { worldId: null, scene: "island", position: null };
 }
 export function returnUrl(context: LearningReturn) {
+  if (context.destination === "physics" && context.worldId)
+    return `/physics/online/${encodeURIComponent(context.worldId)}?scene=${encodeURIComponent(context.scene)}`;
   return `/${context.scene}${context.worldId ? `?world=${encodeURIComponent(context.worldId)}` : ""}`;
 }

@@ -21,7 +21,11 @@ import {
 import { readDraft, writeDraft } from "./drafts";
 import { emitGrowth } from "./progress/store";
 import { speak, stopSpeaking } from "./tutor/speech";
-import { TutorChat, type AskCommand, type ChatMessage } from "./tutor/TutorChat";
+import {
+  TutorChat,
+  type AskCommand,
+  type ChatMessage,
+} from "./tutor/TutorChat";
 import { useContentFeed } from "./contentStore";
 
 type ShelfData = {
@@ -42,7 +46,8 @@ const TUTOR_KEY = "library-tutor-v1";
 function VideoFrame({ url }: { url: string }) {
   const source = videoSource(url);
   if (source.kind === "bilibili") {
-    const query = "bvid" in source ? `bvid=${source.bvid}` : `aid=${source.aid}`;
+    const query =
+      "bvid" in source ? `bvid=${source.bvid}` : `aid=${source.aid}`;
     return (
       <div className="video-frame">
         <iframe
@@ -116,10 +121,12 @@ export default function Bookshelf({
   onClose,
   initialBookId,
   focusChat = false,
+  userId,
 }: {
   onClose: () => void;
   initialBookId?: string;
   focusChat?: boolean;
+  userId?: string;
 }) {
   const [ready, setReady] = useState(false),
     [books, setBooks] = useState<Book[]>(builtinBooks),
@@ -139,12 +146,14 @@ export default function Bookshelf({
     tutorTimer = useRef<number | undefined>(undefined),
     chainStop = useRef(true);
 
+  const shelfKey = userId ? `physics-reading:${userId}:shelf-v1` : SHELF_KEY;
+  const tutorKey = userId ? `physics-reading:${userId}:tutor-v1` : TUTOR_KEY;
   const installedBooks = useContentFeed()?.books ?? builtinBooks;
   useEffect(() => {
     let alive = true;
     Promise.all([
-      readDraft<ShelfData>(SHELF_KEY).catch(() => null),
-      readDraft<TutorData>(TUTOR_KEY).catch(() => null),
+      readDraft<ShelfData>(shelfKey).catch(() => null),
+      readDraft<TutorData>(tutorKey).catch(() => null),
     ]).then(([shelf, saved]) => {
       const published = installedBooks;
       if (!alive) return;
@@ -158,9 +167,7 @@ export default function Bookshelf({
           lastBook: saved.lastBook,
         });
       const wanted = initialBookId ?? saved?.lastBook;
-      const index = wanted
-        ? published.findIndex((b) => b.id === wanted)
-        : -1;
+      const index = wanted ? published.findIndex((b) => b.id === wanted) : -1;
       const book = index >= 0 ? published[index] : null;
       if (book) {
         const p = saved?.progress?.[book.id];
@@ -173,7 +180,7 @@ export default function Bookshelf({
     return () => {
       alive = false;
     };
-  }, [initialBookId, installedBooks]);
+  }, [initialBookId, installedBooks, shelfKey, tutorKey]);
 
   // Reading one page after another keeps its place between visits.
   useEffect(() => {
@@ -190,15 +197,15 @@ export default function Bookshelf({
     if (!ready) return;
     window.clearTimeout(tutorTimer.current);
     tutorTimer.current = window.setTimeout(() => {
-      void writeDraft(TUTOR_KEY, tutor).catch(() => {});
+      void writeDraft(tutorKey, tutor).catch(() => {});
     }, 400);
-  }, [tutor, ready]);
+  }, [tutor, ready, tutorKey]);
 
   const persist = (next: ShelfData) => {
     setData(next);
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
-      void writeDraft(SHELF_KEY, next).catch(() => {});
+      void writeDraft(shelfKey, next).catch(() => {});
     }, 400);
   };
 
@@ -310,7 +317,10 @@ export default function Bookshelf({
         ) : book && current ? (
           <div className="reader">
             <header className="reader-head">
-              <button className="small-button" onClick={() => setBookIndex(null)}>
+              <button
+                className="small-button"
+                onClick={() => setBookIndex(null)}
+              >
                 <ArrowLeft size={14} /> 书架
               </button>
               <div>
@@ -469,7 +479,11 @@ export default function Bookshelf({
                     ))}
                   </ul>
                 )}
-                {playing && <VideoFrame url={`https://www.youtube.com/watch?v=${playing}`} />}
+                {playing && (
+                  <VideoFrame
+                    url={`https://www.youtube.com/watch?v=${playing}`}
+                  />
+                )}
               </div>
             </section>
           </div>
@@ -483,7 +497,11 @@ export default function Bookshelf({
               轻声读，慢慢念。笔记和视频都留在这一页旁边。
             </p>
             {books.map((b, i) => (
-              <button key={b.id} className="shelf-book" onClick={() => openBook(i)}>
+              <button
+                key={b.id}
+                className="shelf-book"
+                onClick={() => openBook(i)}
+              >
                 <span
                   className="shelf-spine"
                   style={{

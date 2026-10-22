@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useOutletContext } from "react-router";
 import type { AuthConfig, User } from "@island/contracts";
 import { api, RequestError } from "../api";
 import "./learning.css";
+import { readReturn, returnUrl } from "./travel";
 export function useLearner() {
   return useOutletContext<{ user: User; adaptiveLearning: boolean }>().user;
 }
@@ -19,7 +20,9 @@ export default function LearningLayout() {
     setError("");
     try {
       const [caps, auth] = await Promise.all([
-        api<{ features?: { learning?: boolean; adaptiveLearning?: boolean } }>("/capabilities"),
+        api<{ features?: { learning?: boolean; adaptiveLearning?: boolean } }>(
+          "/capabilities",
+        ),
         api<AuthConfig>("/auth/config"),
       ]);
       setEnabled(!!caps.features?.learning);
@@ -46,7 +49,9 @@ export default function LearningLayout() {
         <Link to="/learn" className="learn-brand">
           ✦ 心灵家园 <span>学习中心</span>
         </Link>
-        <Link to="/island">回到小岛 ↗</Link>
+        <Link to={user ? returnUrl(readReturn(user.id)) : "/island"}>
+          回到小岛 ↗
+        </Link>
       </header>
       {!ready ? (
         <section className="learn-empty" role="status">
@@ -101,4 +106,6 @@ export default function LearningLayout() {
   );
 }
 
-export function useAdaptiveLearning() { return useOutletContext<{ adaptiveLearning: boolean }>().adaptiveLearning; }
+export function useAdaptiveLearning() {
+  return useOutletContext<{ adaptiveLearning: boolean }>().adaptiveLearning;
+}

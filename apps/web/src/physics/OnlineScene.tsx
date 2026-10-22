@@ -1,4 +1,5 @@
 import { islandGroundColor } from "@island/world-core";
+import LibraryAmbience from "./LibraryAmbience";
 import IslandAmbience from "./IslandAmbience";
 import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -381,6 +382,7 @@ function Contents({
       {scene.template.id === "core:island" && (
         <IslandAmbience scene={scene} night={night} />
       )}
+      {scene.template.id === "core:library" && <LibraryAmbience />}
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
