@@ -1,8 +1,11 @@
+import ThemeAmbience from "./ThemeAmbience";
 import GardenAmbience from "./GardenAmbience";
 import {
   islandGroundColor,
   gardenGroundColor,
   nurseryGroundColor,
+  physicalThemeSpecs,
+  themeGroundColor,
 } from "@island/world-core";
 import LibraryAmbience from "./LibraryAmbience";
 import IslandAmbience from "./IslandAmbience";
@@ -215,6 +218,17 @@ function Contents({
   const facing = useRef(0),
     previous = useRef<Vector3 | null>(null);
   const scene = conn.scene!;
+  const groundColor = useMemo(() => {
+    if (scene.template.id === "core:island") return islandGroundColor;
+    if (scene.template.id === "core:garden") return gardenGroundColor;
+    if (scene.template.id === "core:nursery") return nurseryGroundColor;
+    const theme = physicalThemeSpecs.find(
+      (s) => `core:${s.key}` === scene.template.id,
+    );
+    return theme
+      ? (x: number, z: number) => themeGroundColor(theme.key, x, z)
+      : undefined;
+  }, [scene.template.id]);
   const environment = sceneDefinition(scene.template).environment;
   const target = useMemo(
     () => new Vector3(scene.spawn.x, scene.spawn.y, scene.spawn.z - 2.5),
@@ -394,19 +408,12 @@ function Contents({
           night={night}
         />
       )}
+      <ThemeAmbience template={scene.template.id} night={night} />
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
           tile={tile}
-          vertexColor={
-            scene.template.id === "core:island"
-              ? islandGroundColor
-              : scene.template.id === "core:garden"
-                ? gardenGroundColor
-                : scene.template.id === "core:nursery"
-                  ? nurseryGroundColor
-                  : undefined
-          }
+          vertexColor={groundColor}
           placeAt={draft ? placeAt : undefined}
         />
       ))}

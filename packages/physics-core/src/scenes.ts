@@ -8,11 +8,25 @@ import {
   createIslandPhysicsScene,
   createLibraryPhysicsScene,
   createGardenPhysicsScene,
+  physicalThemeSpecs,
+  createThemePhysicsScene,
 } from "@island/world-core";
 import { createPlayground } from "./playground.js";
 
 /** Registered, versioned scene identities. Each template owns its canonical infrastructure. */
 export const physicsSceneDefinitions = [
+  ...physicalThemeSpecs.map((spec) => ({
+    key: spec.key,
+    id: `core:${spec.key}`,
+    version: 1,
+    name: spec.name,
+    description: spec.description,
+    environment: {
+      sky: spec.sky,
+      ambient: spec.key === "starlight" ? 0.7 : 1.3,
+      sun: spec.key === "starlight" ? 0.5 : 2,
+    },
+  })),
   {
     key: "garden",
     id: "core:garden",
@@ -80,6 +94,16 @@ export function createPhysicsScene(
   if (d.key === "playground") scene = createPlayground();
   else if (d.key === "garden" || d.key === "nursery")
     scene = createGardenPhysicsScene(d.key);
+  else if (
+    d.key === "home" ||
+    d.key === "meadow" ||
+    d.key === "forest" ||
+    d.key === "pond" ||
+    d.key === "lab" ||
+    d.key === "beach" ||
+    d.key === "starlight"
+  )
+    scene = createThemePhysicsScene(d.key);
   else if (d.key === "library") scene = createLibraryPhysicsScene();
   else if (d.key === "island") scene = createIslandPhysicsScene();
   else

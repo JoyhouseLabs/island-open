@@ -1,3 +1,27 @@
+import {
+  homeFeatures,
+  meadowFeatures,
+  forestTrail,
+  pondShape,
+  pondFeatures,
+  labFeatures,
+  starlightFeatures,
+  beachShore,
+  beachLagoon,
+  beachFeatures,
+} from "./theme-geography.js";
+export {
+  homeFeatures,
+  meadowFeatures,
+  forestTrail,
+  pondShape,
+  pondFeatures,
+  labFeatures,
+  starlightFeatures,
+  beachShore,
+  beachLagoon,
+  beachFeatures,
+} from "./theme-geography.js";
 import { nurseryFeatures } from "./garden-geography.js";
 export { nurseryFeatures } from "./garden-geography.js";
 import type {
@@ -99,17 +123,6 @@ function define(
 
 /* ---------------------------------- home --------------------------------- */
 
-export const homeFeatures = {
-  gate: 27,
-  plaza: { x: 0, z: 0, r: 7 },
-  well: { x: -9, z: 9 },
-  cabins: [
-    { id: "main", x: -22, z: -13, w: 12, d: 10 },
-    { id: "guest", x: 22, z: -13, w: 10, d: 9 },
-    { id: "atelier", x: 0, z: -25, w: 11, d: 9 },
-  ],
-  laundry: { x1: 10, x2: 18, z: 8 },
-} as const;
 const home: Rule = (p, entities = [], ignoreId, kind = "tree") => {
   if (Math.abs(p.x) > 36 || Math.abs(p.z) > 30) return "请在小院围栏内布置。";
   if (homeFeatures.cabins.some((c) => inside(p, c.x, c.z, c.w / 2, c.d / 2, 2)))
@@ -127,11 +140,6 @@ const home: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 
 /* --------------------------------- meadow -------------------------------- */
 
-export const meadowFeatures = {
-  gate: 32,
-  blanket: { x: -8, z: 8 },
-  hammock: { x1: 20, x2: 28, z: -12 },
-} as const;
 const meadow: Rule = (p, entities = [], ignoreId, kind = "tree") => {
   if (Math.abs(p.x) > 42 || Math.abs(p.z) > 36) return "请在草地范围内布置。";
   if (Math.abs(p.x) < 3 && p.z > 28) return "这里是进草地的小径。";
@@ -144,16 +152,6 @@ const meadow: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 
 /* --------------------------------- forest -------------------------------- */
 
-export const forestTrail: Point[] = [
-  { x: 0, z: 34 },
-  { x: -16, z: 24 },
-  { x: -22, z: 6 },
-  { x: -12, z: -10 },
-  { x: 4, z: -18 },
-  { x: 20, z: -10 },
-  { x: 24, z: 6 },
-  { x: 14, z: 20 },
-];
 const forest: Rule = (p, entities = [], ignoreId, kind = "tree") => {
   if (Math.abs(p.x) > 46 || Math.abs(p.z) > 40) return "请在林间空地内布置。";
   if (pathDistance(p, forestTrail) < 2.6) return "狐狸的小径要保持通畅。";
@@ -183,8 +181,6 @@ const library: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 
 /* ---------------------------------- pond --------------------------------- */
 
-export const pondShape = { x: 0, z: -6, rx: 21, rz: 16 };
-export const pondFeatures = { gate: 33, bridge: { x1: 8, x2: 20, z: -6 } } as const;
 const pond: Rule = (p, entities = [], ignoreId, kind = "tree") => {
   if (Math.abs(p.x) > 44 || Math.abs(p.z) > 38) return "请在池塘岸边布置。";
   if (Math.hypot(p.x / 22.5, (p.z + 6) / 17.5) < 1)
@@ -197,21 +193,6 @@ const pond: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 
 /* ----------------------------------- lab --------------------------------- */
 
-export const labFeatures = {
-  gate: 30,
-  benches: [
-    { x: -14, z: -20 },
-    { x: 0, z: -22 },
-    { x: 14, z: -20 },
-  ],
-  armillary: { x: 26, z: -2 },
-  dome: { x: 30, z: -18 },
-  beds: [
-    { x: -16, z: 12 },
-    { x: -2, z: 14 },
-    { x: 12, z: 12 },
-  ],
-} as const;
 const lab: Rule = (p, entities = [], ignoreId, kind = "tree") => {
   if (Math.abs(p.x) > 40 || Math.abs(p.z) > 34) return "请在实验场内布置。";
   if (labFeatures.benches.some((b) => Math.hypot(p.x - b.x, p.z - b.z) < 4.5))
@@ -285,13 +266,6 @@ const mountain: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 
 /* -------------------------------- starlight ------------------------------ */
 
-export const starlightFeatures = {
-  cave: { x: 0, z: 27 },
-  stones: Array.from({ length: 9 }, (_, i) => {
-    const a = 0.35 + (i / 9) * Math.PI * 2;
-    return { x: Math.round(Math.cos(a) * 25.7), z: Math.round(Math.sin(a) * 22.6) };
-  }),
-} as const;
 const starlight: Rule = (p, entities = [], ignoreId, kind = "tree") => {
   if (Math.abs(p.x) > 36 || Math.abs(p.z) > 32) return "请在星光空地内布置。";
   if (Math.hypot(p.x, p.z) < 3.5) return "石盆中的星辉要保持完整。";
@@ -305,18 +279,6 @@ const starlight: Rule = (p, entities = [], ignoreId, kind = "tree") => {
 
 /** The sand is a true crescent: outer circle minus an offset lagoon that
  *  crosses the rim, so the bay stays open to the sea at the north. */
-export const beachShore = { r: 42 };
-export const beachLagoon = { x: 0, z: -30, r: 18 };
-export const beachFeatures = {
-  gate: 34,
-  dock: { x: 3, z1: -8, z2: -28 },
-  umbrella: { x: 16, z: 10 },
-  driftwood: { x: -20, z: 14 },
-  palms: [
-    { x: 26, z: 22 },
-    { x: -26, z: 20 },
-  ],
-} as const;
 const onSand = (p: Point) =>
   Math.hypot(p.x, p.z) <= beachShore.r &&
   Math.hypot(p.x - beachLagoon.x, p.z - beachLagoon.z) >= beachLagoon.r + 1.5;

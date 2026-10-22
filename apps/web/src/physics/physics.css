@@ -441,6 +441,9 @@ dialog.physics-workshop .physics-actions {
   grid-template-rows: auto auto minmax(220px, 1fr) auto;
 }
 .physics-scene-nav {
+  max-height: 112px;
+  overflow-y: auto;
+  scrollbar-width: thin;
   margin: 0;
   padding: 0 16px 12px;
   align-items: center;
@@ -493,4 +496,19 @@ dialog.physics-workshop .physics-actions {
 .physics-library-activities small {
   max-width: 32em;
   line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .physics-scene-nav {
+    flex-wrap: nowrap;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-width: 0;
+  }
+  .physics-scene-nav button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .physics-scene-nav span { flex-shrink: 0; }
 }

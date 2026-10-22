@@ -1,4 +1,8 @@
-import { libraryBookDefinition, physicsPlants } from "@island/world-core";
+import {
+  libraryBookDefinition,
+  physicsPlants,
+  themeMovableObjects,
+} from "@island/world-core";
 import { officialBehaviorObjects } from "./behaviors.js";
 import {
   physicsSceneSchema,
@@ -25,6 +29,7 @@ export function officialPhysicsObjects(): ObjectDefinition[] {
     ...officialBehaviorObjects(),
     libraryBookDefinition(),
     ...physicsPlants(),
+    ...themeMovableObjects(),
     ...(["sign", "bookshelf"] as const).map((kind): ObjectDefinition => ({
       id: `core:${kind}`,
       version: 1,

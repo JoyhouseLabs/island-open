@@ -272,3 +272,5 @@ export * from "./physics-library.js";
 
 export * from "./physics-plants.js";
 export * from "./physics-garden.js";
+
+export * from "./physics-themes.js";

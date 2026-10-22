@@ -1,4 +1,15 @@
 import {
+  homeFeatures,
+  meadowFeatures,
+  forestTrail,
+  pondShape,
+  labFeatures,
+  beachFeatures,
+  beachLagoon,
+  starlightFeatures,
+} from "./theme-geography.js";
+import { pathDistance } from "./geom.js";
+import {
   type ObjectDefinition,
   type ObjectInstance,
   type PhysicsScene,
@@ -343,5 +354,57 @@ export function physicsPlantingError(
     )
       return "苗床里只种花";
   }
+  const key = scene.template.id;
+  if (
+    key === "core:home" &&
+    (Math.hypot(x, z) < 7.5 ||
+      (Math.abs(x) < 3.5 && z > 5) ||
+      homeFeatures.cabins.some(
+        (c) =>
+          Math.abs(x - c.x) < c.w / 2 + 2 && Math.abs(z - c.z) < c.d / 2 + 2,
+      ))
+  )
+    return "请为小广场、屋门和小径留出空间";
+  if (
+    key === "core:meadow" &&
+    ((Math.abs(x) < 3 && z > 28) ||
+      (Math.abs(x - meadowFeatures.blanket.x) < 5 &&
+        Math.abs(z - meadowFeatures.blanket.z) < 4.5) ||
+      (Math.abs(x - 24) < 6 && Math.abs(z + 12) < 3))
+  )
+    return "请为野餐、吊床和入口留出空间";
+  if (key === "core:forest" && pathDistance({ x, z }, forestTrail) < 2.6)
+    return "林间小径需要保持通畅";
+  if (
+    key === "core:pond" &&
+    (Math.hypot(
+      x / (pondShape.rx + 1.5),
+      (z - pondShape.z) / (pondShape.rz + 1.5),
+    ) < 1 ||
+      (Math.abs(x) < 3 && z > 20))
+  )
+    return "池塘、拱桥和入口不能种植";
+  if (key === "core:lab" && Math.abs(x) < 3 && z > 22)
+    return "实验室入口需要留出空间";
+  if (
+    key === "core:lab" &&
+    tree &&
+    labFeatures.beds.some((b) => Math.abs(x - b.x) < 5 && Math.abs(z - b.z) < 3)
+  )
+    return "实验苗床里只种花";
+  if (
+    key === "core:beach" &&
+    (Math.hypot(x - beachLagoon.x, z - beachLagoon.z) < beachLagoon.r + 1.5 ||
+      (Math.abs(x - beachFeatures.dock.x) < 2.5 && z < -6) ||
+      (Math.abs(x) < 3 && z > 30))
+  )
+    return "请为海湾、栈桥和入口留出空间";
+  if (
+    key === "core:starlight" &&
+    (Math.hypot(x, z) < 4 ||
+      (Math.abs(x) < 5 && z > 22) ||
+      starlightFeatures.stones.some((s) => Math.hypot(x - s.x, z - s.z) < 3.2))
+  )
+    return "请为石盆、立石和洞口留出空间";
   return null;
 }

@@ -1,3 +1,4 @@
+import { physicalThemeSpecs } from "@island/world-core";
 import PhysicsMechanisms from "./PhysicsMechanisms";
 import { snapBlockPosition } from "@island/physics-core";
 import PhysicsTransfer from "./PhysicsTransfer";
@@ -51,6 +52,15 @@ export default function OnlinePhysics() {
   const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
+  const sceneNav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = sceneNav.current;
+    const current = nav?.querySelector<HTMLButtonElement>(
+      'button[aria-current="page"]',
+    );
+    if (nav && current && nav.scrollWidth > nav.clientWidth)
+      nav.scrollLeft = current.offsetLeft - nav.offsetLeft - 12;
+  }, [sceneKey, sceneChoices, world?.id]);
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
@@ -285,6 +295,7 @@ export default function OnlinePhysics() {
       </header>
       {world && (
         <nav
+          ref={sceneNav}
           className="physics-actions physics-scene-nav"
           aria-label="切换场景"
           inert={!!reading}
@@ -414,6 +425,28 @@ export default function OnlinePhysics() {
             </div>
           </section>
           <section className="physics-controls" inert={busy || !!reading}>
+            {physicalThemeSpecs.some(
+              (s) => `core:${s.key}` === conn.scene!.template.id,
+            ) && (
+              <section
+                className="physics-library-activities"
+                aria-label="场景活动"
+              >
+                <strong>{conn.scene.name}</strong>
+                <span>
+                  {
+                    physicalThemeSpecs.find(
+                      (s) => `core:${s.key}` === conn.scene!.template.id,
+                    )!.description
+                  }
+                </span>
+                <small>
+                  {conn.scene.template.id === "core:lab"
+                    ? "靠近并选中样品瓶，试试拿起、放下和轻抛；也可以沿踏步走上实验台。"
+                    : "用方向键或按钮探索，选中座位后可以坐下休息；在布置家园中继续创作。"}
+                </small>
+              </section>
+            )}
             {["core:garden", "core:nursery"].includes(
               conn.scene.template.id,
             ) && (
