@@ -15,6 +15,7 @@ import OnlineScene from "./OnlineScene";
 import "./physics.css";
 import { IslandConfigProvider } from "../contentStore";
 import { rememberReturn } from "../learning/travel";
+const PhysicsDressing = lazy(() => import("./PhysicsDressing"));
 const Bookshelf = lazy(() => import("../Bookshelf"));
 
 interface World {
@@ -53,7 +54,8 @@ export default function OnlinePhysics() {
   const [dinosaurFocus, setDinosaurFocus] = useState<DinosaurFocus | null>(
     null,
   );
-  const overlayOpen = !!reading || dinosaurFocus !== null;
+  const [dressing, setDressing] = useState(false);
+  const overlayOpen = !!reading || dinosaurFocus !== null || dressing;
   const [learningEnabled, setLearningEnabled] = useState(false);
   const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
@@ -144,6 +146,7 @@ export default function OnlinePhysics() {
     setNight(false);
     setReading(null);
     setDinosaurFocus(null);
+    setDressing(false);
     keys.clear();
     if (!sceneId || !user) {
       setConn(null);
@@ -453,6 +456,15 @@ export default function OnlinePhysics() {
             </div>
           </section>
           <section className="physics-controls" inert={busy || overlayOpen}>
+            <button
+              className="physics-sound"
+              onClick={() => {
+                keys.clear();
+                setDressing(true);
+              }}
+            >
+              我的形象
+            </button>
             {conn.scene.template.id === "core:dinosaur" && (
               <section
                 className="physics-library-activities"
@@ -811,6 +823,23 @@ export default function OnlinePhysics() {
               ? "这个场景尚未开辟或未开放，请选择上方场景"
               : "正在连接世界…"}
         </p>
+      )}
+      {dressing && user && (
+        <Suspense
+          fallback={
+            <div className="modal-backdrop" role="status">
+              正在打开装扮小屋…
+            </div>
+          }
+        >
+          <PhysicsDressing
+            key={user.id}
+            close={() => {
+              keys.clear();
+              setDressing(false);
+            }}
+          />
+        </Suspense>
       )}
       {dinosaurFocus !== null && (
         <DinosaurGuide

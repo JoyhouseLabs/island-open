@@ -1,5 +1,8 @@
 import {
   PHYSICS_RULES_VERSION,
+  defaultAvatar,
+  playerAppearanceSchema,
+  type PlayerAppearance,
   physicsBudgets,
   physicsRoomCommandSchema,
   physicsCheckpointSchema,
@@ -23,6 +26,7 @@ export interface CommandReceipt {
   tick: number;
 }
 interface Player {
+  appearance: PlayerAppearance;
   character: PhysicsCharacter;
   grab: PhysicsGrab;
   canInteract: boolean;
@@ -255,17 +259,27 @@ export class PhysicsRoom {
   get size() {
     return this.players.size;
   }
-  join(id: string, canInteract: boolean) {
+  join(
+    id: string,
+    canInteract: boolean,
+    appearance: PlayerAppearance = {
+      name: "旅人",
+      avatar: defaultAvatar,
+      revision: 0,
+    },
+  ) {
     if (this.players.has(id))
       throw new PhysicsRoomError("INVALID_COMMAND", "连接已经加入房间");
     if (this.players.size >= physicsBudgets.players)
       throw new PhysicsRoomError("ROOM_FULL", "房间已满");
+    const identity = playerAppearanceSchema.parse(appearance);
     const character = this.runtime.createCharacter(
       id,
       this.runtime.scene.spawn,
       canInteract,
     );
     this.players.set(id, {
+      appearance: identity,
       character,
       grab: new PhysicsGrab(this.runtime.world, character),
       canInteract,
@@ -436,6 +450,12 @@ export class PhysicsRoom {
       }
     });
   }
+  setAppearance(id: string, appearance: PlayerAppearance) {
+    const player = this.player(id),
+      value = playerAppearanceSchema.parse(appearance);
+    if (value.revision < player.appearance.revision) return;
+    player.appearance = value;
+  }
   playerState(id: string): PhysicsPlayerState {
     const player = this.player(id),
       handle = player.grab.body?.handle;
@@ -447,6 +467,7 @@ export class PhysicsRoom {
           )?.[0] ?? null);
     return {
       id,
+      appearance: structuredClone(player.appearance),
       ...player.character.snapshot(),
       ackInput: player.ackInput,
       held,

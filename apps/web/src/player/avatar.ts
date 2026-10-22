@@ -1,20 +1,9 @@
 import { useSyncExternalStore } from "react";
 
-export type AvatarForm =
-  | "foxbot"
-  | "pandabot"
-  | "islander"
-  | "bunnybot"
-  | "catbot";
-export type AvatarHat =
-  | "none"
-  | "straw"
-  | "beret"
-  | "crown"
-  | "cap"
-  | "starcrown"
-  | "copter";
-export type AvatarConfig = { form: AvatarForm; accent: string; hat: AvatarHat };
+import type { AvatarConfig } from "@island/contracts";
+export type { AvatarConfig } from "@island/contracts";
+export type AvatarForm = AvatarConfig["form"];
+export type AvatarHat = AvatarConfig["hat"];
 
 export const avatarForms: { id: AvatarForm; name: string; note: string }[] = [
   { id: "foxbot", name: "小狐灵", note: "灵敏爱跑，尾巴亮着微光" },
@@ -53,8 +42,12 @@ export function loadAvatar(): AvatarConfig {
   try {
     const raw = localStorage.getItem(AVATAR_KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<AvatarConfig>) : null;
-    if (parsed?.form && avatarForms.some((f) => f.id === parsed.form) &&
-        typeof parsed.accent === "string" && /^#[0-9a-f]{6}$/i.test(parsed.accent))
+    if (
+      parsed?.form &&
+      avatarForms.some((f) => f.id === parsed.form) &&
+      typeof parsed.accent === "string" &&
+      /^#[0-9a-f]{6}$/i.test(parsed.accent)
+    )
       return {
         form: parsed.form,
         accent: parsed.accent,

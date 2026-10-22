@@ -553,3 +553,56 @@ dialog.physics-workshop .physics-actions {
     max-height: 46dvh;
   }
 }
+
+.physics-dressing {
+  width: min(700px, calc(100vw - 24px));
+}
+.physics-avatar-preview {
+  height: 210px;
+  background: #e4ecdf;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.physics-dressing fieldset {
+  border: 1px solid #bdcbb8;
+  border-radius: 12px;
+  margin: 12px 0;
+}
+.physics-avatar-color {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.physics-dressing fieldset button:first-child {
+  background: white;
+  color: #294336;
+}
+.physics-dressing fieldset button[aria-pressed="true"] {
+  background: #486e51;
+  color: white;
+}
+.physics-dressing header {
+  align-items: center;
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  padding: 12px 0;
+  background: #f6f4ea;
+}
+.physics-dressing header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.physics-dressing header p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 14px;
+}
+@media (max-width: 600px) {
+  .physics-dressing header {
+    top: -12px;
+  }
+}

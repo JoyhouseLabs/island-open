@@ -1,3 +1,4 @@
+import { playerAppearanceSchema } from "./avatar.js";
 import { z } from "zod";
 import {
   physicsTerrainSchema,
@@ -585,6 +586,7 @@ export const physicsRoomCommandSchema = z.discriminatedUnion("type", [
 ]);
 export type PhysicsRoomCommand = z.infer<typeof physicsRoomCommandSchema>;
 export const physicsPlayerStateSchema = characterStateSchema.extend({
+  appearance: playerAppearanceSchema,
   id: z.string().min(1).max(96),
   ackInput: z.number().int().min(-1),
   held: z.string().uuid().nullable(),

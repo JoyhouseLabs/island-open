@@ -1,3 +1,4 @@
+import PhysicsAvatar from "./PhysicsAvatar";
 import ThemeAmbience from "./ThemeAmbience";
 import GardenAmbience from "./GardenAmbience";
 import {
@@ -127,72 +128,6 @@ function Body({
           }
         />
       ))}
-    </group>
-  );
-}
-function Actor({ conn, id }: { conn: PhysicsConnection; id: string }) {
-  const mesh = useRef<Group>(null),
-    standing = useRef<Group>(null),
-    seated = useRef<Group>(null),
-    position = useMemo(() => new Vector3(), []);
-  useFrame(() => {
-    if (!mesh.current) return;
-    const sample = conn.buffer.sample(performance.now());
-    const state =
-      id === conn.you
-        ? conn.me
-        : sample?.after.players.find((p) => p.id === id);
-    if (!state) return;
-    mesh.current.rotation.y = state.yaw;
-    if (standing.current) standing.current.visible = !state.seatId;
-    if (seated.current) seated.current.visible = !!state.seatId;
-    if (id === conn.you && conn.prediction)
-      mesh.current.position.copy(conn.prediction.visualPosition);
-    else if (sample) {
-      const start = sample.before.players.find((p) => p.id === id) ?? state;
-      mesh.current.position
-        .copy(start.position)
-        .lerp(
-          position.set(state.position.x, state.position.y, state.position.z),
-          sample.alpha,
-        );
-    }
-  });
-  const color = id === conn.you ? "#e5a64b" : "#659ac2";
-  return (
-    <group ref={mesh}>
-      <group ref={standing}>
-        <mesh castShadow>
-          <capsuleGeometry args={[0.3, 1.1, 6, 12]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-        <mesh position={[0, 0.54, 0]}>
-          <sphereGeometry args={[0.31, 16, 12]} />
-          <meshStandardMaterial color="#f7dfb1" />
-        </mesh>
-      </group>
-      <group ref={seated} visible={false}>
-        <mesh castShadow>
-          <capsuleGeometry args={[0.27, 0.5, 6, 12]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-        <mesh position={[0, 0.35, 0]}>
-          <sphereGeometry args={[0.26, 16, 12]} />
-          <meshStandardMaterial color="#f7dfb1" />
-        </mesh>
-        {[-0.16, 0.16].map((x) => (
-          <group key={x}>
-            <mesh castShadow position={[x, -0.37, 0.2]}>
-              <boxGeometry args={[0.2, 0.2, 0.5]} />
-              <meshStandardMaterial color={color} />
-            </mesh>
-            <mesh castShadow position={[x, -0.62, 0.4]}>
-              <boxGeometry args={[0.18, 0.45, 0.2]} />
-              <meshStandardMaterial color="#70563d" />
-            </mesh>
-          </group>
-        ))}
-      </group>
     </group>
   );
 }
@@ -451,7 +386,7 @@ function Contents({
         />
       ))}
       {conn.buffer.latest?.players.map((player) => (
-        <Actor key={player.id} conn={conn} id={player.id} />
+        <PhysicsAvatar key={player.id} conn={conn} id={player.id} />
       ))}
       {heldDefinition && preview && (
         <group

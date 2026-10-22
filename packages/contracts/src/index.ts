@@ -241,3 +241,5 @@ export * from "./physics-creations.js";
 
 export * from "./physics-content.js";
 export * from "./physics-bundle.js";
+
+export * from "./avatar.js";
