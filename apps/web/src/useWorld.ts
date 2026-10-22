@@ -329,14 +329,14 @@ export function useWorld(scope?: SceneScope) {
       const c = current.current;
       if (unsupportedRaw.current) {
         notify("请更新客户端后再编辑这个房间。");
-        return;
+        return false;
       }
       const next = update(c.snapshot);
-      if (next === c.snapshot) return;
+      if (next === c.snapshot) return false;
       const problem = validateBuilding(next, c.snapshot) || (next.creations ?? []).map(f => creationPlacementError(next, f)).find(Boolean) || (next.furniture ?? []).map(f => furniturePlacementError(next, f)).find(Boolean);
       if (problem) {
         notify(problem);
-        return;
+        return false;
       }
       setHistory((h) => [...h.slice(-24), { before: c.snapshot, after: next }]);
       setSnapshot(next);
@@ -345,6 +345,7 @@ export function useWorld(scope?: SceneScope) {
       setStatus(nextStatus);
       current.current = { ...c, snapshot: next, status: nextStatus };
       void persist(next, c.record, c.user, true);
+      return true;
     },
     [persist, notify],
   );

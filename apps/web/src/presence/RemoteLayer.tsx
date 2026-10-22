@@ -5,10 +5,10 @@ import type { SubSceneId } from "@island/contracts";
 import { usePresence, presence } from "./client";
 import { RemoteAvatar } from "./RemoteAvatar";
 import { phraseLabel } from "./phrases";
-import { Html } from "@react-three/drei";
+import PresenceLabel from "./PresenceLabel";
 
 /** The local player's own speech bubble, anchored to the live self pose. */
-function SelfBubble({ phrase }: { phrase: string }) {
+function SelfBubble({ phrase, stamp }: { phrase: string; stamp: number }) {
   const group = useRef<T.Group>(null);
   useFrame(() => {
     if (!group.current) return;
@@ -17,11 +17,7 @@ function SelfBubble({ phrase }: { phrase: string }) {
   });
   return (
     <group ref={group}>
-      <Html center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-        <div key={phrase} className="bubble-chip self">
-          {phrase}
-        </div>
-      </Html>
+      <PresenceLabel phrase={phrase} stamp={stamp} self />
     </group>
   );
 }
@@ -47,7 +43,9 @@ export function RemoteLayer({
           bubble={bubbles.find((b) => b.by === p.id)}
         />
       ))}
-      {self?.phrase && <SelfBubble phrase={phraseLabel(self.phrase)} />}
+      {self?.phrase && (
+        <SelfBubble phrase={phraseLabel(self.phrase)} stamp={self.at} />
+      )}
     </group>
   );
 }
