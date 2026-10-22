@@ -209,3 +209,80 @@ export type ColliderShape = z.infer<typeof colliderShapeSchema>;
 export type Vector3 = z.infer<typeof vector3Schema>;
 export type Quaternion = z.infer<typeof quaternionSchema>;
 export type BodyState = z.infer<typeof bodyStateSchema>;
+
+export const characterStateSchema = z
+  .object({
+    position: vector3Schema,
+    velocity: vector3Schema,
+    grounded: z.boolean(),
+    jumpHeld: z.boolean(),
+    coyote: z.number().finite().min(0).max(0.1),
+  })
+  .strict();
+const roomCommandFields = {
+  layoutRevision: z.number().int().positive(),
+  sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+};
+export const physicsRoomCommandSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("input"),
+      ...roomCommandFields,
+      x: z.number().finite().min(-1).max(1),
+      z: z.number().finite().min(-1).max(1),
+      jump: z.boolean(),
+      yaw: z.number().finite().min(-Math.PI).max(Math.PI),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("grab"),
+      ...roomCommandFields,
+      commandId: z.string().uuid(),
+      objectId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("push"),
+      ...roomCommandFields,
+      commandId: z.string().uuid(),
+      objectId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("drop"),
+      ...roomCommandFields,
+      commandId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("toss"),
+      ...roomCommandFields,
+      commandId: z.string().uuid(),
+    })
+    .strict(),
+]);
+export type PhysicsRoomCommand = z.infer<typeof physicsRoomCommandSchema>;
+export const physicsPlayerStateSchema = characterStateSchema.extend({
+  id: z.string().min(1).max(96),
+  ackInput: z.number().int().min(-1),
+  held: z.string().uuid().nullable(),
+  yaw: z.number().finite(),
+  canInteract: z.boolean(),
+});
+export const physicsFrameSchema = z
+  .object({
+    epoch: z.string().uuid(),
+    sequence: z.number().int().nonnegative(),
+    tick: z.number().int().nonnegative(),
+    layoutRevision: z.number().int().positive(),
+    full: z.boolean(),
+    bodies: z.array(bodyStateSchema).max(4096),
+    players: z.array(physicsPlayerStateSchema).max(physicsBudgets.players),
+  })
+  .strict();
+export type PhysicsPlayerState = z.infer<typeof physicsPlayerStateSchema>;
+export type PhysicsFrame = z.infer<typeof physicsFrameSchema>;

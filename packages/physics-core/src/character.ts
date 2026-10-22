@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Vector3 } from "@island/contracts";
+import { collisionGroups } from "./groups.js";
 
 export const characterProfile = Object.freeze({
   radius: 0.3,
@@ -13,6 +14,13 @@ export interface CharacterInput {
   x: number;
   z: number;
   jump: boolean;
+}
+export interface CharacterState {
+  position: Vector3;
+  velocity: Vector3;
+  grounded: boolean;
+  jumpHeld: boolean;
+  coyote: number;
 }
 
 /** Input is in world axes. The caller advances the world once after all actors. */
@@ -28,6 +36,7 @@ export class PhysicsCharacter {
   constructor(
     private world: RAPIER.World,
     spawn: Vector3,
+    canPush = true,
   ) {
     this.body = world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
@@ -40,6 +49,8 @@ export class PhysicsCharacter {
       RAPIER.ColliderDesc.capsule(
         characterProfile.halfHeight,
         characterProfile.radius,
+      ).setCollisionGroups(
+        canPush ? collisionGroups.character : collisionGroups.visitor,
       ),
       this.body,
     );
@@ -48,7 +59,7 @@ export class PhysicsCharacter {
     this.controller.enableSnapToGround(0.2);
     this.controller.setMaxSlopeClimbAngle(Math.PI / 4);
     this.controller.setMinSlopeSlideAngle(Math.PI * 0.28);
-    this.controller.setApplyImpulsesToDynamicBodies(true);
+    this.controller.setApplyImpulsesToDynamicBodies(canPush);
     this.controller.setCharacterMass(1.8);
   }
   step(input: CharacterInput, dt: number) {
@@ -89,6 +100,9 @@ export class PhysicsCharacter {
       this.collider,
       desired,
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+      // Visitors still query dynamic obstacles, but their actual collider
+      // cannot impart solver impulses to someone else's objects.
+      collisionGroups.character,
     );
     const movement = this.controller.computedMovement(),
       position = this.body.translation();
@@ -106,6 +120,28 @@ export class PhysicsCharacter {
   }
   position(): Vector3 {
     return { ...this.body.translation() };
+  }
+  setCanPush(enabled: boolean) {
+    this.collider.setCollisionGroups(
+      enabled ? collisionGroups.character : collisionGroups.visitor,
+    );
+    this.controller.setApplyImpulsesToDynamicBodies(enabled);
+  }
+  snapshot(): CharacterState {
+    return {
+      position: this.position(),
+      velocity: { ...this.velocity },
+      grounded: this.grounded,
+      jumpHeld: this.jumpHeld,
+      coyote: this.coyote,
+    };
+  }
+  reconcile(state: CharacterState) {
+    this.teleport(state.position);
+    this.velocity = { ...state.velocity };
+    this.grounded = state.grounded;
+    this.jumpHeld = state.jumpHeld;
+    this.coyote = state.coyote;
   }
   teleport(position: Vector3) {
     this.body.setTranslation(position, true);

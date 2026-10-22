@@ -68,8 +68,32 @@
 }
 .physics-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
+}
+.physics-select {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: 12px;
+  font-size: 13px;
+}
+.physics-select select {
+  border: 1px solid #bccaba;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 10px;
+  color: #294336;
+}
+.physics-sound {
+  border: 1px solid #bccaba;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 14px;
+  color: #294336;
+  min-height: 44px;
+  cursor: pointer;
 }
 .physics-actions button {
   border: 1px solid #bccaba;
@@ -142,7 +166,7 @@
     width: 100%;
   }
   .physics-actions button {
-    flex: 1;
+    flex: 1 1 28%;
     padding: 8px;
   }
 }

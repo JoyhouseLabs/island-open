@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { PhysicsCharacter } from "./character.js";
+import { collisionGroups } from "./groups.js";
 import {
   physicsSceneSchema,
   physicsBudgets,
@@ -9,7 +10,15 @@ import {
   type ColliderShape,
   type BodyState,
   type Vector3,
+  type ObjectDefinition,
 } from "@island/contracts";
+export interface PhysicsImpact {
+  id: string;
+  material: ObjectDefinition["material"];
+  strength: number;
+  position: Vector3;
+  tick: number;
+}
 export { RAPIER };
 export * from "./playground.js";
 export * from "./character.js";
@@ -57,6 +66,13 @@ export class PhysicsRuntime {
   private previous = new Map<string, BodyState>();
   private ccdThresholds = new Map<string, number>();
   private recoveryAnchors = new Map<string, BodyState>();
+  private events: RAPIER.EventQueue;
+  private colliderObjects = new Map<
+    number,
+    { id: string; material: ObjectDefinition["material"] }
+  >();
+  private impactCooldown = new Map<string, number>();
+  private impacts: PhysicsImpact[] = [];
   private accumulator = 0;
   private disposed = false;
   tick = 0;
@@ -65,6 +81,7 @@ export class PhysicsRuntime {
   private constructor(input: PhysicsScene) {
     this.scene = physicsSceneSchema.parse(input);
     this.world = new RAPIER.World({ x: 0, y: -22, z: 0 });
+    this.events = new RAPIER.EventQueue(true);
     this.world.timestep = PHYSICS_DT;
     try {
       const definitions = new Map(
@@ -94,16 +111,27 @@ export class PhysicsRuntime {
         );
         const material = physicsMaterials[def.material];
         for (const part of def.parts) {
-          this.world.createCollider(
+          const collider = this.world.createCollider(
             colliderDescription(part.shape)
               .setTranslation(part.position.x, part.position.y, part.position.z)
               .setRotation(part.rotation)
               .setFriction(material.friction)
               .setRestitution(material.restitution)
               .setDensity(part.sensor ? 0 : material.density)
+              .setCollisionGroups(
+                def.bodyType === "dynamic"
+                  ? collisionGroups.dynamic
+                  : collisionGroups.fixed,
+              )
+              .setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS)
+              .setContactForceEventThreshold(1)
               .setSensor(part.sensor),
             body,
           );
+          this.colliderObjects.set(collider.handle, {
+            id: instance.id,
+            material: def.material,
+          });
         }
         this.bodies.set(instance.id, body);
         const minimum = Math.min(
@@ -138,10 +166,14 @@ export class PhysicsRuntime {
   private checkAlive() {
     if (this.disposed) throw new Error("物理场景已经关闭");
   }
-  createCharacter(id: string, spawn = this.scene.spawn): PhysicsCharacter {
+  createCharacter(
+    id: string,
+    spawn = this.scene.spawn,
+    canPush = true,
+  ): PhysicsCharacter {
     this.checkAlive();
     if (this.characters.has(id)) throw new Error("角色已经存在");
-    const character = new PhysicsCharacter(this.world, spawn);
+    const character = new PhysicsCharacter(this.world, spawn, canPush);
     this.characters.set(id, character);
     return character;
   }
@@ -172,6 +204,28 @@ export class PhysicsRuntime {
   get alpha() {
     return this.accumulator / PHYSICS_DT;
   }
+  takeImpacts(): PhysicsImpact[] {
+    const events = this.impacts;
+    this.impacts = [];
+    return events;
+  }
+  surfaceMaterial(
+    position: Vector3,
+    excluded?: RAPIER.RigidBody,
+  ): ObjectDefinition["material"] {
+    const hit = this.world.castRay(
+      new RAPIER.Ray(position, { x: 0, y: -1, z: 0 }),
+      2,
+      true,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      undefined,
+      excluded,
+    );
+    return hit
+      ? (this.colliderObjects.get(hit.collider.handle)?.material ?? "stone")
+      : "stone";
+  }
   /** Simulation authority calls this with a fixed clock. */
   step(beforeStep?: (dt: number) => void) {
     this.checkAlive();
@@ -189,10 +243,12 @@ export class PhysicsRuntime {
       });
     }
     beforeStep?.(PHYSICS_DT);
+    const velocities = new Map<number, Vector3>();
     for (const [id, body] of this.bodies) {
       if (!body.isDynamic()) continue;
       const v = body.linvel(),
         speed = Math.hypot(v.x, v.y, v.z);
+      velocities.set(body.handle, { ...v });
       body.enableCcd(
         speed + 22 * PHYSICS_DT > (this.ccdThresholds.get(id) ?? Infinity),
       );
@@ -213,7 +269,52 @@ export class PhysicsRuntime {
           true,
         );
     }
-    this.world.step();
+    this.world.step(this.events);
+    this.events.drainContactForceEvents(
+      (event: RAPIER.TempContactForceEvent) => {
+        const a = event.collider1(),
+          b = event.collider2();
+        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+        if (this.tick - (this.impactCooldown.get(key) ?? -100) < 15) return;
+        const normal = event.maxForceDirection();
+        const candidates = [a, b]
+          .map((handle) => {
+            const body = this.world.getCollider(handle)?.parent();
+            const velocity = body && velocities.get(body.handle);
+            return {
+              handle,
+              body,
+              speed: velocity
+                ? Math.abs(
+                    velocity.x * normal.x +
+                      velocity.y * normal.y +
+                      velocity.z * normal.z,
+                  )
+                : 0,
+            };
+          })
+          .sort((left, right) => right.speed - left.speed);
+        const impact = candidates[0],
+          object = impact && this.colliderObjects.get(impact.handle);
+        if (
+          !impact?.body ||
+          !object ||
+          impact.speed < 0.7 ||
+          this.impacts.length >= 64
+        )
+          return;
+        this.impacts.push({
+          ...object,
+          strength: Math.min(1, impact.speed / 8),
+          position: { ...impact.body.translation() },
+          tick: this.tick,
+        });
+        this.impactCooldown.set(key, this.tick);
+      },
+    );
+    if (this.tick % 120 === 0)
+      for (const [key, tick] of this.impactCooldown)
+        if (this.tick - tick > 120) this.impactCooldown.delete(key);
     for (const [id, body] of this.bodies) {
       if (!body.isDynamic()) continue;
       const state = this.state(id);
@@ -311,6 +412,10 @@ export class PhysicsRuntime {
     this.previous.clear();
     this.ccdThresholds.clear();
     this.recoveryAnchors.clear();
+    this.colliderObjects.clear();
+    this.impactCooldown.clear();
+    this.impacts = [];
+    this.events.free();
     this.world.free();
   }
 }

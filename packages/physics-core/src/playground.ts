@@ -138,7 +138,7 @@ export function createPlayground(): PhysicsScene {
       {
         id: playgroundIds.ramp,
         definitionId: "core:ramp",
-        position: { x: -4, y: 1.4, z: -2 },
+        position: { x: -4, y: 1.1, z: -2 },
         rotation: {
           x: 0,
           y: 0,

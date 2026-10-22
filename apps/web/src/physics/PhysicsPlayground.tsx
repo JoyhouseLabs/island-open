@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, ContactShadows } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { Link } from "react-router";
 import {
   BufferAttribute,
@@ -23,8 +23,17 @@ import type {
 } from "@island/contracts";
 import "./physics.css";
 import { PlaygroundPlayer, type PlaygroundInput } from "./PlaygroundPlayer";
+import { PhysicsAudio } from "./PhysicsAudio";
 
-function Part({ part, selected }: { part: ObjectPart; selected: boolean }) {
+function Part({
+  part,
+  selected,
+  ghost,
+}: {
+  part: ObjectPart;
+  selected: boolean;
+  ghost?: string;
+}) {
   const geometry = useMemo(
     () =>
       part.shape.kind === "convex"
@@ -45,8 +54,8 @@ function Part({ part, selected }: { part: ObjectPart; selected: boolean }) {
         part.rotation.z,
         part.rotation.w,
       ]}
-      castShadow
-      receiveShadow
+      castShadow={!ghost}
+      receiveShadow={!ghost}
     >
       {shape.kind === "box" && (
         <boxGeometry
@@ -70,14 +79,60 @@ function Part({ part, selected }: { part: ObjectPart; selected: boolean }) {
       )}
       {geometry && <primitive object={geometry} attach="geometry" />}
       <meshStandardMaterial
-        color={part.color}
+        color={ghost ?? part.color}
         roughness={0.75}
         emissive={selected ? "#9a5a13" : "#000000"}
         emissiveIntensity={0.3}
-        transparent={part.sensor}
-        opacity={part.sensor ? 0.25 : 1}
+        transparent={part.sensor || !!ghost}
+        opacity={part.sensor || ghost ? 0.25 : 1}
+        depthWrite={!ghost}
       />
     </mesh>
+  );
+}
+function DropGhost({
+  runtime,
+  input,
+  held,
+  valid,
+}: {
+  runtime: PhysicsRuntime;
+  input: PlaygroundInput;
+  held: string;
+  valid: boolean;
+}) {
+  const group = useRef<Group>(null);
+  const instance = runtime.scene.objects.find((o) => o.id === held);
+  const definition = runtime.scene.definitions.find(
+    (d) =>
+      d.id === instance?.definitionId &&
+      d.version === instance.definitionVersion,
+  );
+  useFrame(() => {
+    if (!group.current) return;
+    const p = input.preview;
+    group.current.visible = !!p;
+    if (p) {
+      group.current.position.copy(p.position);
+      group.current.quaternion.set(
+        p.rotation.x,
+        p.rotation.y,
+        p.rotation.z,
+        p.rotation.w,
+      );
+    }
+  });
+  return (
+    <group ref={group}>
+      {definition?.parts.map((part) => (
+        <Part
+          key={part.id}
+          part={part}
+          selected={false}
+          ghost={valid ? "#42bb78" : "#e16e63"}
+        />
+      ))}
+    </group>
   );
 }
 function ObjectMesh({
@@ -156,6 +211,8 @@ function Scene({
   selected,
   select,
   input,
+  held,
+  dropValid,
 }: {
   runtime: PhysicsRuntime;
   paused: boolean;
@@ -163,16 +220,37 @@ function Scene({
   selected: string | null;
   select: (id: string) => void;
   input: PlaygroundInput;
+  held: string | null;
+  dropValid: boolean;
 }) {
   const beforeStep = useRef<((dt: number) => void) | undefined>(undefined);
+  const cameraTarget = useMemo(
+    () =>
+      new Vector3(
+        runtime.scene.spawn.x,
+        runtime.scene.spawn.y,
+        runtime.scene.spawn.z - 2.5,
+      ),
+    [runtime],
+  );
   useEffect(() => {
-    const reset = () => runtime.pauseClock();
+    const reset = () => {
+      runtime.pauseClock();
+      input.keys.clear();
+      input.grabRequested = false;
+      input.tossRequested = false;
+      input.pushRequested = false;
+      input.audio?.setPaused(paused || document.hidden);
+    };
+    input.paused = paused;
     document.addEventListener("visibilitychange", reset);
     reset();
     return () => document.removeEventListener("visibilitychange", reset);
-  }, [runtime, paused]);
+  }, [runtime, paused, input]);
   useFrame((_, dt) => {
     if (!paused && !document.hidden) runtime.advance(dt, beforeStep.current);
+    for (const event of runtime.takeImpacts())
+      input.audio?.play("contact", event.material, event.strength);
   }, -100);
   const definitions = useMemo(
     () =>
@@ -212,18 +290,17 @@ function Scene({
         input={input}
         beforeStep={beforeStep}
       />
-      <ContactShadows
-        position={[0, 0.005, 0]}
-        scale={30}
-        opacity={0.25}
-        blur={2}
-        far={8}
-        resolution={256}
-        frames={1}
-      />
+      {held && (
+        <DropGhost
+          runtime={runtime}
+          input={input}
+          held={held}
+          valid={dropValid}
+        />
+      )}
       <OrbitControls
         makeDefault
-        target={[-1, 1, 0]}
+        target={cameraTarget}
         minDistance={5}
         maxDistance={35}
         maxPolarAngle={Math.PI * 0.48}
@@ -238,19 +315,35 @@ export default function PhysicsPlayground() {
   const [error, setError] = useState("");
   const [paused, setPaused] = useState(false);
   const [debug, setDebug] = useState(false);
+  const [sound, setSound] = useState(false);
+  const [follow, setFollow] = useState(true);
   const [selected, setSelected] = useState<string | null>(playgroundIds.ball);
   const input = useMemo<PlaygroundInput>(
     () => ({
       keys: new Set(),
       selected: playgroundIds.ball,
       grabRequested: false,
+      tossRequested: false,
+      pushRequested: false,
+      preview: null,
+      paused: false,
+      followCamera: true,
+      audio: null,
       held: null,
       message: "",
       position: null,
     }),
     [],
   );
+  useEffect(() => {
+    input.audio = new PhysicsAudio();
+    return () => {
+      input.audio?.dispose();
+      input.audio = null;
+    };
+  }, [input]);
   input.selected = selected;
+  input.followCamera = follow;
   const [status, setStatus] = useState({
     tick: 0,
     states: [] as BodyState[],
@@ -258,6 +351,8 @@ export default function PhysicsPlayground() {
     player: null as PlaygroundInput["position"],
     held: null as string | null,
     message: "",
+    preview: input.preview,
+    audioPlayed: 0,
   });
   useEffect(() => {
     let cancelled = false,
@@ -272,6 +367,8 @@ export default function PhysicsPlayground() {
       player: null,
       held: null,
       message: "",
+      preview: null,
+      audioPlayed: 0,
     });
     PhysicsRuntime.create(createPlayground())
       .then((value) => {
@@ -301,6 +398,8 @@ export default function PhysicsPlayground() {
           player: input.position,
           held: input.held,
           message: input.message,
+          preview: input.preview,
+          audioPlayed: input.audio?.played ?? 0,
         }),
       250,
     );
@@ -313,11 +412,7 @@ export default function PhysicsPlayground() {
   );
   const push = () => {
     if (!runtime || !selected || paused) return;
-    try {
-      runtime.impulse(selected, { x: 0.8, y: 0.45, z: -0.3 });
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "暂时不能推动");
-    }
+    input.pushRequested = true;
   };
   return (
     <main className="physics-playground">
@@ -333,7 +428,14 @@ export default function PhysicsPlayground() {
         {runtime ? (
           <Canvas
             shadows
-            camera={{ position: [13, 12, 17], fov: 45 }}
+            camera={{
+              position: [
+                runtime.scene.spawn.x + 14,
+                runtime.scene.spawn.y + 11,
+                runtime.scene.spawn.z + 14.5,
+              ],
+              fov: 45,
+            }}
             dpr={[1, 1.5]}
           >
             <Scene
@@ -343,6 +445,8 @@ export default function PhysicsPlayground() {
               selected={selected}
               select={setSelected}
               input={input}
+              held={status.held}
+              dropValid={!!status.preview?.valid}
             />
           </Canvas>
         ) : (
@@ -357,6 +461,26 @@ export default function PhysicsPlayground() {
       <aside className="physics-controls">
         <div>
           <strong>{definition?.name ?? "选择一个物品"}</strong>
+          <label className="physics-select">
+            观察物品{" "}
+            <select
+              aria-label="观察物品"
+              value={selected ?? ""}
+              onChange={(event) => setSelected(event.target.value)}
+            >
+              {runtime?.scene.objects.map((object) => (
+                <option key={object.id} value={object.id}>
+                  {
+                    runtime.scene.definitions.find(
+                      (d) =>
+                        d.id === object.definitionId &&
+                        d.version === object.definitionVersion,
+                    )?.name
+                  }
+                </option>
+              ))}
+            </select>
+          </label>
           <p>
             {definition?.bodyType === "dynamic"
               ? "轻推一下，看看它会怎样运动。"
@@ -366,7 +490,12 @@ export default function PhysicsPlayground() {
         <div className="physics-actions">
           <button
             onClick={push}
-            disabled={!runtime || paused || definition?.bodyType !== "dynamic"}
+            disabled={
+              !runtime ||
+              paused ||
+              !!status.held ||
+              definition?.bodyType !== "dynamic"
+            }
           >
             轻推一下
           </button>
@@ -374,9 +503,19 @@ export default function PhysicsPlayground() {
             onClick={() => {
               input.grabRequested = true;
             }}
-            disabled={!runtime || paused}
+            disabled={
+              !runtime || paused || (!!status.held && !status.preview?.valid)
+            }
           >
             {status.held ? "放下" : "拿起"}
+          </button>
+          <button
+            disabled={!runtime || paused || !status.held}
+            onClick={() => {
+              input.tossRequested = true;
+            }}
+          >
+            轻抛
           </button>
           <button onClick={() => setPaused((p) => !p)} disabled={!runtime}>
             {paused ? "继续" : "暂停"}
@@ -392,6 +531,22 @@ export default function PhysicsPlayground() {
         </div>
         {error && runtime && <p role="alert">{error}</p>}
         {status.message && <p role="status">{status.message}</p>}
+        {status.preview && <p role="status">{status.preview.reason}</p>}
+        <button
+          className="physics-sound"
+          aria-pressed={sound}
+          onClick={async () => setSound((await input.audio?.toggle()) ?? false)}
+        >
+          {sound ? "关闭声音" : "开启声音"}
+        </button>
+        <label className="physics-follow">
+          <input
+            type="checkbox"
+            checked={follow}
+            onChange={(event) => setFollow(event.target.checked)}
+          />
+          跟随角色
+        </label>
         <div className="physics-movement" aria-label="角色动作">
           {[
             ["a", "向左"],

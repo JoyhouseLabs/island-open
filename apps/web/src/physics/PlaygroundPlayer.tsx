@@ -5,12 +5,20 @@ import {
   PhysicsRuntime,
   PhysicsCharacter,
   PhysicsGrab,
+  type DropPreview,
 } from "@island/physics-core";
+import type { PhysicsAudio } from "./PhysicsAudio";
 
 export interface PlaygroundInput {
   keys: Set<string>;
   selected: string | null;
   grabRequested: boolean;
+  tossRequested: boolean;
+  pushRequested: boolean;
+  preview: DropPreview | null;
+  paused: boolean;
+  followCamera: boolean;
+  audio: PhysicsAudio | null;
   held: string | null;
   message: string;
   position: { x: number; y: number; z: number } | null;
@@ -26,7 +34,8 @@ export function PlaygroundPlayer({
 }) {
   const actor = useRef<PhysicsCharacter | null>(null),
     mesh = useRef<Group>(null);
-  const { camera } = useThree();
+  const { camera, controls } = useThree();
+  const lastPosition = useRef<{ x: number; y: number; z: number } | null>(null);
   const forward = useMemo(() => new Vector3(), []),
     right = useMemo(() => new Vector3(), []),
     direction = useMemo(() => new Vector3(), []);
@@ -34,7 +43,11 @@ export function PlaygroundPlayer({
   useEffect(() => {
     const player = runtime.createCharacter("local-player");
     actor.current = player;
+    lastPosition.current = player.position();
     const grab = new PhysicsGrab(runtime.world, player);
+    let walked = 0,
+      previous = player.position(),
+      wasGrounded = false;
     beforeStep.current = (dt) => {
       camera.getWorldDirection(forward);
       forward.y = 0;
@@ -52,12 +65,30 @@ export function PlaygroundPlayer({
       if (direction.lengthSq() > 0.01)
         facing.current = { x: direction.x, y: 0, z: direction.z };
       player.step({ x: direction.x, z: direction.z, jump: keys.has(" ") }, dt);
+      const position = player.position(),
+        material = runtime.surfaceMaterial(position, player.body);
+      if (player.grounded) {
+        if (!wasGrounded) input.audio?.play("land", material, 0.65);
+        walked += Math.hypot(position.x - previous.x, position.z - previous.z);
+        if (walked >= 1.1) {
+          walked = 0;
+          input.audio?.play("step", material, 0.3);
+        }
+      } else walked = 0;
+      previous = position;
+      wasGrounded = player.grounded;
       if (input.grabRequested) {
         input.grabRequested = false;
         input.message = "";
         if (grab.body) {
-          grab.release();
-          input.held = null;
+          try {
+            grab.drop();
+            input.held = null;
+            input.message = "已放下";
+          } catch (error) {
+            input.message =
+              error instanceof Error ? error.message : "这里不能放下";
+          }
         } else {
           const object = runtime.scene.objects.find(
             (o) => o.id === input.selected,
@@ -78,7 +109,38 @@ export function PlaygroundPlayer({
           }
         }
       }
+      if (input.tossRequested) {
+        input.tossRequested = false;
+        try {
+          grab.toss(facing.current);
+          input.message = "已轻轻抛出";
+        } catch (error) {
+          input.message =
+            error instanceof Error ? error.message : "暂时不能抛出";
+        }
+      }
+      if (input.pushRequested) {
+        input.pushRequested = false;
+        const object = runtime.scene.objects.find(
+          (o) => o.id === input.selected,
+        );
+        const definition = runtime.scene.definitions.find(
+          (d) =>
+            d.id === object?.definitionId &&
+            d.version === object.definitionVersion,
+        );
+        try {
+          if (!object || !definition?.abilities.includes("grabbable"))
+            throw new Error("先点选一个可以推动的物品");
+          grab.push(runtime.bodies.get(object.id)!);
+          input.message = "已轻推物品";
+        } catch (error) {
+          input.message =
+            error instanceof Error ? error.message : "暂时不能推动";
+        }
+      }
       grab.step(facing.current, dt);
+      input.preview = grab.previewDrop();
       if (!grab.body) input.held = null;
       if (player.position().y < -5) {
         grab.release();
@@ -105,10 +167,13 @@ export function PlaygroundPlayer({
           "arrowleft",
           "arrowright",
           "e",
+          "q",
         ].includes(key)
       )
         event.preventDefault();
+      if (input.paused) return;
       if (key === "e" && !event.repeat) input.grabRequested = true;
+      else if (key === "q" && !event.repeat) input.tossRequested = true;
       else input.keys.add(key);
     };
     const keyup = (event: KeyboardEvent) =>
@@ -116,6 +181,8 @@ export function PlaygroundPlayer({
     const clear = () => {
       input.keys.clear();
       input.grabRequested = false;
+      input.tossRequested = false;
+      input.pushRequested = false;
     };
     window.addEventListener("keydown", keydown);
     window.addEventListener("keyup", keyup);
@@ -132,12 +199,30 @@ export function PlaygroundPlayer({
       actor.current = null;
       input.position = null;
       input.held = null;
+      input.preview = null;
       runtime.removeCharacter("local-player");
     };
   }, [runtime, input, beforeStep, camera, forward, right, direction]);
   useFrame(() => {
     if (!mesh.current || !actor.current) return;
     const position = actor.current.position();
+    if (lastPosition.current && input.followCamera && controls) {
+      const orbit = controls as unknown as {
+        target: Vector3;
+        update: () => void;
+      };
+      const dx = position.x - lastPosition.current.x,
+        dy = position.y - lastPosition.current.y,
+        dz = position.z - lastPosition.current.z;
+      camera.position.x += dx;
+      camera.position.y += dy;
+      camera.position.z += dz;
+      orbit.target.x += dx;
+      orbit.target.y += dy;
+      orbit.target.z += dz;
+      orbit.update();
+    }
+    lastPosition.current = position;
     input.position = position;
     mesh.current.position.copy(position);
     mesh.current.rotation.y = Math.atan2(facing.current.x, facing.current.z);
