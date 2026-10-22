@@ -228,3 +228,5 @@ export interface TutorStatus {
 }
 export * from "./learning.js";
 export * from "./exploration.js";
+
+export * from "./training.js";

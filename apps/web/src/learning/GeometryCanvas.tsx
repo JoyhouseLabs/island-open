@@ -9,7 +9,7 @@ import {
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Line, Edges } from "@react-three/drei";
 import { type GeometryWork, solidFacts } from "@island/contracts";
-export type Highlight = "all" | "base" | "sides" | "vertices" | "height";
+export type Highlight = "none" | "all" | "base" | "sides" | "vertices" | "height";
 class VisualBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }
@@ -154,18 +154,22 @@ export default function GeometryCanvas({
   progress,
   highlight,
   target,
+  label,
+  support,
 }: {
   work: GeometryWork;
   progress: number;
   highlight: Highlight;
   target?: Pick<GeometryWork, "solid" | "height" | "size">;
+  label?: string;
+  support?: GeometryWork["solid"];
 }) {
   // A course owns one small scene; leaving the activity unmounts the Canvas.
   return (
     <VisualBoundary>
       <div
         className="geometry-canvas"
-        aria-label={`${solidFacts[work.solid].name}三维模型`}
+        aria-label={label ?? `${solidFacts[work.solid].name}三维模型`}
       >
         <Canvas
           frameloop="demand"
@@ -179,7 +183,8 @@ export default function GeometryCanvas({
           <ambientLight intensity={1.5} />
           <directionalLight position={[4, 8, 5]} intensity={2.4} />
           <Suspense fallback={null}>
-            <Solid work={work} progress={progress} highlight={highlight} />
+            {support && <Solid work={{ ...work, solid: support, height: 1.2, size: 0.65 }} progress={1} highlight="none" />}
+            <group position={[0, support ? 1.2 : 0, 0]}><Solid work={work} progress={progress} highlight={highlight} /></group>
             {target && (
               <group position={[3.5, 0, 0]}>
                 <Solid

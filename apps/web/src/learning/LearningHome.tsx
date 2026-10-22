@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type { LearningCatalog, LearningSession } from "@island/contracts";
 import { api } from "../api";
-import { useLearner } from "./LearningLayout";
+import { useLearner, useAdaptiveLearning } from "./LearningLayout";
 import { readReturn } from "./travel";
 import CatPicture from "./CatPicture";
 export default function LearningHome() {
+  const adaptiveLearning = useAdaptiveLearning();
   const user = useLearner(),
     navigate = useNavigate(),
     { lessonId } = useParams(),
@@ -52,6 +53,7 @@ export default function LearningHome() {
         </div>
         <CatPicture />
       </section>
+      {adaptiveLearning && !lessonId && <section className="learn-current"><div><span className="learn-eyebrow">新的学习方式</span><h2>选一个目标，开始系统练习</h2><p>学生几何与成人回应练习 · 个人计划、每次反馈、补练与回顾</p></div><Link className="learn-primary" to="/learn/programs">打开训练中心 →</Link></section>}
       {error && (
         <div className="learn-error" role="alert">
           {error} <button onClick={load}>重新读取</button>

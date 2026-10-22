@@ -4,13 +4,14 @@ import type { AuthConfig, User } from "@island/contracts";
 import { api, RequestError } from "../api";
 import "./learning.css";
 export function useLearner() {
-  return useOutletContext<{ user: User }>().user;
+  return useOutletContext<{ user: User; adaptiveLearning: boolean }>().user;
 }
 export default function LearningLayout() {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null),
     [config, setConfig] = useState<AuthConfig | null>(null),
     [ready, setReady] = useState(false),
+    [adaptiveLearning, setAdaptiveLearning] = useState(false),
     [enabled, setEnabled] = useState(false),
     [error, setError] = useState("");
   async function load() {
@@ -18,11 +19,12 @@ export default function LearningLayout() {
     setError("");
     try {
       const [caps, auth] = await Promise.all([
-        api<{ features?: { learning?: boolean } }>("/capabilities"),
+        api<{ features?: { learning?: boolean; adaptiveLearning?: boolean } }>("/capabilities"),
         api<AuthConfig>("/auth/config"),
       ]);
       setEnabled(!!caps.features?.learning);
       setConfig(auth);
+      setAdaptiveLearning(!!caps.features?.adaptiveLearning);
       setUser(
         await api<User>("/auth/me").catch((e) => {
           if (e instanceof RequestError && e.status === 401) return null;
@@ -93,8 +95,10 @@ export default function LearningLayout() {
           )}
         </section>
       ) : (
-        <Outlet context={{ user }} />
+        <Outlet context={{ user, adaptiveLearning }} />
       )}
     </main>
   );
 }
+
+export function useAdaptiveLearning() { return useOutletContext<{ adaptiveLearning: boolean }>().adaptiveLearning; }

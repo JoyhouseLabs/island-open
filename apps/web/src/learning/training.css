@@ -1,0 +1,215 @@
+.training-content {
+  max-width: 1120px;
+}
+.training-content > .learn-eyebrow {
+  display: block;
+  margin-top: 30px;
+}
+.training-hero {
+  margin: 24px 0;
+  padding: clamp(24px, 5vw, 56px);
+  background: linear-gradient(125deg, #e0e9d7, #efe6d7);
+  border-radius: 28px;
+}
+.training-hero p {
+  max-width: 600px;
+}
+.training-cycle,
+.training-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.training-cycle {
+  margin-top: 30px;
+}
+.training-cycle span {
+  background: #ffffff90;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+.training-package h2 {
+  margin-top: 16px;
+}
+.training-package.adult {
+  background: #f3eee6;
+}
+.training-preferences {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  border: 1px solid #cad5c6;
+  padding: 16px 20px 22px;
+  border-radius: 16px;
+  margin: 22px 0;
+}
+.training-preferences label {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  gap: 8px;
+}
+.training-content select,
+.training-content input[type="number"],
+.training-content textarea {
+  width: 100%;
+  min-height: 44px;
+  background: #fffdf8;
+  border: 1px solid #a9bbad;
+  color: #294c40;
+  border-radius: 10px;
+  padding: 10px;
+  font: inherit;
+}
+.training-content textarea {
+  min-height: 100px;
+  margin-top: 10px;
+  resize: vertical;
+}
+.training-path {
+  list-style: none;
+  padding: 0;
+}
+.training-path > li {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #fffdf6;
+  border: 1px solid #dce3d6;
+  padding: 20px;
+  border-radius: 18px;
+  margin: 12px 0;
+}
+.training-path h3,
+.training-path p {
+  margin: 0 0 5px;
+}
+.training-path > li > div {
+  flex: 1;
+}
+.training-number {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  background: #e3ebd5;
+  border-radius: 50%;
+}
+.training-notice {
+  background: #e9eedf;
+  padding: 16px 20px;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.training-objective {
+  font-size: 20px;
+  color: #547363;
+}
+.training-lab {
+  padding: 22px;
+  background: #edf2e9;
+  border-radius: 20px;
+  margin: 24px 0;
+}
+.training-diagram {
+  display: block;
+  width: 100%;
+  height: 280px;
+  max-width: 440px;
+  margin: auto;
+}
+.training-range {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.training-questions {
+  margin: 24px 0;
+  padding: 0;
+  border: 0;
+}
+.training-questions > legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.training-questions fieldset {
+  border: 1px solid #ccd7c7;
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 22px;
+}
+.training-questions fieldset legend {
+  font-weight: 650;
+  padding: 0 8px;
+}
+.training-questions label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  margin: 6px 0;
+  background: #fffdf8;
+  cursor: pointer;
+}
+.training-questions label.selected {
+  background: #dce9cb;
+  outline: 1px solid #6e8b64;
+}
+.training-questions input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #456d50;
+}
+.training-explanation {
+  display: block;
+  margin: 24px 0;
+}
+.training-result {
+  margin-top: 28px;
+  padding: 28px;
+  background: #e0ead7;
+  border-radius: 20px;
+}
+.training-result h2 {
+  margin-top: 12px;
+  font-size: 22px;
+}
+.training-history {
+  padding-left: 24px;
+}
+.training-history li {
+  padding: 12px 0;
+  border-bottom: 1px solid #dce3d6;
+}
+.training-history p {
+  margin: 6px 0;
+}
+@media (max-width: 600px) {
+  .training-path > li {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .training-path > li > button {
+    width: 100%;
+  }
+  .training-lab {
+    padding: 14px;
+  }
+  .training-cycle {
+    gap: 6px;
+  }
+  .training-cycle span {
+    padding: 7px 10px;
+  }
+  .training-actions button {
+    flex: 1 1 auto;
+  }
+}

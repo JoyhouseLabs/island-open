@@ -7,6 +7,9 @@ const VisitSession = lazy(() => import("./VisitSession"));
 const GameChrome = lazy(() => import("./GameChrome"));
 const LearningLayout = lazy(() => import("./learning/LearningLayout"));
 const LearningHome = lazy(() => import("./learning/LearningHome"));
+const TrainingCenter = lazy(() => import("./learning/TrainingCenter"));
+const TrainingPlan = lazy(() => import("./learning/TrainingPlan"));
+const TrainingPlayer = lazy(() => import("./learning/TrainingPlayer"));
 const LearningPlayer = lazy(() => import("./learning/LearningPlayer"));
 const WildernessPage = lazy(() => import("./pages/WildernessPage"));
 const IslandPage = lazy(() => import("./pages/IslandPage"));
@@ -114,6 +117,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to={paths.island} replace />} />
           <Route element={<LearningLayout />}>
+            <Route path="/learn/programs" element={<TrainingCenter />} />
+            <Route path="/learn/programs/:programId" element={<TrainingCenter />} />
+            <Route path="/learn/plans/:planId" element={<TrainingPlan />} />
+            <Route path="/learn/reports/:planId" element={<TrainingPlan />} />
+            <Route path="/learn/attempts/:attemptId" element={<TrainingPlayer />} />
             <Route path="/learn" element={<LearningHome />} />
             <Route path="/learn/lessons/:lessonId" element={<LearningHome />} />
             <Route path="/learn/sessions/:sessionId" element={<LearningPlayer />} />
