@@ -222,3 +222,35 @@ describe("wildlife and exploration journal", () => {
     expect(wildIdentity("unknown")).toBeNull();
   });
 });
+
+it("keeps departure blocked through a lost save response and resolves device conflicts explicitly", async () => {
+  const remote = server(),
+    disk = storage();
+  let lose = true;
+  const journal = new ExplorationJournal("departure", 717, disk, {
+    read: remote.read,
+    save: async (request) => {
+      const result = await remote.save(request);
+      if (lose) {
+        lose = false;
+        throw Error("lost response");
+      }
+      return result;
+    },
+  });
+  await journal.load();
+  journal.update({ ...journal.state, position: packPosition(50, 40) });
+  await expect(journal.saveBeforeLeave()).rejects.toThrow("尚未同步");
+  await journal.saveBeforeLeave();
+  expect((await remote.read()).revision).toBe(1);
+  const other = new ExplorationJournal("other", 717, storage(), remote);
+  await other.load();
+  other.update({ ...other.state, position: packPosition(51, 40) });
+  await other.saveBeforeLeave();
+  journal.update({ ...journal.state, position: packPosition(52, 40) });
+  await expect(journal.saveBeforeLeave()).rejects.toThrow("另一台设备");
+  await journal.resolve("cloud");
+  await journal.saveBeforeLeave();
+  expect(unpackPosition(journal.state)).toEqual({ x: 51, z: 40 });
+  expect(disk.getItem("departure:backup")).toContain('"x":52');
+});

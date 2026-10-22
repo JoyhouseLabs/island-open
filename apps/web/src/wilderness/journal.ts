@@ -189,6 +189,18 @@ export class ExplorationJournal {
     });
     return this.busy;
   }
+  async saveBeforeLeave() {
+    await this.load();
+    await this.flush();
+    if (this.remote && (this.status !== "synced" || this.dirty || this.pending))
+      throw new Error(
+        this.status === "conflict"
+          ? "请先处理另一台设备的探索进度，再返回公园"
+          : "探索进度尚未同步，请重试保存后返回公园",
+      );
+    if (this.storageFailed)
+      throw new Error("本机保存失败，请保持页面打开并重试");
+  }
   private async send() {
     const request = this.pending ?? {
       revision: this.revision,

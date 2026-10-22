@@ -41,6 +41,7 @@ export default function PhysicsWalker({
   avatar,
   report,
   onStatus,
+  paused = false,
 }: {
   seed: number;
   stream: WildStream;
@@ -51,6 +52,7 @@ export default function PhysicsWalker({
   avatar: AvatarConfig;
   report(p: ExplorePosition): void;
   onStatus(ready: boolean, error?: string): void;
+  paused?: boolean;
 }) {
   const body = useRef<T.Group>(null),
     controls = useRef<ElementRef<typeof OrbitControls>>(null),
@@ -157,7 +159,7 @@ export default function PhysicsWalker({
     gl.domElement.dataset.physicsRegions = String(world.stats.regions);
     gl.domElement.dataset.physicsColliders = String(world.stats.colliders);
     gl.domElement.dataset.physicsTick = String(world.runtime.tick);
-    if (!ready.current || document.hidden) {
+    if (!ready.current || document.hidden || paused) {
       world.runtime.pauseClock();
       return;
     }

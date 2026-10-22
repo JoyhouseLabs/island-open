@@ -42,3 +42,19 @@ export type ExplorationRecord = {
   mutationId: string | null;
 };
 export type SaveExploration = z.infer<typeof saveExplorationSchema>;
+
+export const physicsExplorationRecordSchema = z
+  .object({
+    seed: z.number().int(),
+    revision: z.number().int().nonnegative(),
+    state: explorationStateSchema.nullable(),
+    mutationId: z.string().uuid().nullable(),
+  })
+  .strict()
+  .refine(
+    (record) => !record.state || record.state.seed === record.seed,
+    "探索种子不一致",
+  );
+export type PhysicsExplorationRecord = z.infer<
+  typeof physicsExplorationRecordSchema
+>;

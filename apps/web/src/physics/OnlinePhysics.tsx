@@ -1,3 +1,4 @@
+import PhysicsLogin from "./PhysicsLogin";
 import { homePath, visitPath, type PhysicsEntry } from "./routes";
 import DinosaurGuide, { type DinosaurFocus } from "./DinosaurGuide";
 import { dinosaurHabitats } from "@island/world-core";
@@ -61,7 +62,6 @@ export default function OnlinePhysics({
     [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [name, setName] = useState("旅人"),
     [world, setWorld] = useState<World | null>(null),
     [items, setItems] = useState<Array<{ id: string; name: string }>>([]);
   const [conn, setConn] = useState<PhysicsConnection | null>(null),
@@ -297,6 +297,31 @@ export default function OnlinePhysics({
     keys.clear();
     setReading(mode);
   }
+  async function exploreWilderness() {
+    if (
+      !world?.owner ||
+      !conn?.scene ||
+      busy ||
+      conn.editing ||
+      conn.editPending ||
+      conn.pending
+    )
+      return;
+    const generation = ++switchGeneration.current;
+    setBusy(true);
+    setError("");
+    keys.clear();
+    try {
+      await conn.saveBeforeLeave();
+      if (generation === switchGeneration.current)
+        go(`/dinosaur/explore?world=${encodeURIComponent(world.id)}`);
+    } catch (e) {
+      if (generation === switchGeneration.current)
+        setError((e as Error).message);
+    } finally {
+      if (generation === switchGeneration.current) setBusy(false);
+    }
+  }
   async function visitLearning() {
     if (
       !world?.owner ||
@@ -332,7 +357,7 @@ export default function OnlinePhysics({
       if (generation === switchGeneration.current) setBusy(false);
     }
   }
-  async function login(development: boolean) {
+  async function login(development: boolean, name: string) {
     setBusy(true);
     setError("");
     try {
@@ -493,36 +518,7 @@ export default function OnlinePhysics({
           <Link to="/physics">先去本地游乐场</Link>
         </section>
       ) : !user ? (
-        <section className="physics-login">
-          <h2>登录后进入世界</h2>
-          <p>世界会保存到账号；参观也需要一个名字。</p>
-          {auth?.joyhouse && (
-            <a
-              href={`/api/auth/joyhouse/start?returnTo=${encodeURIComponent(location.pathname + location.search)}`}
-            >
-              微信登录并返回
-            </a>
-          )}
-          {auth?.development && (
-            <button disabled={busy} onClick={() => void login(true)}>
-              本地开发账号登录
-            </button>
-          )}
-          <label>
-            你的名字
-            <input
-              value={name}
-              maxLength={12}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <button
-            disabled={busy || !name.trim()}
-            onClick={() => void login(false)}
-          >
-            以访客身份进入
-          </button>
-        </section>
+        <PhysicsLogin auth={auth} busy={busy} login={login} />
       ) : !worldId && entry === "home" ? (
         <p role="status">正在准备你的家园…</p>
       ) : !worldId ? (
@@ -626,6 +622,19 @@ export default function OnlinePhysics({
                 >
                   公园导览 · 四处发现
                 </button>
+                {world?.owner && (
+                  <button
+                    disabled={
+                      busy ||
+                      conn.editing ||
+                      !!conn.editPending ||
+                      !!conn.pending
+                    }
+                    onClick={() => void exploreWilderness()}
+                  >
+                    探索外围
+                  </button>
+                )}
                 <span>也可以点击园区标牌、蛋巢或动物，打开观察介绍。</span>
               </section>
             )}

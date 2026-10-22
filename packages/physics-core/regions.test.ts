@@ -211,3 +211,30 @@ describe("procedural physical regions", () => {
     }
   });
 });
+
+it("restores the full capsule above sloped terrain without shifting the saved location", async () => {
+  const seed = 1669790777,
+    x = 48,
+    z = 26.9;
+  const world = await PhysicsRegionWorld.create({ x, y: 30, z });
+  try {
+    for (const c of wildRing({ x: 0, z: 0 }, 1))
+      world.mount(
+        wildPhysicsRegion(seed, generateWildChunk(seed, c), { x: 0, z: 0 }),
+      );
+    world.refreshQueries();
+    world.placeOnSurface(x, z);
+    expect(world.player.position().x).toBeCloseTo(x, 4);
+    expect(world.player.position().z).toBeCloseTo(z, 4);
+    for (let i = 0; i < 60; i++)
+      world.runtime.step((dt) =>
+        world.player.step({ x: 0, z: 0, jump: false }, dt),
+      );
+    expect(world.player.grounded).toBe(true);
+    expect(world.player.position().y).toBeGreaterThan(
+      wildHeight(seed, x, z) + 0.8,
+    );
+  } finally {
+    world.dispose();
+  }
+});

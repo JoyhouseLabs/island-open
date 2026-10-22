@@ -27,6 +27,7 @@ const TrainingCenter = lazy(() => import("./learning/TrainingCenter"));
 const TrainingPlan = lazy(() => import("./learning/TrainingPlan"));
 const TrainingPlayer = lazy(() => import("./learning/TrainingPlayer"));
 const LearningPlayer = lazy(() => import("./learning/LearningPlayer"));
+const PhysicsWilderness = lazy(() => import("./physics/PhysicsWilderness"));
 const WildernessPage = lazy(() => import("./pages/WildernessPage"));
 const IslandPage = lazy(() => import("./pages/IslandPage"));
 const SubScenePage = lazy(() => import("./pages/SubScenePage"));
@@ -104,6 +105,7 @@ export default function App() {
       (key) => location.pathname.replace(/\/+$/, "") === `/${key}`,
     ) ||
     location.pathname.startsWith("/visit/") ||
+    location.pathname === paths.wilderness ||
     location.pathname === "/worlds" ||
     location.pathname === "/";
   useEffect(() => {
@@ -233,8 +235,13 @@ export default function App() {
               />
             ))}
           </Route>
+          <Route
+            path={paths.wilderness}
+            element={physical ? <PhysicsWilderness /> : <HomeSession />}
+          >
+            {!physical && <Route index element={<WildernessPage />} />}
+          </Route>
           <Route element={<HomeSession />}>
-            <Route path={paths.wilderness} element={<WildernessPage />} />
             <Route path="/place/:sceneId" element={<PlacePage />} />
             <Route path="/books" element={<BooksPage />} />
             <Route path="/books/:bookId" element={<BookReaderPage />} />

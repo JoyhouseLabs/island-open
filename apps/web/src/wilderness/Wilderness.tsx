@@ -63,12 +63,14 @@ export default function Wilderness({
   avatar,
   onExit,
   journal,
+  paused = false,
 }: {
   seed: number;
   low: boolean;
   avatar: AvatarConfig | null;
   onExit(): void;
   journal: ExplorationJournal;
+  paused?: boolean;
 }) {
   const position = useRef<Position>(unpackPosition(journal.state)),
     input = useRef<Input>({
@@ -158,6 +160,7 @@ export default function Wilderness({
   const resolve = async (choice: "local" | "cloud") => {
     await journal.resolve(choice);
     if (choice === "cloud" && journal.status === "synced") {
+      setPhysicsStatus({ ready: false, error: "" });
       input.current.keys.clear();
       input.current.touch = "";
       input.current.jump = false;
@@ -199,6 +202,7 @@ export default function Wilderness({
     ]);
     const down = (e: KeyboardEvent) => {
       if (
+        paused ||
         !codes.has(e.code) ||
         (e.code === "Space" &&
           (e.target as HTMLElement)?.closest("button,a")) ||
@@ -231,7 +235,7 @@ export default function Wilderness({
       window.removeEventListener("blur", clear);
       document.removeEventListener("visibilitychange", clear);
     };
-  }, []);
+  }, [paused]);
   const ready = wildRing(center, 1).every((c) =>
     stream.chunks.has(chunkKey(c)),
   );
@@ -254,6 +258,7 @@ export default function Wilderness({
   return (
     <main
       className="wild-page"
+      inert={paused}
       data-testid="wilderness"
       data-chunk={chunkKey(center)}
       data-loaded={stream.chunks.size}
@@ -309,6 +314,7 @@ export default function Wilderness({
             />
           ))}
         <PhysicsWalker
+          paused={paused}
           seed={seed}
           stream={stream}
           center={center}

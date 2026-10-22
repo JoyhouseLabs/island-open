@@ -442,3 +442,23 @@
 .wild-loading { pointer-events: none; }
 .wild-loading > div { display: grid; gap: 12px; justify-items: center; max-width: 80vw; }
 .wild-loading button { pointer-events: auto; }
+
+
+.wild-navigation-status {
+  position: fixed;
+  z-index: 80;
+  top: 95px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #adc0a7;
+  border-radius: 12px;
+  background: #fff8e8;
+  color: #294336;
+}
+.wild-navigation-status button {
+  margin-left: 12px;
+  min-height: 44px;
+}

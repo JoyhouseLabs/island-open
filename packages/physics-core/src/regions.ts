@@ -210,11 +210,13 @@ export class PhysicsRegionWorld {
       [0, 2],
       [0, -2],
     ]) {
-      const hit = this.runtime.world.castRay(
-        new RAPIER.Ray(
-          { x: x + dx!, y: 128, z: z + dz! },
-          { x: 0, y: -1, z: 0 },
-        ),
+      // Sweep the capsule, not a point: its rounded base needs extra clearance on slopes.
+      const hit = this.runtime.world.castShape(
+        { x: x + dx!, y: 128, z: z + dz! },
+        identityQuaternion,
+        { x: 0, y: -1, z: 0 },
+        this.player.collider.shape,
+        0,
         256,
         true,
         RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
@@ -225,7 +227,7 @@ export class PhysicsRegionWorld {
       if (!hit) continue;
       const position = {
         x: x + dx!,
-        y: 128 - hit.timeOfImpact + 0.87,
+        y: 128 - hit.time_of_impact + 0.02,
         z: z + dz!,
       };
       let free = true;
