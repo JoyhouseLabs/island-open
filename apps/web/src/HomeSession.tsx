@@ -62,7 +62,7 @@ export default function HomeSession() {
   const recordId = world.record?.id,
     userName = world.user?.name,
     scene =
-      Object.entries(paths).find(([, p]) => p === location.pathname)?.[0] ??
+      Object.entries(paths).find(([, p]) => p === location.pathname.replace(/\/+$/, ""))?.[0] ??
       "island";
   useEffect(() => {
     growth.bind(world.user?.id ?? null);

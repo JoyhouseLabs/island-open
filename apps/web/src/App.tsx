@@ -101,7 +101,7 @@ export default function App() {
   return (
     <PageBoundary path={location.pathname}>
       {/* One chat panel for every mode: host or visitor, any scene. */}
-      {location.pathname !== paths.wilderness && <><PlayerChat /><GatePrompt /><SceneTransitionVeil /></>}
+      {location.pathname.replace(/\/+$/, "") !== paths.wilderness && <><PlayerChat /><GatePrompt /><SceneTransitionVeil /></>}
       <Suspense
         fallback={
           <div className="scene-loading" role="status">
