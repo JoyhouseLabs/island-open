@@ -1,5 +1,9 @@
 import { useForage } from "./useForage";
 import { PhysicsAudio } from "./PhysicsAudio";
+import { dialogue, useNpcChat } from "../dialogue/store";
+import { personaFor } from "../animals/personas";
+import type { Resident } from "@island/world-core";
+const NpcChat = lazy(() => import("../dialogue/NpcChat"));
 import type { SubjectId } from "@island/contracts";
 import { useAccountInventory } from "../activities/useAccountInventory";
 import PublishedPlaces from "./PublishedPlaces";
@@ -84,12 +88,16 @@ export default function OnlinePhysics({
   const [backpack, setBackpack] = useState(false);
   const [dressing, setDressing] = useState(false);
   const [card, setCard] = useState<SubjectId | null>(null);
+  const [nearResident, setNearResident] = useState<Resident | null>(null),
+    [notice, setNotice] = useState("");
+  const npcChat = useNpcChat();
   const overlayOpen =
     !!reading ||
     dinosaurFocus !== null ||
     dressing ||
     backpack ||
-    card !== null;
+    card !== null ||
+    npcChat !== null;
   const forage = useForage(
     conn,
     inventory,
@@ -113,6 +121,20 @@ export default function OnlinePhysics({
     keys.clear();
     setBackpack(false);
     setCard(`forage:${kind}` as SubjectId);
+  };
+  const talkResident = (resident: Resident) => {
+    keys.clear();
+    const scene = conn?.scene;
+    if (!scene) return;
+    const persona = personaFor(
+      `${scene.template.id.replace(/^core:/, "")}-${resident.name}`,
+    );
+    if (!persona) {
+      setNotice("伙伴们的悄悄话功能还没有开放");
+      return;
+    }
+    setNotice("");
+    dialogue.openDeepChat(persona);
   };
   const sceneNav = useRef<HTMLElement>(null);
   const inspectDinosaur = (id: DinosaurFocus) => {
@@ -591,6 +613,8 @@ export default function OnlinePhysics({
               night={night}
               conn={conn}
               keys={keys}
+              talkResident={talkResident}
+              residentNear={setNearResident}
               selected={selected}
               select={(id) => {
                 select(id);
@@ -670,6 +694,15 @@ export default function OnlinePhysics({
                 {forage.message}
               </p>
             )}
+            {nearResident && !npcChat && !conn.editing && (
+              <button
+                className="physics-sound"
+                onClick={() => talkResident(nearResident)}
+              >
+                和{nearResident.name}说说话
+              </button>
+            )}
+            {notice && <p role="status">{notice}</p>}
             {forage.spots.length > 0 && (
               <p>
                 散落着 {forage.spots.length}{" "}
@@ -1129,6 +1162,11 @@ export default function OnlinePhysics({
               setCard(null);
             }}
           />
+        </Suspense>
+      )}
+      {npcChat && user && (
+        <Suspense fallback={null}>
+          <NpcChat />
         </Suspense>
       )}
       {backpack && user && (

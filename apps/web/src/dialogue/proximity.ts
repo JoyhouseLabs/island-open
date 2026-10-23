@@ -11,6 +11,9 @@ class ProximityStore {
     season: "summer",
     night: false,
   };
+  /** Only the legacy world reports a real environment; other pages must not
+   *  claim a season or weather the island does not actually have. */
+  envKnown = false;
   private listeners = new Set<() => void>();
   private version = 0;
   subscribe = (cb: () => void) => {
@@ -32,6 +35,7 @@ class ProximityStore {
   }
   setEnv(env: { weather: string; season: string; night: boolean }) {
     this.env = env;
+    this.envKnown = true;
   }
 }
 

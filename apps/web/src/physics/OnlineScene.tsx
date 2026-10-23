@@ -1,5 +1,7 @@
 import PhysicsForage from "./PhysicsForage";
+import PhysicsResidents from "./PhysicsResidents";
 import type { PhysicsForageSpot } from "@island/contracts";
+import type { Resident } from "@island/world-core";
 import PhysicsAvatar from "./PhysicsAvatar";
 import ThemeAmbience from "./ThemeAmbience";
 import GardenAmbience from "./GardenAmbience";
@@ -146,6 +148,8 @@ function Contents({
   inspectDinosaur,
   forageSpots,
   inspectForage,
+  talkResident,
+  residentNear,
 }: {
   forageSpots: PhysicsForageSpot[];
   inspectForage(kind: string): void;
@@ -159,6 +163,8 @@ function Contents({
   select: (id: string) => void;
   draft: PhysicsDraft | null;
   placeAt: (position: Position, normal?: Position) => void;
+  talkResident(resident: Resident): void;
+  residentNear(resident: Resident | null): void;
 }) {
   const { camera, controls } = useThree();
   const forward = useMemo(() => new Vector3(), []),
@@ -373,6 +379,16 @@ function Contents({
       {!conn.editing && (
         <PhysicsForage spots={forageSpots} inspect={inspectForage} />
       )}
+      {!conn.editing && (
+        <PhysicsResidents
+          templateId={scene.template.id}
+          terrain={scene.terrain}
+          paused={paused}
+          player={() => conn.me?.position ?? null}
+          onTalk={talkResident}
+          onNearChange={residentNear}
+        />
+      )}
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
@@ -476,6 +492,8 @@ export default function OnlineScene(props: {
   select: (id: string) => void;
   draft: PhysicsDraft | null;
   placeAt: (position: Position, normal?: Position) => void;
+  talkResident(resident: Resident): void;
+  residentNear(resident: Resident | null): void;
 }) {
   const scene = props.conn.scene!;
   return (

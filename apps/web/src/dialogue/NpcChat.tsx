@@ -101,11 +101,15 @@ export default function NpcChat() {
     setError("");
     setMessages((m) => [...m, { role: "user", content: text }]);
     setStreaming(true);
-    const env = {
-      weather: proximity.env.weather as Weather,
-      season: proximity.env.season as Season,
-      hour: proximity.env.night ? 21 : 10,
-    };
+    // Only pages with a real environment report it; others let the speaker
+    // talk without a fabricated season or weather.
+    const env = proximity.envKnown
+      ? {
+          weather: proximity.env.weather as Weather,
+          season: proximity.env.season as Season,
+          hour: proximity.env.night ? 21 : 10,
+        }
+      : undefined;
     setMessages((m) => [...m, { role: "assistant", content: "" }]);
     let reply = "";
     void streamChat(

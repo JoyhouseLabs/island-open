@@ -109,6 +109,14 @@ class DialogueStore {
     this.bump();
   }
 
+  /** Opens the deep chat directly. The physics rooms have no scripted
+   *  greeting stage; they click (or walk up to) a resident instead. */
+  openDeepChat(persona: SpeakerPersona) {
+    if (this.open || this.npc || this.playerChat) return;
+    this.npc = { ...persona, speakerId: persona.subject };
+    this.bump();
+  }
+
   /** Is the player in any kind of conversation with one agent — script
    *  dialogue or the deep chat that follows? Animals freeze while true. */
   talkingWith(id: string) {
