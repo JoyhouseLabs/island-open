@@ -1,5 +1,6 @@
 import PhysicsForage from "./PhysicsForage";
 import PhysicsResidents from "./PhysicsResidents";
+import PhysicsFox from "./PhysicsFox";
 import type { PhysicsForageSpot } from "@island/contracts";
 import type { Resident } from "@island/world-core";
 import PhysicsAvatar from "./PhysicsAvatar";
@@ -150,6 +151,7 @@ function Contents({
   inspectForage,
   talkResident,
   residentNear,
+  talkFox,
 }: {
   forageSpots: PhysicsForageSpot[];
   inspectForage(kind: string): void;
@@ -165,6 +167,7 @@ function Contents({
   placeAt: (position: Position, normal?: Position) => void;
   talkResident(resident: Resident): void;
   residentNear(resident: Resident | null): void;
+  talkFox(): void;
 }) {
   const { camera, controls } = useThree();
   const forward = useMemo(() => new Vector3(), []),
@@ -389,6 +392,17 @@ function Contents({
           onNearChange={residentNear}
         />
       )}
+      {!conn.editing &&
+        !["core:playground", "core:building-yard"].includes(
+          scene.template.id,
+        ) && (
+          <PhysicsFox
+            terrain={scene.terrain}
+            paused={paused}
+            player={() => conn.me?.position ?? null}
+            onTalk={talkFox}
+          />
+        )}
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
@@ -494,6 +508,7 @@ export default function OnlineScene(props: {
   placeAt: (position: Position, normal?: Position) => void;
   talkResident(resident: Resident): void;
   residentNear(resident: Resident | null): void;
+  talkFox(): void;
 }) {
   const scene = props.conn.scene!;
   return (

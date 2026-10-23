@@ -25,7 +25,7 @@ const idleAction = (prefer: Resident["prefer"]): AnimalAction =>
         ? "browse"
         : "sniff";
 
-function groundAt(terrain: PhysicsTerrainTile[], x: number, z: number) {
+export function groundAt(terrain: PhysicsTerrainTile[], x: number, z: number) {
   let best: number | undefined;
   for (const tile of terrain) {
     const h = terrainHeightAt(tile, x, z);

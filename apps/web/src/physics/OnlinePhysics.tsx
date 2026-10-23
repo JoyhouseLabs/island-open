@@ -136,6 +136,16 @@ export default function OnlinePhysics({
     setNotice("");
     dialogue.openDeepChat(persona);
   };
+  const talkFox = () => {
+    keys.clear();
+    const persona = personaFor("fox");
+    if (!persona) {
+      setNotice("伙伴们的悄悄话功能还没有开放");
+      return;
+    }
+    setNotice("");
+    dialogue.openDeepChat(persona);
+  };
   const sceneNav = useRef<HTMLElement>(null);
   const inspectDinosaur = (id: DinosaurFocus) => {
     keys.clear();
@@ -615,6 +625,7 @@ export default function OnlinePhysics({
               keys={keys}
               talkResident={talkResident}
               residentNear={setNearResident}
+              talkFox={talkFox}
               selected={selected}
               select={(id) => {
                 select(id);
@@ -700,6 +711,19 @@ export default function OnlinePhysics({
                 onClick={() => talkResident(nearResident)}
               >
                 和{nearResident.name}说说话
+              </button>
+            )}
+            {!npcChat && !conn.editing && (
+              <button
+                className="physics-sound"
+                disabled={
+                  ["core:playground", "core:building-yard"].includes(
+                    conn.scene.template.id,
+                  )
+                }
+                onClick={talkFox}
+              >
+                小狐狸
               </button>
             )}
             {notice && <p role="status">{notice}</p>}
