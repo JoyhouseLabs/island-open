@@ -1,3 +1,4 @@
+import { useAccountInventory } from "../activities/useAccountInventory";
 import PublishedPlaces from "./PublishedPlaces";
 import PhysicsLogin from "./PhysicsLogin";
 import { homePath, visitPath, type PhysicsEntry } from "./routes";
@@ -25,6 +26,7 @@ import OnlineScene from "./OnlineScene";
 import "./physics.css";
 import { IslandConfigProvider } from "../contentStore";
 import { rememberReturn } from "../learning/travel";
+const AccountBackpack = lazy(() => import("../activities/AccountBackpack"));
 const PhysicsDressing = lazy(() => import("./PhysicsDressing"));
 const Bookshelf = lazy(() => import("../Bookshelf"));
 
@@ -72,8 +74,11 @@ export default function OnlinePhysics({
   const [dinosaurFocus, setDinosaurFocus] = useState<DinosaurFocus | null>(
     null,
   );
+  const inventory = useAccountInventory(user?.id ?? null);
+  const [backpack, setBackpack] = useState(false);
   const [dressing, setDressing] = useState(false);
-  const overlayOpen = !!reading || dinosaurFocus !== null || dressing;
+  const overlayOpen =
+    !!reading || dinosaurFocus !== null || dressing || backpack;
   const [learningEnabled, setLearningEnabled] = useState(false);
   const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
@@ -612,6 +617,18 @@ export default function OnlinePhysics({
               className="physics-sound"
               onClick={() => {
                 keys.clear();
+                setBackpack(true);
+              }}
+            >
+              我的背包
+            </button>
+            {inventory.error && !overlayOpen && (
+              <p role="alert">背包同步：{inventory.error}</p>
+            )}
+            <button
+              className="physics-sound"
+              onClick={() => {
+                keys.clear();
                 setDressing(true);
               }}
             >
@@ -1045,6 +1062,28 @@ export default function OnlinePhysics({
               : "正在连接世界…"}
         </p>
       )}
+      {backpack && user && (
+        <Suspense
+          fallback={
+            <div className="modal-backdrop" role="status">
+              正在打开背包…
+            </div>
+          }
+        >
+          <AccountBackpack
+            key={user.id}
+            inventory={inventory}
+            close={() => {
+              keys.clear();
+              setBackpack(false);
+            }}
+            dress={() => {
+              setBackpack(false);
+              setDressing(true);
+            }}
+          />
+        </Suspense>
+      )}
       {dressing && user && (
         <Suspense
           fallback={
@@ -1054,6 +1093,7 @@ export default function OnlinePhysics({
           }
         >
           <PhysicsDressing
+            inventory={inventory}
             key={user.id}
             close={() => {
               keys.clear();
@@ -1084,6 +1124,7 @@ export default function OnlinePhysics({
             <Bookshelf
               key={user.id}
               userId={user.id}
+              record={inventory.record}
               focusChat={reading === "tutor"}
               onClose={() => {
                 keys.clear();

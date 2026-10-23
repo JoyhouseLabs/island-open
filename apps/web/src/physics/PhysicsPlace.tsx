@@ -385,12 +385,17 @@ export default function PhysicsPlace() {
     setLoaded(null);
     setError("");
     void Promise.all([
-      api<{ places: unknown[] }>("/content/places"),
-      api("/physics/avatar"),
+      api<{ place: unknown }>(
+        `/physics/activities/places/${encodeURIComponent(sceneId ?? "")}`,
+        {
+          method: "POST",
+          body: JSON.stringify({ accountId: activity.user.id }),
+        },
+      ),
+      api(`/physics/avatar?accountId=${activity.user.id}`),
     ])
       .then(([feed, profile]) => {
-        const places = feed.places.map((p) => placeSchema.parse(p)),
-          place = places.find((p) => p.id === sceneId);
+        const place = placeSchema.parse(feed.place);
         if (!place)
           throw new Error("这处小天地尚未安装到你的账号，或已停止发布。");
         const avatar = avatarProfileSchema.parse(profile).avatar;

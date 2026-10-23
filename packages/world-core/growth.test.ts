@@ -25,16 +25,26 @@ test("events fold into counts, stars and deeds; completion happens once", () => 
 
 test("detail-qualified goals only match their own detail", () => {
   let state = emptyGrowth();
-  state = applyGrowthEvent(state, { type: "weather.changed", detail: "sun" }).state;
-  state = applyGrowthEvent(state, { type: "book.page_read", detail: "lunyu-xueer" })
-    .state;
+  state = applyGrowthEvent(state, {
+    type: "weather.changed",
+    detail: "sun",
+  }).state;
+  state = applyGrowthEvent(state, {
+    type: "book.page_read",
+    detail: "lunyu-xueer",
+  }).state;
   const storm = starterTasks.find((t) => t.id === "storm-watcher")!;
   const page = starterTasks.find((t) => t.id === "page-of-light")!;
   expect(state.done[storm.id]).toBeUndefined();
   expect(state.done[page.id]).toBeUndefined();
-  state = applyGrowthEvent(state, { type: "weather.changed", detail: "thunder" }).state;
-  state = applyGrowthEvent(state, { type: "book.page_read", detail: "qianziwen" })
-    .state;
+  state = applyGrowthEvent(state, {
+    type: "weather.changed",
+    detail: "thunder",
+  }).state;
+  state = applyGrowthEvent(state, {
+    type: "book.page_read",
+    detail: "qianziwen",
+  }).state;
   expect(state.done[storm.id]).toBe(true);
   expect(state.done[page.id]).toBe(true);
 });
@@ -51,13 +61,22 @@ test("progress reporting is capped at the goal", () => {
 
 test("detail-free goals aggregate every detail of the same event type", () => {
   let state = emptyGrowth();
-  state = applyGrowthEvent(state, { type: "scene.visited", detail: "library" }).state;
-  state = applyGrowthEvent(state, { type: "scene.visited", detail: "garden" }).state;
+  state = applyGrowthEvent(state, {
+    type: "scene.visited",
+    detail: "library",
+  }).state;
+  state = applyGrowthEvent(state, {
+    type: "scene.visited",
+    detail: "garden",
+  }).state;
   expect(
     state.done["wanderer"],
     "two visits of three should not complete the task",
   ).toBeUndefined();
-  state = applyGrowthEvent(state, { type: "scene.visited", detail: "home" }).state;
+  state = applyGrowthEvent(state, {
+    type: "scene.visited",
+    detail: "home",
+  }).state;
   expect(state.done["wanderer"]).toBe(true);
   expect(state.stars).toBe(2);
 });
@@ -77,4 +96,15 @@ test("stars buy unlocks once, and only when affordable", () => {
   const again = buyUnlock(bought.state, crown.id);
   expect(again.ok).toBe(false);
   expect(again.state.stars).toBe(1);
+});
+
+test("long-lived activity counters stay within the account inventory contract", () => {
+  const state = {
+    ...emptyGrowth(),
+    counts: { "book.opened:qianziwen": 10000 },
+  };
+  expect(
+    applyGrowthEvent(state, { type: "book.opened", detail: "qianziwen" }).state
+      .counts["book.opened:qianziwen"],
+  ).toBe(10000);
 });

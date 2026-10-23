@@ -49,5 +49,6 @@ export const saveAvatarSchema = z
   .object({
     avatar: avatarConfigSchema,
     expectedRevision: z.number().int().nonnegative(),
+    accountId: z.string().uuid().optional(),
   })
   .strict();

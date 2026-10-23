@@ -87,7 +87,10 @@ export function buyUnlock(
       ...state,
       stars: state.stars - def.cost,
       owned: { ...state.owned, [id]: true },
-      deeds: [{ text: `用 ${def.cost}★ 换来了「${def.name}」`, at: now }, ...state.deeds].slice(0, 40),
+      deeds: [
+        { text: `用 ${def.cost}★ 换来了「${def.name}」`, at: now },
+        ...state.deeds,
+      ].slice(0, 40),
     },
     ok: true,
   };
@@ -112,7 +115,10 @@ export function collectItem(
       collected: { ...state.collected, [kind]: had + 1 },
       stars: first ? state.stars + 1 : state.stars,
       deeds: first
-        ? [{ text: `第一次捡到「${name}」`, at: now }, ...state.deeds].slice(0, 40)
+        ? [{ text: `第一次捡到「${name}」`, at: now }, ...state.deeds].slice(
+            0,
+            40,
+          )
         : state.deeds,
     },
   };
@@ -194,12 +200,14 @@ export const starterTasks: TaskDef[] = [
 
 /** Goals without a detail match every event of that type, whatever the
  *  detail — "visit three scenes" counts library, garden and home alike. */
-export function goalCount(counts: Record<string, number>, goal: TaskDef["goal"]): number {
+export function goalCount(
+  counts: Record<string, number>,
+  goal: TaskDef["goal"],
+): number {
   if (goal.detail) return counts[`${goal.event}:${goal.detail}`] ?? 0;
   let n = counts[goal.event] ?? 0;
   const prefix = `${goal.event}:`;
-  for (const [k, v] of Object.entries(counts))
-    if (k.startsWith(prefix)) n += v;
+  for (const [k, v] of Object.entries(counts)) if (k.startsWith(prefix)) n += v;
   return n;
 }
 
@@ -217,7 +225,7 @@ export function applyGrowthEvent(
   now = Date.now(),
 ): { state: GrowthState; completed: TaskDef[] } {
   const counts = { ...state.counts };
-  counts[keyOf(event)] = (counts[keyOf(event)] ?? 0) + 1;
+  counts[keyOf(event)] = Math.min(10000, (counts[keyOf(event)] ?? 0) + 1);
   const completed: TaskDef[] = [];
   const done = { ...state.done };
   let stars = state.stars;
@@ -232,12 +240,22 @@ export function applyGrowthEvent(
   const deeds =
     completed.length > 0
       ? [
-          ...completed.map((t) => ({ text: `完成「${t.title}」 +${t.stars}★`, at: now })),
+          ...completed.map((t) => ({
+            text: `完成「${t.title}」 +${t.stars}★`,
+            at: now,
+          })),
           ...state.deeds,
         ].slice(0, 40)
       : state.deeds;
   return {
-    state: { stars, counts, done, deeds, owned: state.owned, collected: state.collected },
+    state: {
+      stars,
+      counts,
+      done,
+      deeds,
+      owned: state.owned,
+      collected: state.collected,
+    },
     completed,
   };
 }

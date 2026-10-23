@@ -1,3 +1,4 @@
+import type { AccountInventory } from "../activities/useAccountInventory";
 import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
@@ -10,7 +11,13 @@ import { AvatarPreview } from "../player/AvatarModel";
 import { avatarForms, avatarHats, avatarAccents } from "../player/avatar";
 import { api } from "../api";
 
-export default function PhysicsDressing({ close }: { close(): void }) {
+export default function PhysicsDressing({
+  close,
+  inventory,
+}: {
+  close(): void;
+  inventory: AccountInventory;
+}) {
   const dialog = useRef<HTMLDialogElement>(null),
     alive = useRef(true),
     generation = useRef(0);
@@ -25,7 +32,9 @@ export default function PhysicsDressing({ close }: { close(): void }) {
     setError("");
     setMessage("");
     try {
-      const p = avatarProfileSchema.parse(await api("/physics/avatar"));
+      const p = avatarProfileSchema.parse(
+        await api(`/physics/avatar?accountId=${inventory.accountId}`),
+      );
       if (alive.current && request === generation.current) {
         setProfile(p);
         setDraft(p.avatar);
@@ -59,6 +68,7 @@ export default function PhysicsDressing({ close }: { close(): void }) {
           method: "PUT",
           body: JSON.stringify({
             avatar: draft,
+            accountId: inventory.accountId,
             expectedRevision: profile.revision,
           }),
         }),
@@ -80,14 +90,10 @@ export default function PhysicsDressing({ close }: { close(): void }) {
     setError("");
     setMessage("");
     try {
-      await api("/inventory/act", {
-        method: "POST",
-        body: JSON.stringify({
-          idempotencyKey: crypto.randomUUID(),
-          action: { op: "buy", itemId: unlock },
-        }),
-      });
-      const p = avatarProfileSchema.parse(await api("/physics/avatar"));
+      if (!(await inventory.buy(unlock))) return;
+      const p = avatarProfileSchema.parse(
+        await api(`/physics/avatar?accountId=${inventory.accountId}`),
+      );
       if (alive.current) {
         setProfile((previous) =>
           previous
@@ -119,7 +125,9 @@ export default function PhysicsDressing({ close }: { close(): void }) {
           关闭装扮
         </button>
         {message && <p role="status">{message}</p>}
-        {error && <p role="alert">{error}</p>}
+        {(error || inventory.error) && (
+          <p role="alert">{error || inventory.error}</p>
+        )}
       </header>
       <p>形象随账号保存，在自己的世界和朋友的岛上都能使用。</p>
       {profile && draft ? (
@@ -174,10 +182,14 @@ export default function PhysicsDressing({ close }: { close(): void }) {
             </div>
           </fieldset>
           <fieldset disabled={busy}>
-            <legend>帽饰 · {profile.stars} 颗星星</legend>
+            <legend>
+              帽饰 · {inventory.state?.stars ?? profile.stars} 颗星星
+            </legend>
             <div className="physics-actions">
               {avatarHats.map((h) => {
-                const owned = profile.ownedHats.includes(h.id),
+                const owned =
+                    profile.ownedHats.includes(h.id) ||
+                    !!(h.unlockId && inventory.state?.owned[h.unlockId]),
                   cost = unlocks.find((u) => u.id === h.unlockId)?.cost;
                 return (
                   <button

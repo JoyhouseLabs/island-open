@@ -193,7 +193,7 @@ export default function PhysicsWilderness() {
         });
       if (!active) return;
       const [profile, record] = await Promise.all([
-        api("/physics/avatar"),
+        api(`/physics/avatar?accountId=${user.id}`),
         api(`/physics/worlds/${home.id}/exploration`),
       ]);
       const avatar = avatarProfileSchema.parse(profile).avatar,

@@ -19,7 +19,7 @@ import {
   type ChapterMedia,
 } from "@island/contracts";
 import { readDraft, writeDraft } from "./drafts";
-import { emitGrowth } from "./progress/store";
+
 import { speak, stopSpeaking } from "./tutor/speech";
 import {
   TutorChat,
@@ -122,11 +122,15 @@ export default function Bookshelf({
   initialBookId,
   focusChat = false,
   userId,
+  record = (event) => {
+    void import("./progress/store").then(({ emitGrowth }) => emitGrowth(event));
+  },
 }: {
   onClose: () => void;
   initialBookId?: string;
   focusChat?: boolean;
   userId?: string;
+  record?: (event: { type: string; detail?: string }) => void;
 }) {
   const [ready, setReady] = useState(false),
     [books, setBooks] = useState<Book[]>(builtinBooks),
@@ -220,12 +224,12 @@ export default function Bookshelf({
     setChapter(0);
     setLineIndex(0);
     setPlaying(null);
-    emitGrowth({ type: "book.opened", detail: books[i]!.id });
-    emitGrowth({ type: "book.page_read", detail: books[i]!.id });
+    record({ type: "book.opened", detail: books[i]!.id });
+    record({ type: "book.page_read", detail: books[i]!.id });
   };
   const setNote = (text: string) => {
-    if (text.trim() && text !== (data.notes[chapterId] ?? ""))
-      emitGrowth({ type: "note.written" });
+    if (text.trim() && !(data.notes[chapterId] ?? "").trim())
+      record({ type: "note.written" });
     persist({ ...data, notes: { ...data.notes, [chapterId]: text } });
   };
 
@@ -393,7 +397,7 @@ export default function Bookshelf({
                   setChapter((c) => c - 1);
                   setLineIndex(0);
                   setPlaying(null);
-                  emitGrowth({ type: "book.page_read", detail: book.id });
+                  record({ type: "book.page_read", detail: book.id });
                 }}
               >
                 <ArrowLeft size={14} /> 上一页
@@ -406,7 +410,7 @@ export default function Bookshelf({
                   setChapter((c) => c + 1);
                   setLineIndex(0);
                   setPlaying(null);
-                  emitGrowth({ type: "book.page_read", detail: book.id });
+                  record({ type: "book.page_read", detail: book.id });
                 }}
               >
                 下一页 <ArrowRight size={14} />

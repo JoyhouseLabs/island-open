@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 import {
   physicsSceneKeySchema,
@@ -10,7 +10,7 @@ import { IslandConfigProvider } from "../contentStore";
 import PhysicsLogin from "../physics/PhysicsLogin";
 import { homePath } from "../physics/routes";
 import { ActivityContext, type ActivityScope } from "./context";
-import { ActivityEvents } from "./events";
+import { useAccountInventory } from "./useAccountInventory";
 import "../physics/physics.css";
 import "./activities.css";
 function Ready({
@@ -25,35 +25,10 @@ function Ready({
   scene: string;
 }) {
   const [message, notify] = useState("");
-  const events = useMemo(() => {
-    try {
-      return new ActivityEvents(user.id, localStorage, (request) =>
-        api("/inventory/act", {
-          method: "POST",
-          body: JSON.stringify(request),
-        }),
-      );
-    } catch {
-      return null;
-    }
-  }, [user.id]);
+  const inventory = useAccountInventory(user.id);
   useEffect(() => {
-    const flush = () => {
-      if (events)
-        void events
-          .flush()
-          .catch(() =>
-            notify("活动记录尚未同步，本机记录保留，联网后会重试。"),
-          );
-    };
-    flush();
-    window.addEventListener("online", flush);
-    const timer = setInterval(flush, 15000);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("online", flush);
-    };
-  }, [events]);
+    if (inventory.error) notify(inventory.error);
+  }, [inventory.error]);
   const query =
     physical && worldId
       ? `?${new URLSearchParams({ world: worldId, scene })}`
@@ -65,22 +40,7 @@ function Ready({
     library: physical && worldId ? homePath(worldId, "library") : "/library",
     returnTo: physical && worldId ? homePath(worldId, scene) : "/island",
     notify,
-    record(event) {
-      if (!events) {
-        notify("本机活动记录不可用，成长记录暂未保存。");
-        return;
-      }
-      try {
-        events.record(event);
-        void events
-          .flush()
-          .catch(() =>
-            notify("活动记录尚未同步，本机记录保留，联网后会重试。"),
-          );
-      } catch {
-        notify("本机活动记录保存失败，请保持页面打开后重试。");
-      }
-    },
+    record: inventory.record,
   };
   return (
     <ActivityContext.Provider value={value}>

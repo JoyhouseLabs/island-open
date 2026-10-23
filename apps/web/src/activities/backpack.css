@@ -1,0 +1,101 @@
+.account-backpack {
+  width: min(650px, calc(100vw - 24px));
+  max-height: 88dvh;
+  box-sizing: border-box;
+  color: #30483f;
+}
+.account-backpack > header {
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fffdf5;
+}
+.account-backpack button {
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid #bfcdbb;
+  border-radius: 12px;
+  color: inherit;
+  background: white;
+  font: inherit;
+}
+.account-backpack button:disabled {
+  opacity: 0.55;
+}
+.account-backpack nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.account-backpack button[aria-pressed="true"] {
+  background: #e1edd7;
+}
+.backpack-balance {
+  font-size: 22px;
+  font-weight: bold;
+}
+.backpack-sync,
+.backpack-goals li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.backpack-goals {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.backpack-goals li {
+  border: 1px solid #d4decf;
+  padding: 14px;
+  border-radius: 14px;
+}
+.backpack-goals p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.backpack-goals small {
+  display: block;
+  margin-top: 7px;
+}
+.backpack-goals progress {
+  width: 100%;
+  accent-color: #669355;
+}
+.backpack-collection {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.backpack-collection article {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #edf0e4;
+  text-align: center;
+}
+.backpack-collection article > span:first-child {
+  font-size: 28px;
+}
+@media (max-width: 699px) {
+  .account-backpack {
+    padding: 14px;
+  }
+  .backpack-collection {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .account-backpack > header {
+    top: -14px;
+  }
+  .backpack-goals li > div {
+    align-items: start;
+  }
+}

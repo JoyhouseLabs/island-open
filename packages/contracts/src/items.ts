@@ -74,3 +74,7 @@ export const inventoryActSchema = z
     action: inventoryActionSchema,
   })
   .strict();
+
+export const visitPublishedPlaceSchema = z
+  .object({ accountId: z.string().uuid() })
+  .strict();
