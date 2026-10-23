@@ -28,7 +28,16 @@ export const collectForageSchema = forageContextSchema
 export const placeForageContextSchema = z
   .object({ accountId: z.string().uuid() })
   .strict();
-export const collectPlaceForageSchema = placeForageContextSchema
+/** Personal exploration asks for one chunk ring at a time, deterministically
+ * regenerated server-side from the world's seed. */
+export const explorationForageContextSchema = z
+  .object({
+    accountId: z.string().uuid(),
+    chunk: z.string().regex(/^-?\d{1,6},-?\d{1,6}$/),
+  })
+  .strict();
+/** Account-scoped collect body shared by published places and exploration. */
+export const collectAccountForageSchema = placeForageContextSchema
   .extend({ spotId: z.string().min(1).max(80), claimId: z.string().uuid() })
   .strict();
 export const forageAvailabilitySchema = z

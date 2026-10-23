@@ -10,7 +10,12 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as T from "three";
-import { PhysicsRegionWorld, characterProfile } from "@island/physics-core";
+import {
+  PhysicsRegionWorld,
+  canReachForage,
+  characterProfile,
+} from "@island/physics-core";
+import type { PhysicsForageSpot } from "@island/contracts";
 import {
   CHUNK_SIZE,
   chunkAt,
@@ -39,6 +44,8 @@ export default function PhysicsWalker({
   position,
   input,
   avatar,
+  forageSpots,
+  onPickup,
   report,
   onStatus,
   paused = false,
@@ -50,6 +57,9 @@ export default function PhysicsWalker({
   position: MutableRefObject<ExplorePosition>;
   input: MutableRefObject<ExploreInput>;
   avatar: AvatarConfig;
+  /** Forage offers already shifted into this walker's chunk-local frame. */
+  forageSpots?: PhysicsForageSpot[];
+  onPickup?(spot: PhysicsForageSpot): void;
   report(p: ExplorePosition): void;
   onStatus(ready: boolean, error?: string): void;
   paused?: boolean;
@@ -231,6 +241,13 @@ export default function PhysicsWalker({
     camera.position.y += next.y - old.y;
     controls.current?.target.set(next.x, feet + 1.4, next.z);
     controls.current?.update();
+    // Local roaming has no authoritative room, so reach uses the shared rule.
+    if (forageSpots?.length && !document.hidden) {
+      const reached = forageSpots.find((s) =>
+        canReachForage(world.runtime, world.player, s),
+      );
+      if (reached) onPickup?.(reached);
+    }
     gl.domElement.dataset.grounded = String(world.player.grounded);
     gl.domElement.dataset.feetY = feet.toFixed(3);
     timer.current += delta;

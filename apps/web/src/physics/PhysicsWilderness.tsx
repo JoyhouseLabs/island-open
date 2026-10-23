@@ -112,6 +112,8 @@ function Journey({
         low={true}
         avatar={avatar}
         journal={journal}
+        worldId={worldId}
+        accountId={user.id}
         paused={saving}
         onExit={() => navigate(homePath(worldId, "dinosaur"))}
       />

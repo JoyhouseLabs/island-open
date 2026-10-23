@@ -7,7 +7,12 @@ import {
   createPhysicsScene,
   physicsSceneDefinitions,
 } from "./src/index.js";
-import { placePhysicsRegion, placeForageSpots } from "@island/world-core";
+import {
+  placePhysicsRegion,
+  placeForageSpots,
+  wildForageSpots,
+  wildPhysicsRegion,
+} from "@island/world-core";
 import { physicalForageSpots, canReachForage } from "./src/forage.js";
 
 it("forage in every themed room uses stable IDs and the actual terrain, never sea or solid infrastructure", async () => {
@@ -101,6 +106,47 @@ it("published place finds sit on the mounted region and use the same reach rule"
     world.player.seated = true;
     expect(canReachForage(world.runtime, world.player, spot)).toBe(false);
     world.player.seated = false;
+    world.player.body.setTranslation({ x: p.x - 3, y: p.y + 0.55, z: p.z }, true);
+    expect(canReachForage(world.runtime, world.player, spot)).toBe(false);
+  } finally {
+    world.dispose();
+  }
+});
+
+it("exploration finds sit on the streamed terrain and use the same reach rule", async () => {
+  const seed = 424242,
+    zero = { x: 0, z: 0 };
+  // Skip chunks whose spots were all rejected; the world has plenty more.
+  const coord = [0, 1, 2, 3]
+    .flatMap((x) => [0, 1, 2, 3].map((z) => ({ x, z })))
+    .find((c) => wildForageSpots(seed, c).length > 0)!;
+  const spots = wildForageSpots(seed, coord),
+    spot = spots[0]!,
+    p = spot.position;
+  const world = await PhysicsRegionWorld.create({ x: 0, y: 30, z: 0 });
+  try {
+    world.mount(
+      wildPhysicsRegion(seed, { ...zero, key: "0,0", props: [] }, zero),
+    );
+    world.mount(
+      wildPhysicsRegion(
+        seed,
+        {
+          ...coord,
+          key: `${coord.x},${coord.z}`,
+          props: [],
+        },
+        zero,
+      ),
+    );
+    world.refreshQueries();
+    world.player.teleport({ x: p.x - 0.8, y: p.y + 0.6, z: p.z });
+    for (let i = 0; i < 90; i++)
+      world.runtime.step((dt) =>
+        world.player.step({ x: 0, z: 0, jump: false }, dt),
+      );
+    expect(world.player.grounded).toBe(true);
+    expect(canReachForage(world.runtime, world.player, spot)).toBe(true);
     world.player.body.setTranslation({ x: p.x - 3, y: p.y + 0.55, z: p.z }, true);
     expect(canReachForage(world.runtime, world.player, spot)).toBe(false);
   } finally {

@@ -6,17 +6,32 @@ import {
 import { forageCatalog } from "@island/world-core";
 import { api } from "../api";
 
-export type PlaceForageSpot = ForageAvailability["spots"][number];
+export type ForageOffer = ForageAvailability["spots"][number];
 
-/** Published places roam on a local runtime, so the shared capsule rule in the
- * scene calls collect(); receipts, cooldowns and recovery stay server-side. */
-export function usePlaceForage(
-  placeId: string,
-  accountId: string,
-  paused: boolean,
-  onPickedUp?: () => void,
-) {
-  const [spots, setSpots] = useState<PlaceForageSpot[]>([]),
+/** One server-owned spot catalog (a published place, or one exploration chunk
+ * ring) with receipts, cooldowns and lost-response recovery. Personal roaming
+ * has no authoritative room, so the scene calls collect() from its own shared
+ * capsule reach check. */
+export function useServerForage({
+  key,
+  accountId,
+  availabilityPath,
+  collectPath,
+  paused,
+  enabled = true,
+  onPickedUp,
+}: {
+  /** Changing the key resets offers, e.g. a different place or exploration chunk. */
+  key: string;
+  accountId: string;
+  availabilityPath: string;
+  collectPath: string;
+  paused: boolean;
+  /** The legacy wilderness page mounts the same scene without an account. */
+  enabled?: boolean;
+  onPickedUp?: () => void;
+}) {
+  const [spots, setSpots] = useState<ForageOffer[]>([]),
     [message, setMessage] = useState("");
   const live = useRef({ paused, onPickedUp });
   live.current = { paused, onPickedUp };
@@ -30,9 +45,14 @@ export function usePlaceForage(
   });
   const refresh = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
-    const s = state.current,
-      base = `/physics/activities/places/${encodeURIComponent(placeId)}/forage`;
-    s.alive = true;
+    const s = state.current;
+    s.alive = enabled;
+    if (!enabled) {
+      s.available = [];
+      setSpots([]);
+      setMessage("");
+      return;
+    }
     s.reading = false;
     s.collecting = false;
     s.offset = 0;
@@ -56,8 +76,11 @@ export function usePlaceForage(
       if (!s.alive || s.reading) return;
       s.reading = true;
       try {
+        const join = availabilityPath.includes("?") ? "&" : "?";
         const result = forageAvailabilitySchema.parse(
-          await api(`${base}?${new URLSearchParams({ accountId })}`),
+          await api(
+            `${availabilityPath}${join}${new URLSearchParams({ accountId })}`,
+          ),
         );
         if (s.alive) {
           s.available = result.spots;
@@ -91,12 +114,13 @@ export function usePlaceForage(
       window.removeEventListener("focus", retry);
       window.removeEventListener("online", retry);
     };
-  }, [placeId, accountId]);
+  }, [key, accountId, availabilityPath, enabled]);
   const collect = useCallback(
-    async (spot: PlaceForageSpot) => {
+    async (spot: ForageOffer) => {
       const s = state.current;
       if (
         !s.alive ||
+        !enabled ||
         s.collecting ||
         live.current.paused ||
         Date.now() < s.retryAt
@@ -105,17 +129,14 @@ export function usePlaceForage(
       s.collecting = true;
       let confirmed = false;
       try {
-        const result = await api<{ readyAt: number }>(
-          `/physics/activities/places/${encodeURIComponent(placeId)}/forage`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              accountId,
-              spotId: spot.id,
-              claimId: spot.claimId,
-            }),
-          },
-        );
+        const result = await api<{ readyAt: number }>(collectPath, {
+          method: "POST",
+          body: JSON.stringify({
+            accountId,
+            spotId: spot.id,
+            claimId: spot.claimId,
+          }),
+        });
         if (s.alive) {
           confirmed = true;
           s.available = s.available.map((x) =>
@@ -151,7 +172,7 @@ export function usePlaceForage(
         }
       }
     },
-    [placeId, accountId],
+    [collectPath, accountId, enabled],
   );
   return { spots, message, collect };
 }

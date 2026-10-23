@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { PlaceConfig } from "@island/contracts";
 import { placeForageSpots } from "./collectibles.js";
+import {
+  CAMP,
+  CHUNK_SIZE,
+  generateWildChunk,
+  wildBiome,
+  wildForageChunk,
+  wildForageSpots,
+  wildHeight,
+  type ChunkCoord,
+} from "./wilderness.js";
 
 const place = (over: Partial<PlaceConfig> = {}): PlaceConfig => ({
   id: "quiet-test",
@@ -90,5 +100,67 @@ describe("placeForageSpots", () => {
     const kinds = new Set(placeForageSpots(place()).map((s) => s.kind));
     expect(kinds).toContain("pinecone");
     expect(kinds).toContain("shell");
+  });
+});
+
+describe("wildForageSpots", () => {
+  const seed = 123456789;
+  const withSpots = (): { coord: ChunkCoord; spots: ReturnType<typeof wildForageSpots> } => {
+    for (let x = 0; x < 6; x++)
+      for (let z = 0; z < 6; z++) {
+        const coord = { x, z },
+          spots = wildForageSpots(seed, coord);
+        if (spots.length > 0) return { coord, spots };
+      }
+    throw Error("no chunk with forage spots found");
+  };
+  it("is deterministic, ids parse back to their chunk, and spots sit on the terrain", () => {
+    const { coord, spots } = withSpots();
+    expect(wildForageSpots(seed, coord)).toEqual(spots);
+    expect(spots.length).toBeLessThanOrEqual(2);
+    for (const spot of spots) {
+      expect(spot.id).toMatch(/^wfind:-?\d+:-?\d+:[01]$/);
+      expect(wildForageChunk(spot.id)).toEqual(coord);
+      expect(spot.position.x).toBeGreaterThan(coord.x * CHUNK_SIZE);
+      expect(spot.position.x).toBeLessThan((coord.x + 1) * CHUNK_SIZE);
+      expect(spot.position.z).toBeGreaterThan(coord.z * CHUNK_SIZE);
+      expect(spot.position.z).toBeLessThan((coord.z + 1) * CHUNK_SIZE);
+      expect(spot.position.y).toBeCloseTo(
+        wildHeight(seed, spot.position.x, spot.position.z) + 0.3,
+        5,
+      );
+      expect(["petal", "pinecone", "mushroom", "pebble"]).toContain(spot.kind);
+    }
+    // Ids encode the chunk and slot, so a different seed keeps the ids but
+    // moves the actual finds.
+    expect(wildForageSpots(seed + 1, coord)).not.toEqual(spots);
+    expect(wildForageChunk("wfind:9:9:2")).toBeNull();
+    expect(wildForageChunk("wild2:0:0:0:raptor")).toBeNull();
+  });
+  it("keeps the camp, the departure trail and solid props clear", () => {
+    for (let x = -2; x <= 2; x++)
+      for (let z = -2; z <= 2; z++) {
+        const coord = { x, z };
+        for (const spot of wildForageSpots(seed, coord)) {
+          expect(Math.hypot(spot.position.x - CAMP.x, spot.position.z - CAMP.z)).toBeGreaterThanOrEqual(18);
+          expect(Math.abs(spot.position.x - CAMP.x)).toBeGreaterThanOrEqual(7);
+          const props = generateWildChunk(seed, coord).props;
+          for (const p of props)
+            expect(
+              Math.hypot(spot.position.x - p.x, spot.position.z - p.z),
+            ).toBeGreaterThanOrEqual(1.3 * p.scale + 0.45);
+        }
+      }
+  });
+  it("follows the biome when choosing kinds", () => {
+    const { spots } = withSpots();
+    for (const spot of spots) {
+      const biome = wildBiome(seed, spot.position.x, spot.position.z);
+      expect(
+        (biome === "forest" && ["pinecone", "mushroom"].includes(spot.kind)) ||
+          (biome === "rock" && spot.kind === "pebble") ||
+          (biome === "meadow" && spot.kind === "petal"),
+      ).toBe(true);
+    }
   });
 });

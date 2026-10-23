@@ -1,3 +1,5 @@
+import type { PhysicsForageSpot } from "@island/contracts";
+import type { ForageKind } from "./collectibles.js";
 /** Independent from editable world snapshots. Bump this version if generation changes. */
 export const WILDERNESS_VERSION = 2;
 export const CHUNK_SIZE = 96;
@@ -215,4 +217,64 @@ export function wildIdentity(id: string) {
     chunk: { x, z },
     number: `${prefix}-2-${x < 0 ? "W" : "E"}${Math.abs(x).toString(36).toUpperCase()}-${z > 0 ? "S" : "N"}${Math.abs(z).toString(36).toUpperCase()}-${String(slot + 1).padStart(2, "0")}`,
   };
+}
+
+/** The little finds scattered across exploration chunks. Same seed and chunk
+ * always yield the same spots on walkable ground, clear of the camp, the
+ * departure trail and solid props; ids parse back to their chunk so the server
+ * can verify a pickup without trusting browser coordinates. */
+export function wildForageSpots(
+  seed: number,
+  coord: ChunkCoord,
+): PhysicsForageSpot[] {
+  const chunk = generateWildChunk(seed, coord),
+    spots: PhysicsForageSpot[] = [];
+  for (let slot = 0; slot < 2; slot++) {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const x =
+        coord.x * CHUNK_SIZE +
+        10 +
+        hash(seed ^ (501 + attempt * 71 + slot * 877), coord.x, coord.z) * 76;
+      const z =
+        coord.z * CHUNK_SIZE +
+        10 +
+        hash(seed ^ (613 + attempt * 89 + slot * 787), coord.x, coord.z) * 76;
+      if (Math.hypot(x - CAMP.x, z - CAMP.z) < 18 || Math.abs(x - CAMP.x) < 7)
+        continue;
+      if (
+        chunk.props.some((p) => Math.hypot(x - p.x, z - p.z) < 1.3 * p.scale + 0.45)
+      )
+        continue;
+      if (
+        spots.some((s) => Math.hypot(x - s.position.x, z - s.position.z) < 12)
+      )
+        continue;
+      const biome = wildBiome(seed, x, z),
+        kind: ForageKind =
+          biome === "forest"
+            ? hash(seed ^ 71, coord.x, coord.z) < 0.5
+              ? "pinecone"
+              : "mushroom"
+            : biome === "rock"
+              ? "pebble"
+              : "petal";
+      spots.push({
+        id: `wfind:${coord.x}:${coord.z}:${slot}`,
+        kind,
+        position: { x, y: wildHeight(seed, x, z) + 0.3, z },
+      });
+      break;
+    }
+  }
+  return spots;
+}
+
+/** Collect ids parse back to their chunk for server-side verification. */
+export function wildForageChunk(id: string): ChunkCoord | null {
+  const match = /^wfind:(-?\d{1,6}):(-?\d{1,6}):[01]$/.exec(id);
+  if (!match) return null;
+  const x = Number(match[1]),
+    z = Number(match[2]);
+  if (String(x) !== match[1] || String(z) !== match[2]) return null;
+  return { x, z };
 }

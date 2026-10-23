@@ -15,11 +15,15 @@ import {
   type WildEncounter,
   type ChunkCoord,
 } from "@island/world-core";
+import type { PhysicsForageSpot } from "@island/contracts";
 import PhysicsWalker, {
   type ExplorePosition,
   type ExploreInput,
 } from "./PhysicsWalker";
 import { PhysicsPart } from "../physics/PhysicsPart";
+import PhysicsForage from "../physics/PhysicsForage";
+import { PhysicsAudio } from "../physics/PhysicsAudio";
+import { useServerForage } from "../physics/useServerForage";
 import { loadAvatar, type AvatarConfig } from "../player/avatar";
 import RendererCleanup from "../RendererCleanup";
 import Terrain from "./Terrain";
@@ -63,6 +67,8 @@ export default function Wilderness({
   avatar,
   onExit,
   journal,
+  worldId,
+  accountId,
   paused = false,
 }: {
   seed: number;
@@ -70,6 +76,9 @@ export default function Wilderness({
   avatar: AvatarConfig | null;
   onExit(): void;
   journal: ExplorationJournal;
+  /** The legacy wilderness page mounts this scene without a physics account. */
+  worldId?: string;
+  accountId?: string;
   paused?: boolean;
 }) {
   const position = useRef<Position>(unpackPosition(journal.state)),
@@ -106,6 +115,42 @@ export default function Wilderness({
     > | null>(null),
     [showJournal, setShowJournal] = useState(false);
   const [showMap, setShowMap] = useState(() => window.innerWidth >= 700);
+  const chime = useRef<PhysicsAudio | null>(null),
+    [cues, setCues] = useState(false);
+  useEffect(() => {
+    chime.current = new PhysicsAudio();
+    return () => {
+      chime.current?.dispose();
+      chime.current = null;
+    };
+  }, []);
+  const foragePath = worldId
+    ? `/physics/worlds/${encodeURIComponent(worldId)}/exploration/forage`
+    : "";
+  const forage = useServerForage({
+    key: `${worldId ?? "legacy"}:${chunkKey(center)}`,
+    accountId: accountId ?? "",
+    availabilityPath: `${foragePath}?chunk=${chunkKey(center)}`,
+    collectPath: foragePath,
+    paused: paused || selected !== null,
+    enabled: !!worldId && !!accountId,
+    onPickedUp: () => chime.current?.play("pickup", "wood"),
+  });
+  // Spots arrive in absolute exploration coordinates; the walker and the scene
+  // both work in the current center chunk's local frame.
+  const localSpots = useMemo<PhysicsForageSpot[]>(
+    () =>
+      forage.spots.map((s) => ({
+        id: s.id,
+        kind: s.kind,
+        position: {
+          x: s.position.x - center.x * CHUNK_SIZE,
+          y: s.position.y,
+          z: s.position.z - center.z * CHUNK_SIZE,
+        },
+      })),
+    [forage.spots, center.x, center.z],
+  );
   const [journalPage, setJournalPage] = useState(0);
   const pageCount = Math.max(
       1,
@@ -313,6 +358,7 @@ export default function Wilderness({
               inspect={inspect}
             />
           ))}
+        {ready && <PhysicsForage spots={localSpots} />}
         <PhysicsWalker
           paused={paused}
           seed={seed}
@@ -322,6 +368,11 @@ export default function Wilderness({
           position={position}
           input={input}
           avatar={avatar ?? loadAvatar()}
+          forageSpots={localSpots}
+          onPickup={(spot) => {
+            const offer = forage.spots.find((s) => s.id === spot.id);
+            if (offer) void forage.collect(offer);
+          }}
           report={report}
           onStatus={onPhysicsStatus}
         />
@@ -367,6 +418,13 @@ export default function Wilderness({
       )}
       <footer className="wild-hint">
         WASD / 方向键行走 · Shift 奔跑 · 空格跳跃 · 拖动画面转向
+        {worldId && " · 走近小物件可以拾取"}
+        {forage.message && (
+          <span role="status" data-testid="forage-message">
+            {" "}
+            · {forage.message}
+          </span>
+        )}
         <br />
         <span role="status">
           {journal.storageFailed
@@ -408,6 +466,17 @@ export default function Wilderness({
           探索手记 · {journal.state.discoveries.length} 处发现
         </button>
         <button onClick={returnCamp}>回到营地</button>
+        {worldId && (
+          <button
+            aria-pressed={cues}
+            onClick={() => {
+              input.current.keys.clear();
+              void chime.current!.toggle().then((on) => setCues(on));
+            }}
+          >
+            {cues ? "关闭拾取提示音" : "拾取提示音"}
+          </button>
+        )}
       </nav>
       <section className="wild-discovery" aria-label="探索发现">
         {nearby

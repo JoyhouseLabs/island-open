@@ -3,7 +3,13 @@ import { useFrame } from "@react-three/fiber";
 import { Group } from "three";
 import type { PhysicsForageSpot } from "@island/contracts";
 import ForageMesh from "../collect/ForageMesh";
-function Find({ spot, inspect }: { spot: PhysicsForageSpot; inspect(): void }) {
+function Find({
+  spot,
+  inspect,
+}: {
+  spot: PhysicsForageSpot;
+  inspect?(): void;
+}) {
   const group = useRef<Group>(null);
   useFrame(({ clock }) => {
     if (group.current) {
@@ -16,10 +22,14 @@ function Find({ spot, inspect }: { spot: PhysicsForageSpot; inspect(): void }) {
     <group
       ref={group}
       position={[spot.position.x, spot.position.y, spot.position.z]}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (e.delta < 5) inspect();
-      }}
+      onClick={
+        inspect
+          ? (e) => {
+              e.stopPropagation();
+              if (e.delta < 5) inspect();
+            }
+          : undefined
+      }
     >
       <ForageMesh kind={spot.kind} />
     </group>
@@ -30,12 +40,16 @@ export default function PhysicsForage({
   inspect,
 }: {
   spots: PhysicsForageSpot[];
-  inspect(kind: string): void;
+  inspect?(kind: string): void;
 }) {
   return (
     <>
       {spots.map((spot) => (
-        <Find key={spot.id} spot={spot} inspect={() => inspect(spot.kind)} />
+        <Find
+          key={spot.id}
+          spot={spot}
+          inspect={inspect ? () => inspect(spot.kind) : undefined}
+        />
       ))}
     </>
   );

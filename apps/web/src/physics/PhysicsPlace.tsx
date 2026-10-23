@@ -33,7 +33,7 @@ import { usePlaceAmbience } from "../places/ambience";
 import { PhysicsPart } from "./PhysicsPart";
 import PhysicsForage from "./PhysicsForage";
 import { PhysicsAudio } from "./PhysicsAudio";
-import { usePlaceForage, type PlaceForageSpot } from "./usePlaceForage";
+import { useServerForage, type ForageOffer } from "./useServerForage";
 import "./place.css";
 
 const KnowledgeCardDialog = lazy(
@@ -59,8 +59,8 @@ function Scene({
   jump: { current: boolean };
   night: boolean;
   reset: number;
-  spots: PlaceForageSpot[];
-  onPickup(spot: PlaceForageSpot): void;
+  spots: ForageOffer[];
+  onPickup(spot: ForageOffer): void;
   inspect(kind: string): void;
   report(ready: boolean, error?: string): void;
   onExit(): void;
@@ -265,12 +265,15 @@ function Visit({
       chime.current = null;
     };
   }, []);
-  const forage = usePlaceForage(
-    place.id,
-    activity.user.id,
-    card !== null,
-    () => chime.current?.play("pickup", "wood"),
-  );
+  const foragePath = `/physics/activities/places/${encodeURIComponent(place.id)}/forage`;
+  const forage = useServerForage({
+    key: place.id,
+    accountId: activity.user.id,
+    availabilityPath: foragePath,
+    collectPath: foragePath,
+    paused: card !== null,
+    onPickedUp: () => chime.current?.play("pickup", "wood"),
+  });
   const ambience = usePlaceAmbience(
     place.ambience.assetId,
     place.ambience.volume,
