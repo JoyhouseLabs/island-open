@@ -1,7 +1,8 @@
 import PhysicsForage from "./PhysicsForage";
 import PhysicsResidents from "./PhysicsResidents";
 import PhysicsFox from "./PhysicsFox";
-import type { PhysicsForageSpot } from "@island/contracts";
+import { WeatherFx } from "../scenes/weather-fx";
+import type { PhysicsForageSpot, Weather } from "@island/contracts";
 import type { Resident } from "@island/world-core";
 import PhysicsAvatar from "./PhysicsAvatar";
 import ThemeAmbience from "./ThemeAmbience";
@@ -152,6 +153,9 @@ function Contents({
   talkResident,
   residentNear,
   talkFox,
+  talkPlayer,
+  weather,
+  wolfOwned,
 }: {
   forageSpots: PhysicsForageSpot[];
   inspectForage(kind: string): void;
@@ -168,6 +172,9 @@ function Contents({
   talkResident(resident: Resident): void;
   residentNear(resident: Resident | null): void;
   talkFox(): void;
+  talkPlayer(id: string, name: string): void;
+  weather: Weather;
+  wolfOwned: boolean;
 }) {
   const { camera, controls } = useThree();
   const forward = useMemo(() => new Vector3(), []),
@@ -382,12 +389,18 @@ function Contents({
       {!conn.editing && (
         <PhysicsForage spots={forageSpots} inspect={inspectForage} />
       )}
+      <WeatherFx
+        weather={weather}
+        low={false}
+        span={scene.template.id === "core:island" ? 150 : 70}
+      />
       {!conn.editing && (
         <PhysicsResidents
           templateId={scene.template.id}
           terrain={scene.terrain}
           paused={paused}
           player={() => conn.me?.position ?? null}
+          wolfOwned={wolfOwned}
           onTalk={talkResident}
           onNearChange={residentNear}
         />
@@ -425,7 +438,13 @@ function Contents({
         />
       ))}
       {conn.buffer.latest?.players.map((player) => (
-        <PhysicsAvatar key={player.id} conn={conn} id={player.id} />
+        <PhysicsAvatar
+          key={player.id}
+          conn={conn}
+          id={player.id}
+          bubble={conn.bubbles.find((bubble) => bubble.playerId === player.id)}
+          onTalkPlayer={talkPlayer}
+        />
       ))}
       {heldDefinition && preview && (
         <group
@@ -509,6 +528,9 @@ export default function OnlineScene(props: {
   talkResident(resident: Resident): void;
   residentNear(resident: Resident | null): void;
   talkFox(): void;
+  talkPlayer(id: string, name: string): void;
+  weather: Weather;
+  wolfOwned: boolean;
 }) {
   const scene = props.conn.scene!;
   return (

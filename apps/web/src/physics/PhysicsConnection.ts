@@ -22,6 +22,13 @@ export class PhysicsConnection {
   status: "connecting" | "connected" | "disconnected" = "connecting";
   message = "正在连接世界…";
   saved = "尚未确认保存";
+  /** One latest quick-phrase bubble per player, newest last. */
+  bubbles: Array<{
+    playerId: string;
+    phrase?: string;
+    emote?: string;
+    at: number;
+  }> = [];
   pending = false;
   lease = { holder: null as string | null, expiresAt: 0 };
   editPending: PhysicsLayoutEdit | null = null;
@@ -257,6 +264,13 @@ export class PhysicsConnection {
         }
         this.saved = `已保存 ${new Date(message.savedAt).toLocaleTimeString()} · ${message.revision}`;
         this.changed();
+      } else if (message.type === "bubble") {
+        this.bubbles = [
+          ...this.bubbles.filter((bubble) =>
+            bubble.playerId !== message.playerId && bubble.at > Date.now() - 6000),
+          message,
+        ].slice(-8);
+        this.changed();
       } else {
         this.message = message.message;
         if (message.requestId === this.editPending?.commandId) {
@@ -355,6 +369,11 @@ export class PhysicsConnection {
   }
   input(command: PhysicsRoomCommand) {
     if (this.status === "connected") this.send({ type: "command", command });
+  }
+  /** Quick-phrase chat; the room broadcasts it back with the sender id. */
+  sendBubble(bubble: { phrase?: string; emote?: string }) {
+    if (this.status === "connected")
+      this.send({ type: "bubble", ...bubble });
   }
   action(
     type: "grab" | "drop" | "push" | "toss" | "sit" | "stand" | "toggle",

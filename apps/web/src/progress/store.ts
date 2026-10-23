@@ -14,6 +14,7 @@ import {
 import type { InventoryAction, InventoryState } from "@island/contracts";
 import { readDraft, writeDraft } from "../drafts";
 import { api, RequestError } from "../api";
+import { setDialogueTaskSource } from "../dialogue/scripts";
 
 const KEY = "growth-v1";
 const userKey = (userId: string) => `${KEY}:${userId}`;
@@ -292,3 +293,12 @@ export function useGrowth() {
 export function emitGrowth(event: GrowthEvent) {
   growth.emit(event);
 }
+
+// The dialogue scripts ask this module for the next starter-task hint; the
+// physics rooms import the scripts without ever loading this legacy store.
+setDialogueTaskSource(() => {
+  const next = starterTasks.find((t) => !growth.state.done[t.id]);
+  if (!next) return null;
+  const progress = taskProgress(growth.state, next);
+  return `我听说你有一件想做的事：「${next.title}」——${next.story}（现在 ${progress}/${next.goal.count}）。`;
+});

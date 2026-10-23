@@ -1,5 +1,3 @@
-import { starterTasks, taskProgress } from "@island/world-core";
-import { growth } from "../progress/store";
 import { proximity } from "./proximity";
 
 export type DialogueNode = {
@@ -35,19 +33,24 @@ function weatherLine() {
 
 function seasonLine() {
   const { season } = proximity.env;
-  return {
-    spring: "花都开了，空气里有甜甜的味道。",
-    summer: "夏天的午后，蝉会把时间叫得很长。",
-    autumn: "叶子开始变颜色了，捡一片当书签吧。",
-    winter: "呼——冬天要围好围巾再出门哦。",
-  }[season] ?? "";
+  return (
+    {
+      spring: "花都开了，空气里有甜甜的味道。",
+      summer: "夏天的午后，蝉会把时间叫得很长。",
+      autumn: "叶子开始变颜色了，捡一片当书签吧。",
+      winter: "呼——冬天要围好围巾再出门哦。",
+    }[season ?? ""] ?? ""
+  );
 }
 
+/** The starter-task hint is legacy-growth state; the old world registers a
+ *  source at startup so the physics rooms never load that singleton. */
+let taskSource: (() => string | null) | null = null;
+export function setDialogueTaskSource(source: (() => string | null) | null) {
+  taskSource = source;
+}
 function nextTaskInfo() {
-  const next = starterTasks.find((t) => !growth.state.done[t.id]);
-  if (!next) return null;
-  const progress = taskProgress(growth.state, next);
-  return `我听说你有一件想做的事：「${next.title}」——${next.story}（现在 ${progress}/${next.goal.count}）。`;
+  return taskSource?.() ?? null;
 }
 
 const smallTalk: Record<SpeakerKind, string[]> = {

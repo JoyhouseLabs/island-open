@@ -1,9 +1,13 @@
 import { useForage } from "./useForage";
 import { PhysicsAudio } from "./PhysicsAudio";
-import { dialogue, useNpcChat } from "../dialogue/store";
+import { dialogue, useDialogue, useNpcChat, usePlayerChat } from "../dialogue/store";
+import { proximity } from "../dialogue/proximity";
+import type { Weather } from "@island/contracts";
 import { personaFor } from "../animals/personas";
 import type { Resident } from "@island/world-core";
 const NpcChat = lazy(() => import("../dialogue/NpcChat"));
+const DialogueBox = lazy(() => import("../dialogue/DialogueBox"));
+const PhysicsPlayerChat = lazy(() => import("./PhysicsPlayerChat"));
 import type { SubjectId } from "@island/contracts";
 import { useAccountInventory } from "../activities/useAccountInventory";
 import PublishedPlaces from "./PublishedPlaces";
@@ -90,14 +94,18 @@ export default function OnlinePhysics({
   const [card, setCard] = useState<SubjectId | null>(null);
   const [nearResident, setNearResident] = useState<Resident | null>(null),
     [notice, setNotice] = useState("");
-  const npcChat = useNpcChat();
+  const npcChat = useNpcChat(),
+    script = useDialogue(),
+    playerChat = usePlayerChat();
   const overlayOpen =
     !!reading ||
     dinosaurFocus !== null ||
     dressing ||
     backpack ||
     card !== null ||
-    npcChat !== null;
+    npcChat !== null ||
+    script !== null ||
+    playerChat !== null;
   const forage = useForage(
     conn,
     inventory,
@@ -106,6 +114,11 @@ export default function OnlinePhysics({
   );
   const [learningEnabled, setLearningEnabled] = useState(false);
   const [night, setNight] = useState(false);
+  const [weather, setWeather] = useState<Weather>("sun");
+  // Local weather preview, like the night toggle; the deep-chat env follows.
+  useEffect(() => {
+    proximity.setEnv({ weather, night });
+  }, [weather, night]);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
   const chime = useRef<PhysicsAudio | null>(null),
@@ -126,25 +139,30 @@ export default function OnlinePhysics({
     keys.clear();
     const scene = conn?.scene;
     if (!scene) return;
-    const persona = personaFor(
-      `${scene.template.id.replace(/^core:/, "")}-${resident.name}`,
-    );
-    if (!persona) {
-      setNotice("伙伴们的悄悄话功能还没有开放");
-      return;
-    }
-    setNotice("");
-    dialogue.openDeepChat(persona);
+    // The scripted greeting first; its 「再多聊聊」 leads into the deep chat.
+    dialogue.requestTalk({
+      id: `${scene.template.id.replace(/^core:/, "")}-${resident.name}`,
+      kind: resident.species,
+      name: resident.name,
+      x: 0,
+      z: 0,
+      distance: 0,
+    });
   };
   const talkFox = () => {
     keys.clear();
-    const persona = personaFor("fox");
-    if (!persona) {
-      setNotice("伙伴们的悄悄话功能还没有开放");
-      return;
-    }
-    setNotice("");
-    dialogue.openDeepChat(persona);
+    dialogue.requestTalk({
+      id: "fox",
+      kind: "fox",
+      name: "小狐狸",
+      x: 0,
+      z: 0,
+      distance: 0,
+    });
+  };
+  const talkPlayer = (id: string, name: string) => {
+    keys.clear();
+    dialogue.requestTalk({ id, kind: "visitor", name, x: 0, z: 0, distance: 0 });
   };
   const sceneNav = useRef<HTMLElement>(null);
   const inspectDinosaur = (id: DinosaurFocus) => {
@@ -528,6 +546,7 @@ export default function OnlinePhysics({
   return (
     <main
       className={`physics-playground ${world ? "physics-has-scenes" : ""} ${conn?.scene ? "" : "physics-lobby"}`}
+      data-weather={weather}
     >
       <header className="physics-header" inert={busy || overlayOpen}>
         <Link to={entry ? "/worlds" : "/physics/online"}>← 我的世界</Link>
@@ -626,6 +645,9 @@ export default function OnlinePhysics({
               talkResident={talkResident}
               residentNear={setNearResident}
               talkFox={talkFox}
+              talkPlayer={talkPlayer}
+              weather={weather}
+              wolfOwned={!!inventory.state?.owned["resident-wolf"]}
               selected={selected}
               select={(id) => {
                 select(id);
@@ -726,6 +748,22 @@ export default function OnlinePhysics({
                 小狐狸
               </button>
             )}
+            {(conn.buffer.latest?.players.length ?? 0) > 1 &&
+              !npcChat &&
+              playerChat === null &&
+              !conn.editing && (
+                <button
+                  className="physics-sound"
+                  onClick={() => {
+                    const other = conn.buffer.latest?.players.find(
+                      (player) => player.id !== conn.you,
+                    );
+                    if (other) talkPlayer(other.id, other.appearance.name);
+                  }}
+                >
+                  和朋友打招呼
+                </button>
+              )}
             {notice && <p role="status">{notice}</p>}
             {forage.spots.length > 0 && (
               <p>
@@ -913,6 +951,20 @@ export default function OnlinePhysics({
                 onChange={(e) => setNight(e.target.checked)}
               />
               夜晚预览（仅自己）
+            </label>
+            <label className="physics-select">
+              天气预览（仅自己）
+              <select
+                aria-label="天气预览"
+                data-testid="weather-preview"
+                value={weather}
+                onChange={(e) => setWeather(e.target.value as Weather)}
+              >
+                <option value="sun">晴朗</option>
+                <option value="rain">小雨</option>
+                <option value="thunder">雷雨</option>
+                <option value="wind">大风</option>
+              </select>
             </label>
             <div>
               <strong data-testid="physics-online-status">
@@ -1191,6 +1243,16 @@ export default function OnlinePhysics({
       {npcChat && user && (
         <Suspense fallback={null}>
           <NpcChat />
+        </Suspense>
+      )}
+      {script !== null && user && conn && (
+        <Suspense fallback={null}>
+          <DialogueBox />
+        </Suspense>
+      )}
+      {playerChat !== null && user && conn && (
+        <Suspense fallback={null}>
+          <PhysicsPlayerChat conn={conn} />
         </Suspense>
       )}
       {backpack && user && (

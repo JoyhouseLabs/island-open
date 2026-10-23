@@ -106,7 +106,9 @@ export default function NpcChat() {
     const env = proximity.envKnown
       ? {
           weather: proximity.env.weather as Weather,
-          season: proximity.env.season as Season,
+          ...(proximity.env.season
+            ? { season: proximity.env.season as Season }
+            : {}),
           hour: proximity.env.night ? 21 : 10,
         }
       : undefined;

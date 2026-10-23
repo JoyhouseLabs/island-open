@@ -1,21 +1,39 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Group, Vector3 } from "three";
 import { characterProfile } from "@island/physics-core";
 import { AvatarMesh, type AvatarAnim } from "../player/AvatarModel";
 import PresenceLabel from "../presence/PresenceLabel";
+import { EMOTES, phraseLabel } from "../presence/phrases";
 import type { PhysicsConnection } from "./PhysicsConnection";
 
 /** A visual skin over the shared capsule; clothing never changes collision or movement. */
 export default function PhysicsAvatar({
   conn,
   id,
+  bubble,
+  onTalkPlayer,
 }: {
   conn: PhysicsConnection;
   id: string;
+  bubble?: { phrase?: string; emote?: string; at: number };
+  onTalkPlayer?(id: string, name: string): void;
 }) {
   const root = useRef<Group>(null),
     skin = useRef<Group>(null);
+  const [showing, setShowing] = useState<{
+    phrase?: string;
+    emote?: string;
+    at: number;
+  } | null>(null),
+    lastStamp = useRef(0);
+  useEffect(() => {
+    if (!bubble || bubble.at === lastStamp.current) return;
+    lastStamp.current = bubble.at;
+    setShowing(bubble);
+    const timer = setTimeout(() => setShowing(null), 4200);
+    return () => clearTimeout(timer);
+  }, [bubble]);
   const last = useRef<Vector3 | null>(null),
     target = useMemo(() => new Vector3(), []);
   const anim = useRef<AvatarAnim>({ phase: 0, moving: false });
@@ -56,8 +74,20 @@ export default function PhysicsAvatar({
     (last.current ??= new Vector3()).copy(at);
   }, -1);
   if (!current) return null;
+  const remote = id !== conn.you;
   return (
-    <group ref={root}>
+    <group
+      ref={root}
+      onClick={
+        remote && onTalkPlayer
+          ? (e) => {
+              if (e.delta > 5) return;
+              e.stopPropagation();
+              onTalkPlayer(id, current.appearance.name);
+            }
+          : undefined
+      }
+    >
       <group ref={skin}>
         <AvatarMesh config={current.appearance.avatar} anim={anim.current} />
       </group>
@@ -67,6 +97,18 @@ export default function PhysicsAvatar({
         position={[0, 1.45, 0]}
         maxDistance={55}
       />
+      {showing && (
+        <PresenceLabel
+          phrase={
+            phraseLabel(showing.phrase ?? "") ||
+            (EMOTES.find((e) => e.id === showing.emote)?.label ?? "")
+          }
+          stamp={showing.at}
+          self={id === conn.you}
+          position={[0, 2.15, 0]}
+          maxDistance={55}
+        />
+      )}
     </group>
   );
 }

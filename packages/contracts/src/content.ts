@@ -214,7 +214,8 @@ export const npcChatRequestSchema = z
     env: z
       .object({
         weather: z.enum(["sun", "rain", "thunder", "wind"]),
-        season: z.enum(["spring", "summer", "autumn", "winter"]),
+        /** The legacy world reports a season; rooms without one omit it. */
+        season: z.enum(["spring", "summer", "autumn", "winter"]).optional(),
         hour: z.number().min(0).max(24),
       })
       .strict()

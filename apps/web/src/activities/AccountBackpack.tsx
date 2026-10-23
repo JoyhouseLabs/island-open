@@ -140,7 +140,7 @@ export default function AccountBackpack({
         <>
           <ul className="backpack-goals">
             {unlocks
-              .filter((u) => u.id.startsWith("hat-"))
+              .filter((u) => u.id !== "decor-lantern")
               .map((u) => (
                 <li key={u.id}>
                   <strong>{u.name}</strong>
@@ -150,7 +150,11 @@ export default function AccountBackpack({
                     onClick={async () => {
                       setMessage("");
                       if (await inventory.buy(u.id))
-                        setMessage(`已拥有${u.name}，可以到「我的形象」穿戴。`);
+                        setMessage(
+                          u.id === "resident-wolf"
+                            ? "风哨已经搬来主岛和听风山脚下，去和它打个招呼吧。"
+                            : `已拥有${u.name}，可以到「我的形象」穿戴。`,
+                        );
                     }}
                   >
                     {state.owned[u.id]
@@ -164,6 +168,7 @@ export default function AccountBackpack({
               ))}
           </ul>
           <button onClick={dress}>去我的形象穿戴</button>
+          <p>许愿星灯需要写进家园场景，稍后开放兑换。</p>
         </>
       )}
       {state &&

@@ -6,13 +6,12 @@ export type NearSpeaker = AgentInfo & { id: string; distance: number };
 /** Who is standing close enough to talk to right now. */
 class ProximityStore {
   speaker: NearSpeaker | null = null;
-  env: { weather: string; season: string; night: boolean } = {
+  env: { weather: string; season?: string; night: boolean } = {
     weather: "sun",
-    season: "summer",
     night: false,
   };
-  /** Only the legacy world reports a real environment; other pages must not
-   *  claim a season or weather the island does not actually have. */
+  /** Only pages with a real environment report one; others must not claim a
+   *  season or weather the island does not actually have. */
   envKnown = false;
   private listeners = new Set<() => void>();
   private version = 0;
@@ -33,7 +32,7 @@ class ProximityStore {
     this.speaker = speaker;
     if (changed || speaker) this.bump();
   }
-  setEnv(env: { weather: string; season: string; night: boolean }) {
+  setEnv(env: { weather: string; season?: string; night: boolean }) {
     this.env = env;
     this.envKnown = true;
   }

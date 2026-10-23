@@ -705,6 +705,14 @@ export const physicsClientMessageSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("save"), requestId: z.string().uuid() }).strict(),
+  /** Quick-phrase chat: one bubble per send, at least one field set. */
+  z
+    .object({
+      type: z.literal("bubble"),
+      phrase: z.enum(["hi", "play", "pretty", "bye"]).optional(),
+      emote: z.enum(["heart", "sparkle", "note", "flower"]).optional(),
+    })
+    .strict(),
 ]);
 export const physicsServerMessageSchema = z.discriminatedUnion("type", [
   z
@@ -765,6 +773,15 @@ export const physicsServerMessageSchema = z.discriminatedUnion("type", [
       code: z.string(),
       message: z.string(),
       requestId: z.string().uuid().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("bubble"),
+      playerId: z.string().min(1).max(96),
+      phrase: z.enum(["hi", "play", "pretty", "bye"]).optional(),
+      emote: z.enum(["heart", "sparkle", "note", "flower"]).optional(),
+      at: z.number(),
     })
     .strict(),
 ]);

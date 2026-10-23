@@ -46,6 +46,7 @@ function lerpAngle(from: number, to: number, t: number) {
  * the shared deep-chat panel does the talking. */
 function ResidentAnimal({
   resident,
+  agentId,
   terrain,
   paused,
   player,
@@ -54,6 +55,8 @@ function ResidentAnimal({
   report,
 }: {
   resident: Resident;
+  /** The dialogue agent id, `${scene}-${name}`, matching the old registry. */
+  agentId: string;
   terrain: PhysicsTerrainTile[];
   paused: boolean;
   player(): { x: number; z: number } | null;
@@ -61,7 +64,6 @@ function ResidentAnimal({
   onNear(within: boolean): void;
   report(x: number, z: number): void;
 }) {
-  const subject = `resident:${resident.name}`;
   const root = useRef<Group>(null);
   const rng = useMemo(
     () => random(hashText(`physics:${resident.name}`)),
@@ -85,7 +87,7 @@ function ResidentAnimal({
     const s = st.current,
       dt = Math.min(rawDt, 0.05),
       me = player();
-    if (dialogue.talkingWith(subject)) {
+    if (dialogue.talkingWith(agentId)) {
       s.target = null;
       s.mode = "idle";
       s.until = 2;
@@ -167,12 +169,13 @@ function hashText(text: string) {
 }
 
 /** The named residents of one physics scene. Locked rosters (the wolf waits
- *  on a growth unlock that has not migrated yet) simply do not move in. */
+ *  on its star redemption) simply do not move in yet. */
 export default function PhysicsResidents({
   templateId,
   terrain,
   paused,
   player,
+  wolfOwned,
   onTalk,
   onNearChange,
 }: {
@@ -180,6 +183,8 @@ export default function PhysicsResidents({
   terrain: PhysicsTerrainTile[];
   paused: boolean;
   player(): { x: number; z: number } | null;
+  /** Whether this account redeemed 风哨 (resident-wolf). */
+  wolfOwned: boolean;
   onTalk(resident: Resident): void;
   /** The first resident currently in talking range, or null. */
   onNearChange(resident: Resident | null): void;
@@ -202,7 +207,7 @@ export default function PhysicsResidents({
     gl.domElement.dataset.residents = trace.join("|");
   });
   const roster = residents[key as keyof typeof residents]?.filter(
-    (r) => !r.unlockId,
+    (r) => !r.unlockId || (r.unlockId === "resident-wolf" && wolfOwned),
   );
   if (!roster?.length) return null;
   const settle = () => {
@@ -218,6 +223,7 @@ export default function PhysicsResidents({
         <ResidentAnimal
           key={`${key}-${resident.name}`}
           resident={resident}
+          agentId={`${key}-${resident.name}`}
           terrain={terrain}
           paused={paused}
           player={player}
