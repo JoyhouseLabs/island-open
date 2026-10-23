@@ -1,4 +1,5 @@
 export * from "./physics.js";
+export * from "./forage.js";
 import { creationPlacementSchema } from "./creations.js";
 export * from "./creations.js";
 import { furniturePlacementSchema } from "./shop.js";

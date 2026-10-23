@@ -1,3 +1,5 @@
+import { useForage } from "./useForage";
+import type { SubjectId } from "@island/contracts";
 import { useAccountInventory } from "../activities/useAccountInventory";
 import PublishedPlaces from "./PublishedPlaces";
 import PhysicsLogin from "./PhysicsLogin";
@@ -26,6 +28,9 @@ import OnlineScene from "./OnlineScene";
 import "./physics.css";
 import { IslandConfigProvider } from "../contentStore";
 import { rememberReturn } from "../learning/travel";
+const KnowledgeCardDialog = lazy(
+  () => import("../activities/KnowledgeCardDialog"),
+);
 const AccountBackpack = lazy(() => import("../activities/AccountBackpack"));
 const PhysicsDressing = lazy(() => import("./PhysicsDressing"));
 const Bookshelf = lazy(() => import("../Bookshelf"));
@@ -77,12 +82,23 @@ export default function OnlinePhysics({
   const inventory = useAccountInventory(user?.id ?? null);
   const [backpack, setBackpack] = useState(false);
   const [dressing, setDressing] = useState(false);
+  const [card, setCard] = useState<SubjectId | null>(null);
   const overlayOpen =
-    !!reading || dinosaurFocus !== null || dressing || backpack;
+    !!reading ||
+    dinosaurFocus !== null ||
+    dressing ||
+    backpack ||
+    card !== null;
+  const forage = useForage(conn, inventory, busy || overlayOpen);
   const [learningEnabled, setLearningEnabled] = useState(false);
   const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
+  const inspectForage = (kind: string) => {
+    keys.clear();
+    setBackpack(false);
+    setCard(`forage:${kind}` as SubjectId);
+  };
   const sceneNav = useRef<HTMLElement>(null);
   const inspectDinosaur = (id: DinosaurFocus) => {
     keys.clear();
@@ -552,6 +568,8 @@ export default function OnlinePhysics({
         <>
           <section className="physics-viewport" inert={overlayOpen}>
             <OnlineScene
+              forageSpots={forage.spots}
+              inspectForage={inspectForage}
               dinosaurFocus={dinosaurFocus}
               inspectDinosaur={inspectDinosaur}
               paused={busy || overlayOpen}
@@ -622,6 +640,17 @@ export default function OnlinePhysics({
             >
               我的背包
             </button>
+            {forage.message && (
+              <p role="status" data-testid="forage-message">
+                {forage.message}
+              </p>
+            )}
+            {forage.spots.length > 0 && (
+              <p>
+                散落着 {forage.spots.length}{" "}
+                件小物件，走近即可收集，点选可以查看图鉴。
+              </p>
+            )}
             {inventory.error && !overlayOpen && (
               <p role="alert">背包同步：{inventory.error}</p>
             )}
@@ -1062,6 +1091,21 @@ export default function OnlinePhysics({
               : "正在连接世界…"}
         </p>
       )}
+      {card && user && conn && (
+        <Suspense fallback={<p role="status">正在翻开图鉴…</p>}>
+          <KnowledgeCardDialog
+            key={`${user.id}:${card}`}
+            subject={card}
+            accountId={user.id}
+            sceneId={conn.sceneId}
+            token={token}
+            close={() => {
+              keys.clear();
+              setCard(null);
+            }}
+          />
+        </Suspense>
+      )}
       {backpack && user && (
         <Suspense
           fallback={
@@ -1073,6 +1117,7 @@ export default function OnlinePhysics({
           <AccountBackpack
             key={user.id}
             inventory={inventory}
+            inspect={inspectForage}
             close={() => {
               keys.clear();
               setBackpack(false);

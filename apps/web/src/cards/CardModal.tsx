@@ -6,7 +6,7 @@ import { isSpeaking, speak, stopSpeaking } from "../tutor/speech";
 import { closeCard, useOpenCardSubject } from "./store";
 
 /** Read-aloud text assembled from the card, capped at the TTS limit. */
-function readAloudText(card: KnowledgeCard) {
+export function readAloudText(card: KnowledgeCard) {
   const facts = card.facts.map((f) => `${f.label}：${f.text}。`).join("");
   return `${card.title}。${card.subtitle ? card.subtitle + "。" : ""}${card.look}。${facts}`.slice(
     0,
@@ -15,7 +15,7 @@ function readAloudText(card: KnowledgeCard) {
 }
 
 /** The optional illustration, fetched as an object URL. */
-function CardImage({ card }: { card: KnowledgeCard }) {
+export function CardImage({ card }: { card: KnowledgeCard }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!card.image) return;

@@ -18,6 +18,7 @@ import { PhysicsRuntime } from "./index.js";
 import { PhysicsCharacter } from "./character.js";
 import { sitCharacter, standCharacter, type SeatClaim } from "./seats.js";
 import { PhysicsGrab } from "./grab.js";
+import { physicalForageSpots, canReachForage } from "./forage.js";
 
 export interface CommandReceipt {
   commandId: string;
@@ -325,6 +326,20 @@ export class PhysicsRoom {
     const player = this.players.get(id);
     if (!player) throw new PhysicsRoomError("NOT_JOINED", "请重新进入房间");
     return player;
+  }
+  forage(id: string, spotId?: string) {
+    const player = this.player(id);
+    if (this.prepared)
+      throw new PhysicsRoomError("EDIT_CONFLICT", "布置正在更新，请稍后采集");
+    const spots = physicalForageSpots(this.runtime);
+    if (spotId === undefined) return spots;
+    const spot = spots.find((s) => s.id === spotId);
+    if (!spot || !canReachForage(this.runtime, player.character, spot))
+      throw new PhysicsRoomError(
+        "INVALID_COMMAND",
+        "请走近小物件，确认中间没有障碍再拾取",
+      );
+    return spot;
   }
   command(id: string, input: unknown): CommandReceipt | null {
     if (this.prepared)

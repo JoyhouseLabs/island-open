@@ -606,3 +606,12 @@ dialog.physics-workshop .physics-actions {
     top: -12px;
   }
 }
+.physics-knowledge-card { max-width: min(580px, calc(100vw - 24px)); line-height: 1.7; }
+.physics-knowledge-card .card-image { max-width: 100%; max-height: 240px; object-fit: contain; }
+.physics-knowledge-card dl > div { display: grid; grid-template-columns: 4em 1fr; gap: 12px; margin: 8px 0; }
+.physics-knowledge-card dt { font-weight: 700; }
+.physics-knowledge-card dd { margin: 0; }
+.physics-knowledge-card button { min-height: 44px; }
+.physics-knowledge-card header { justify-content: space-between; }
+.physics-knowledge-card header button { flex: 0 0 auto; padding: 8px 14px; }
+.physics-knowledge-card > button { padding: 8px 18px; border: 1px solid #7b9682; border-radius: 10px; background: #e2ebdd; }

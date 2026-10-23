@@ -16,10 +16,12 @@ export default function AccountBackpack({
   inventory,
   close,
   dress,
+  inspect,
 }: {
   inventory: AccountInventory;
   close(): void;
   dress(): void;
+  inspect(kind: string): void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [tab, setTab] = useState<
@@ -125,6 +127,9 @@ export default function AccountBackpack({
                 <strong>{item.name}</strong>
                 <span>{state.collected[item.kind] ?? 0} / 99</span>
                 <small>{item.note}</small>
+                <button onClick={() => inspect(item.kind)}>
+                  查看{item.name}图鉴
+                </button>
               </article>
             ))}
           </div>

@@ -1,3 +1,5 @@
+import PhysicsForage from "./PhysicsForage";
+import type { PhysicsForageSpot } from "@island/contracts";
 import PhysicsAvatar from "./PhysicsAvatar";
 import ThemeAmbience from "./ThemeAmbience";
 import GardenAmbience from "./GardenAmbience";
@@ -142,7 +144,11 @@ function Contents({
   paused,
   dinosaurFocus,
   inspectDinosaur,
+  forageSpots,
+  inspectForage,
 }: {
+  forageSpots: PhysicsForageSpot[];
+  inspectForage(kind: string): void;
   dinosaurFocus: DinosaurFocus | null;
   inspectDinosaur(id: DinosaurHabitatId): void;
   night: boolean;
@@ -364,6 +370,9 @@ function Contents({
           </Suspense>
         </>
       )}
+      {!conn.editing && (
+        <PhysicsForage spots={forageSpots} inspect={inspectForage} />
+      )}
       {scene.terrain.map((tile) => (
         <PhysicsTerrain
           key={tile.id}
@@ -455,6 +464,8 @@ function Contents({
   );
 }
 export default function OnlineScene(props: {
+  forageSpots: PhysicsForageSpot[];
+  inspectForage(kind: string): void;
   dinosaurFocus: DinosaurFocus | null;
   inspectDinosaur(id: DinosaurHabitatId): void;
   night: boolean;
