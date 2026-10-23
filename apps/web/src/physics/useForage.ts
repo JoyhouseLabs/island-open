@@ -12,11 +12,12 @@ export function useForage(
   conn: PhysicsConnection | null,
   inventory: AccountInventory,
   paused: boolean,
+  onPickedUp?: () => void,
 ) {
   const [spots, setSpots] = useState<ForageAvailability["spots"]>([]),
     [message, setMessage] = useState("");
-  const live = useRef({ paused, inventory });
-  live.current = { paused, inventory };
+  const live = useRef({ paused, inventory, onPickedUp });
+  live.current = { paused, inventory, onPickedUp };
   const accountId = inventory.accountId,
     connectionId = conn?.you,
     layout = conn?.scene;
@@ -102,6 +103,7 @@ export function useForage(
           setMessage(
             `捡到了${forageCatalog.find((f) => f.kind === spot.kind)!.name}，已放入背包`,
           );
+          live.current.onPickedUp?.();
           void live.current.inventory.refresh();
         }
       } catch (error) {
@@ -124,6 +126,7 @@ export function useForage(
           recovered.readyAt + offset > Date.now()
         ) {
           setMessage("拾取记录已恢复，收获已放入背包");
+          live.current.onPickedUp?.();
           void live.current.inventory.refresh();
         }
       }

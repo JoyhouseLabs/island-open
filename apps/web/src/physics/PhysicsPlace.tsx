@@ -1,4 +1,6 @@
 import {
+  Suspense,
+  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -12,18 +14,31 @@ import { OrbitControls, Stars } from "@react-three/drei";
 import { Group, Vector3 } from "three";
 import {
   avatarProfileSchema,
+  forageAvailabilitySchema,
   placeSchema,
   type AvatarConfig,
   type PlaceConfig,
+  type SubjectId,
 } from "@island/contracts";
 import { placePhysicsRegion } from "@island/world-core";
-import { PhysicsRegionWorld, characterProfile } from "@island/physics-core";
+import {
+  PhysicsRegionWorld,
+  canReachForage,
+  characterProfile,
+} from "@island/physics-core";
 import { api } from "../api";
 import { useActivity } from "../activities/context";
 import { AvatarMesh, type AvatarAnim } from "../player/AvatarModel";
 import { usePlaceAmbience } from "../places/ambience";
 import { PhysicsPart } from "./PhysicsPart";
+import PhysicsForage from "./PhysicsForage";
+import { PhysicsAudio } from "./PhysicsAudio";
+import { usePlaceForage, type PlaceForageSpot } from "./usePlaceForage";
 import "./place.css";
+
+const KnowledgeCardDialog = lazy(
+  () => import("../activities/KnowledgeCardDialog"),
+);
 
 function Scene({
   place,
@@ -32,6 +47,9 @@ function Scene({
   jump,
   night,
   reset,
+  spots,
+  onPickup,
+  inspect,
   report,
   onExit,
 }: {
@@ -41,6 +59,9 @@ function Scene({
   jump: { current: boolean };
   night: boolean;
   reset: number;
+  spots: PlaceForageSpot[];
+  onPickup(spot: PlaceForageSpot): void;
+  inspect(kind: string): void;
   report(ready: boolean, error?: string): void;
   onExit(): void;
 }) {
@@ -139,6 +160,12 @@ function Scene({
       respawn(w);
       next = w.player.position();
     }
+    // Local roaming has no authoritative room, so reach is judged by the same
+    // shared capsule rule the server applies in physics scenes.
+    if (spots.length && !document.hidden && !fallen) {
+      const reached = spots.find((s) => canReachForage(w.runtime, w.player, s));
+      if (reached) onPickup(reached);
+    }
     const feet = next.y - characterProfile.halfHeight - characterProfile.radius;
     body.current?.position.set(next.x, feet - 0.03, next.z);
     if (body.current && (dx || dz)) body.current.rotation.y = Math.atan2(x, z);
@@ -186,6 +213,7 @@ function Scene({
           />
         </group>
       ))}
+      <PhysicsForage spots={spots} inspect={inspect} />
       {night &&
         place.props
           .filter((p) => p.kind === "lamp")
@@ -226,7 +254,23 @@ function Visit({
   const [night, setNight] = useState(false),
     [reset, setReset] = useState(0),
     [ready, setReady] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [card, setCard] = useState<SubjectId | null>(null),
+    [cues, setCues] = useState(false);
+  const chime = useRef<PhysicsAudio | null>(null);
+  useEffect(() => {
+    chime.current = new PhysicsAudio();
+    return () => {
+      chime.current?.dispose();
+      chime.current = null;
+    };
+  }, []);
+  const forage = usePlaceForage(
+    place.id,
+    activity.user.id,
+    card !== null,
+    () => chime.current?.play("pickup", "wood"),
+  );
   const ambience = usePlaceAmbience(
     place.ambience.assetId,
     place.ambience.volume,
@@ -253,7 +297,7 @@ function Visit({
       if (
         e.target instanceof HTMLElement &&
         e.target.closest(
-          "input,textarea,select,button,a,[contenteditable=true]",
+          "input,textarea,select,button,a,dialog,[contenteditable=true]",
         )
       )
         return;
@@ -309,6 +353,13 @@ function Visit({
             jump={jump}
             night={night}
             reset={reset}
+            spots={forage.spots}
+            onPickup={(spot) => void forage.collect(spot)}
+            inspect={(kind) => {
+              keys.clear();
+              jump.current = false;
+              setCard(`forage:${kind}` as SubjectId);
+            }}
             report={report}
             onExit={() => navigate(activity.returnTo)}
           />
@@ -326,6 +377,15 @@ function Visit({
         <button disabled={!ready} onClick={() => setReset((n) => n + 1)}>
           回到入口
         </button>
+        <button
+          aria-pressed={cues}
+          onClick={() => {
+            keys.clear();
+            void chime.current!.toggle().then((on) => setCues(on));
+          }}
+        >
+          {cues ? "关闭拾取提示音" : "拾取提示音"}
+        </button>
         {place.ambience.assetId && (
           <button disabled={ambience.loading} onClick={ambience.toggle}>
             {ambience.loading
@@ -334,6 +394,14 @@ function Visit({
                 ? "关闭环境声"
                 : "听听环境声"}
           </button>
+        )}
+        {forage.message && (
+          <p role="status" data-testid="forage-message">
+            {forage.message}
+          </p>
+        )}
+        {forage.spots.length > 0 && (
+          <p>散落着 {forage.spots.length} 件小物件，走近即可收集。</p>
         )}
         {[
           ["KeyW", "向前"],
@@ -366,8 +434,21 @@ function Visit({
       </nav>
       <footer>
         方向键 / WASD 行走 · 空格跳跃 · 拖动旋转视角 ·
-        这里可以自由漫游，暂不开放布置；点击木门也可回家
+        走近小物件可以拾取，点选可以查看图鉴；点击木门也可回家
       </footer>
+      {card && (
+        <Suspense fallback={<p role="status">正在翻开图鉴…</p>}>
+          <KnowledgeCardDialog
+            key={`${activity.user.id}:${card}`}
+            subject={card}
+            accountId={activity.user.id}
+            sceneId={place.id}
+            token={null}
+            cardsPath={`/physics/activities/places/${encodeURIComponent(place.id)}/cards`}
+            close={() => setCard(null)}
+          />
+        </Suspense>
+      )}
     </main>
   );
 }

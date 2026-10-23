@@ -1,4 +1,4 @@
-import type { SubSceneId } from "@island/contracts";
+import type { PhysicsForageSpot, PlaceConfig, SubSceneId } from "@island/contracts";
 import { island } from "./index.js";
 import { random } from "./random.js";
 
@@ -121,6 +121,68 @@ export function forageSpots(
         z: Math.sin(angle) * island.radiusZ * rad,
       });
     }
+  }
+  return spots;
+}
+
+/** Published places are flat solids, so their forage layout is analytic: same
+ * place id always yields the same few spots on open ground, clear of props,
+ * the spawn point and the south corridor to the home gate. The server derives
+ * receipts from this same list; the browser never invents spot ids. */
+export function placeForageSpots(place: PlaceConfig): PhysicsForageSpot[] {
+  const half = place.ground.size / 2,
+    spawnZ = place.ground.size / 4;
+  const kinds: ForageKind[] = ["petal", "pebble"];
+  if (place.props.some((p) => p.kind === "tree")) kinds.push("pinecone");
+  if (place.props.some((p) => p.kind === "pond")) kinds.push("shell");
+  const blocked = (x: number, z: number) => {
+    if (Math.hypot(x, z - spawnZ) < 3) return true; // spawn clearing
+    if (Math.abs(x) < 2.5 && z > spawnZ) return true; // gate corridor
+    for (const p of place.props) {
+      const s = p.scale;
+      switch (p.kind) {
+        case "tree":
+          if (Math.hypot(x - p.x, z - p.z) < 0.3 * s + 0.45) return true;
+          break;
+        case "rock":
+          if (Math.hypot(x - p.x, z - p.z) < 1.2 * s + 0.45) return true;
+          break;
+        case "bench":
+          if (
+            Math.abs(x - p.x) < 1.2 * s + 0.35 &&
+            Math.abs(z - p.z) < 0.4 * s + 0.35
+          )
+            return true;
+          break;
+        case "lamp":
+          if (Math.hypot(x - p.x, z - p.z) < 0.09 * s + 0.4) return true;
+          break;
+        case "pond":
+          if (Math.hypot(x - p.x, z - p.z) < 2.5 * s + 0.3) return true;
+          break;
+        case "flower":
+          if (Math.hypot(x - p.x, z - p.z) < 0.18 * s + 0.3) return true;
+          break;
+      }
+    }
+    return false;
+  };
+  const inside = (x: number, z: number) =>
+    place.ground.shape === "disc"
+      ? Math.hypot(x, z) < half - 3
+      : Math.abs(x) < half - 3 && Math.abs(z) < half - 3;
+  const rng = random(hashString(place.id) ^ 0x5f3759df);
+  const wanted = 5 + Math.floor(rng() * 3),
+    spots: PhysicsForageSpot[] = [];
+  for (let attempt = 0; spots.length < wanted && attempt < 60; attempt++) {
+    const x = (rng() * 2 - 1) * (half - 3),
+      z = (rng() * 2 - 1) * (half - 3);
+    if (!inside(x, z) || blocked(x, z)) continue;
+    spots.push({
+      id: `place-${spots.length}`,
+      kind: kinds[Math.floor(rng() * kinds.length)]!,
+      position: { x, y: 0.3, z },
+    });
   }
   return spots;
 }

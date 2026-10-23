@@ -12,12 +12,15 @@ export default function KnowledgeCardDialog({
   accountId,
   sceneId,
   token,
+  cardsPath,
   close,
 }: {
   subject: SubjectId;
   accountId: string;
   sceneId: string;
   token: string | null;
+  /** Rooms read the owner's catalog through scene access; other pages pass their own cards endpoint. */
+  cardsPath?: string;
   close(): void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -39,7 +42,9 @@ export default function KnowledgeCardDialog({
     setError("");
     const query = new URLSearchParams({ accountId });
     if (token) query.set("t", token);
-    void api<{ cards: unknown[] }>(`/physics/scenes/${sceneId}/cards?${query}`)
+    const path =
+      cardsPath ?? `/physics/scenes/${encodeURIComponent(sceneId)}/cards`;
+    void api<{ cards: unknown[] }>(`${path}?${query}`)
       .then((result) => {
         const next = result.cards.map((c) => knowledgeCardSchema.parse(c));
         if (alive) setCards(next);
@@ -51,7 +56,7 @@ export default function KnowledgeCardDialog({
     return () => {
       alive = false;
     };
-  }, [accountId, sceneId, token, retry]);
+  }, [accountId, sceneId, token, cardsPath, retry]);
   useEffect(() => {
     setSpeaking(false);
     return () => stopSpeaking();

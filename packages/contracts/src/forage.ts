@@ -24,6 +24,13 @@ export const forageContextSchema = z
 export const collectForageSchema = forageContextSchema
   .extend({ spotId: z.string().min(1).max(80), claimId: z.string().uuid() })
   .strict();
+/** Published places have no live room, so their forage context is the account itself. */
+export const placeForageContextSchema = z
+  .object({ accountId: z.string().uuid() })
+  .strict();
+export const collectPlaceForageSchema = placeForageContextSchema
+  .extend({ spotId: z.string().min(1).max(80), claimId: z.string().uuid() })
+  .strict();
 export const forageAvailabilitySchema = z
   .object({
     serverTime: z.number().finite(),

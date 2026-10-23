@@ -66,7 +66,12 @@ export {
   collectItem,
 } from "./growth.js";
 export type { GrowthEvent, TaskDef, GrowthState, UnlockDef } from "./growth.js";
-export { forageCatalog, forageSceneIds, forageSpots } from "./collectibles.js";
+export {
+  forageCatalog,
+  forageSceneIds,
+  forageSpots,
+  placeForageSpots,
+} from "./collectibles.js";
 export type { ForageKind, ForageSpot } from "./collectibles.js";
 export { pushOut, supportY, mantleBoost, landingY } from "./physics.js";
 export type { Obstacle } from "./physics.js";

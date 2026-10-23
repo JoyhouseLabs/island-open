@@ -1,6 +1,6 @@
 import type { ObjectDefinition } from "@island/contracts";
 
-export type PhysicsSound = "step" | "land" | "contact";
+export type PhysicsSound = "step" | "land" | "contact" | "pickup";
 /** Short synthesized material cues, activated only by the sound button. */
 export class PhysicsAudio {
   private context: AudioContext | null = null;
@@ -62,6 +62,11 @@ export class PhysicsAudio {
     if (now - (this.last.get(key) ?? -1) < (kind === "step" ? 0.18 : 0.08))
       return;
     this.last.set(key, now);
+    if (kind === "pickup") {
+      this.chime(now, 660, 0.09);
+      this.chime(now + 0.09, 990, 0.16);
+      return;
+    }
     const base = { wood: 170, stone: 95, rubber: 290, ice: 650 }[material];
     const oscillator = ctx.createOscillator(),
       gain = ctx.createGain();
@@ -88,6 +93,26 @@ export class PhysicsAudio {
     oscillator.start();
     oscillator.stop(now + duration + 0.01);
     this.played++;
+  }
+  /** A pickup is a soft rising two-note chime, not a material thud. */
+  private chime(at: number, frequency: number, duration: number) {
+    const ctx = this.context!;
+    const oscillator = ctx.createOscillator(),
+      gain = ctx.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, at);
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.09, at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    oscillator.connect(gain).connect(this.master!);
+    this.voices.add(oscillator);
+    oscillator.onended = () => {
+      this.voices.delete(oscillator);
+      oscillator.disconnect();
+      gain.disconnect();
+    };
+    oscillator.start(at);
+    oscillator.stop(at + duration + 0.01);
   }
   dispose() {
     this.disposed = true;

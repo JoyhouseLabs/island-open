@@ -1,4 +1,5 @@
 import { useForage } from "./useForage";
+import { PhysicsAudio } from "./PhysicsAudio";
 import type { SubjectId } from "@island/contracts";
 import { useAccountInventory } from "../activities/useAccountInventory";
 import PublishedPlaces from "./PublishedPlaces";
@@ -89,11 +90,25 @@ export default function OnlinePhysics({
     dressing ||
     backpack ||
     card !== null;
-  const forage = useForage(conn, inventory, busy || overlayOpen);
+  const forage = useForage(
+    conn,
+    inventory,
+    busy || overlayOpen,
+    () => chime.current?.play("pickup", "wood"),
+  );
   const [learningEnabled, setLearningEnabled] = useState(false);
   const [night, setNight] = useState(false);
   const [draft, setDraft] = useState<PhysicsDraft | null>(null);
   const keys = useMemo(() => new Set<string>(), []);
+  const chime = useRef<PhysicsAudio | null>(null),
+    [cues, setCues] = useState(false);
+  useEffect(() => {
+    chime.current = new PhysicsAudio();
+    return () => {
+      chime.current?.dispose();
+      chime.current = null;
+    };
+  }, []);
   const inspectForage = (kind: string) => {
     keys.clear();
     setBackpack(false);
@@ -631,6 +646,16 @@ export default function OnlinePhysics({
             </div>
           </section>
           <section className="physics-controls" inert={busy || overlayOpen}>
+            <button
+              className="physics-sound"
+              aria-pressed={cues}
+              onClick={() => {
+                keys.clear();
+                void chime.current!.toggle().then((on) => setCues(on));
+              }}
+            >
+              {cues ? "关闭拾取提示音" : "拾取提示音"}
+            </button>
             <button
               className="physics-sound"
               onClick={() => {
