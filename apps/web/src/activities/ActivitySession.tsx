@@ -211,7 +211,11 @@ export default function ActivitySession({ physical }: { physical: boolean }) {
     <main className="physics-playground physics-lobby">
       <header className="physics-header">
         <Link to="/island">回我的岛</Link>
-        <h1>阅读与创作</h1>
+        <h1>
+          {location.pathname.startsWith("/place/")
+            ? "我的小天地"
+            : "阅读与创作"}
+        </h1>
       </header>
       {error ? (
         <section role="alert">

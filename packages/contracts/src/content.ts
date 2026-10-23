@@ -9,7 +9,9 @@ import { sceneIds } from "./scenes.js";
 export const contentSceneSchema = z.enum(sceneIds);
 export type ContentScene = (typeof sceneIds)[number];
 
-const slug = z.string().regex(/^[a-z0-9-]{2,40}$/, "id 只能用小写字母、数字和连字符");
+const slug = z
+  .string()
+  .regex(/^[a-z0-9-]{2,40}$/, "id 只能用小写字母、数字和连字符");
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "颜色需为 #rrggbb 格式");
 const mediaUrl = z
   .string()
@@ -132,7 +134,11 @@ export const placeSchema = z
       })
       .strict(),
     sky: z
-      .object({ day: hex, night: hex, stars: z.number().int().min(0).max(3000) })
+      .object({
+        day: hex,
+        night: hex,
+        stars: z.number().int().min(0).max(3000),
+      })
       .strict(),
     ambience: z
       .object({
@@ -151,6 +157,42 @@ export const placeSchema = z
         message: "一个秘境最多一个池塘",
         path: ["props"],
       });
+    if (p.props.filter((x) => x.kind === "lamp").length > 4)
+      ctx.addIssue({
+        code: "custom",
+        message: "一个秘境最多四盏灯",
+        path: ["props"],
+      });
+    p.props.forEach((prop, i) => {
+      const radius =
+        {
+          tree: 1.6,
+          flower: 0.18,
+          bench: 1.3,
+          rock: 1.2,
+          lamp: 0.24,
+          pond: 2.5,
+        }[prop.kind] * prop.scale;
+      const edge =
+        p.ground.shape === "disc"
+          ? Math.hypot(prop.x, prop.z)
+          : Math.max(Math.abs(prop.x), Math.abs(prop.z));
+      if (edge + radius > p.ground.size / 2 - 0.5)
+        ctx.addIssue({
+          code: "custom",
+          message: "物件须完整放在地面边界内",
+          path: ["props", i],
+        });
+      if (
+        Math.abs(prop.x) < 3 + radius &&
+        prop.z + radius > p.ground.size / 4 - 2
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "请保留南侧出生点与回家门之间的通道",
+          path: ["props", i],
+        });
+    });
   });
 export type PlaceProp = z.infer<typeof placePropSchema>;
 export type PlaceConfig = z.infer<typeof placeSchema>;

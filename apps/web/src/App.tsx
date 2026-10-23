@@ -32,6 +32,7 @@ const PhysicsWilderness = lazy(() => import("./physics/PhysicsWilderness"));
 const WildernessPage = lazy(() => import("./pages/WildernessPage"));
 const IslandPage = lazy(() => import("./pages/IslandPage"));
 const SubScenePage = lazy(() => import("./pages/SubScenePage"));
+const PhysicsPlace = lazy(() => import("./physics/PhysicsPlace"));
 const PlacePage = lazy(() => import("./pages/PlacePage"));
 const BooksPage = lazy(() => import("./pages/BooksPage"));
 const BookReaderPage = lazy(() => import("./pages/BookReaderPage"));
@@ -110,6 +111,7 @@ export default function App() {
       (key) => location.pathname.replace(/\/+$/, "") === `/${key}`,
     ) ||
     location.pathname.startsWith("/visit/") ||
+    location.pathname.startsWith("/place/") ||
     location.pathname === paths.wilderness ||
     location.pathname === "/worlds" ||
     location.pathname === "/";
@@ -247,8 +249,13 @@ export default function App() {
           >
             {!physical && <Route index element={<WildernessPage />} />}
           </Route>
-          <Route element={<HomeSession />}>
-            <Route path="/place/:sceneId" element={<PlacePage />} />
+          <Route
+            element={physical ? <ActivitySession physical /> : <HomeSession />}
+          >
+            <Route
+              path="/place/:sceneId"
+              element={physical ? <PhysicsPlace /> : <PlacePage />}
+            />
           </Route>
           <Route element={<ActivitySession physical={physical === true} />}>
             <Route path="/books" element={<BooksPage />} />

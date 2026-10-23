@@ -277,3 +277,4 @@ export * from "./physics-themes.js";
 export * from "./physics-mountain.js";
 
 export * from "./physics-dinosaur.js";
+export * from "./physics-place.js";

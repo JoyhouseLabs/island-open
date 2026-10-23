@@ -1,0 +1,87 @@
+.physics-place {
+  min-height: 100dvh;
+  background: #f4f1e8;
+  color: #30483f;
+  display: flex;
+  flex-direction: column;
+}
+.physics-place header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 22px;
+  border-bottom: 3px solid var(--place-accent);
+}
+.physics-place h1 {
+  margin: 2px 0;
+  font-size: 24px;
+}
+.physics-place p {
+  margin: 4px 0;
+}
+.physics-place header a {
+  white-space: nowrap;
+  padding: 12px;
+  color: inherit;
+}
+.physics-place small {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+.physics-place-view {
+  position: relative;
+  height: max(420px, 66dvh);
+}
+.physics-place-view > p {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 12px;
+  background: #fff9;
+}
+.physics-place nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+}
+.physics-place button {
+  min-height: 44px;
+  min-width: 52px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid #bcc9b9;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.physics-place button:disabled {
+  opacity: 0.5;
+}
+.physics-place .place-move {
+  touch-action: none;
+  user-select: none;
+}
+.physics-place footer {
+  text-align: center;
+  padding: 8px 16px 18px;
+  font-size: 12px;
+}
+@media (max-width: 699px) {
+  .physics-place header {
+    padding: 8px;
+    gap: 8px;
+  }
+  .physics-place h1 {
+    font-size: 20px;
+  }
+  .physics-place-view {
+    height: 56dvh;
+    min-height: 340px;
+  }
+  .physics-place nav {
+    gap: 6px;
+    padding: 8px;
+  }
+}

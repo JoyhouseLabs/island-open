@@ -1,3 +1,4 @@
+import PublishedPlaces from "./PublishedPlaces";
 import PhysicsLogin from "./PhysicsLogin";
 import { homePath, visitPath, type PhysicsEntry } from "./routes";
 import DinosaurGuide, { type DinosaurFocus } from "./DinosaurGuide";
@@ -719,6 +720,23 @@ export default function OnlinePhysics({
                   AI 工坊
                 </button>
               </section>
+            )}
+            {world?.owner && user && (
+              <PublishedPlaces
+                key={user.id}
+                disabled={
+                  busy ||
+                  !connected ||
+                  !!conn.editing ||
+                  !!conn.editPending ||
+                  !!conn.pending
+                }
+                visit={(id) =>
+                  void visitActivity(
+                    `/place/${encodeURIComponent(id)}?${new URLSearchParams({ world: world.id, scene: sceneKey })}`,
+                  )
+                }
+              />
             )}
             {conn.scene.template.id === "core:library" && (
               <section
