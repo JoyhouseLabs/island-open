@@ -9,6 +9,8 @@ import {
   type DeviceInstance,
   type Placement,
 } from "@island/contracts";
+import { benchGeometry } from "./surfaces.js";
+import { libraryFeatures } from "./scenes.js";
 export const cellKey = (c: Cell) => `${c.x},${c.y},${c.z}`;
 export const parseCell = (k: string): Cell => {
   const [x, y, z] = k.split(",").map(Number);
@@ -173,13 +175,24 @@ export function supportCells(box: Box, y: number): Cell[] {
   return out;
 }
 export function entityBox(e: WorldSnapshot["entities"][number], y = 0): Box {
-  const rx = e.kind === "tree" ? 1.3 : e.kind === "bench" ? 2 : 0.45,
-    rz = e.kind === "bench" ? 0.78 : rx;
+  const rx =
+      e.kind === "tree"
+        ? 1.3
+        : e.kind === "bench"
+          ? benchGeometry.halfLength
+          : 0.45,
+    rz = e.kind === "bench" ? benchGeometry.halfWidth : rx;
   return {
     min: { x: e.x - rx, y, z: e.z - rz },
     max: {
       x: e.x + rx,
-      y: y + (e.kind === "tree" ? 12 : e.kind === "bench" ? 2.9 : 0.8),
+      y:
+        y +
+        (e.kind === "tree"
+          ? 12
+          : e.kind === "bench"
+            ? benchGeometry.backTopY
+            : 0.8),
       z: e.z + rz,
     },
   };
@@ -193,12 +206,24 @@ export function entityCollisionBoxes(
   if (e.kind !== "bench") return [box];
   return [
     {
-      min: { x: box.min.x, y, z: e.z - 0.7 },
-      max: { x: box.max.x, y: y + 1.575, z: e.z + 0.7 },
+      min: { x: box.min.x, y, z: e.z - benchGeometry.seatHalfDepth },
+      max: {
+        x: box.max.x,
+        y: y + benchGeometry.seatY,
+        z: e.z + benchGeometry.seatHalfDepth,
+      },
     },
     {
-      min: { x: box.min.x, y: y + 1.575, z: e.z - 0.775 },
-      max: { x: box.max.x, y: y + 2.9, z: e.z - 0.525 },
+      min: {
+        x: box.min.x,
+        y: y + benchGeometry.seatY,
+        z: e.z - benchGeometry.backOuterZ,
+      },
+      max: {
+        x: box.max.x,
+        y: y + benchGeometry.backTopY,
+        z: e.z - benchGeometry.backInnerZ,
+      },
     },
   ];
 }
@@ -206,12 +231,9 @@ const protectedLibraryBoxes: Box[] = [
   { min: { x: -28, y: 0, z: -19 }, max: { x: -8, y: 20, z: -1 } },
   { min: { x: -3, y: 0, z: 6 }, max: { x: 3, y: 20, z: 31 } },
   { min: { x: -6.5, y: 0, z: -1.5 }, max: { x: 2.5, y: 5, z: 7.5 } },
-  ...[
-    [2, 0],
-    [10, 12],
-  ].map(([x, z]) => ({
-    min: { x: x! - 2.5, y: 0, z: z! - 2.5 },
-    max: { x: x! + 2.5, y: 7, z: z! + 2.5 },
+  ...libraryFeatures.lamps.map((l) => ({
+    min: { x: l.x - 2.5, y: 0, z: l.z - 2.5 },
+    max: { x: l.x + 2.5, y: 7, z: l.z + 2.5 },
   })),
 ];
 export function protectedLibrary(box: Box): boolean {

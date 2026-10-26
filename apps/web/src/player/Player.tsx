@@ -23,6 +23,7 @@ import {
   readCells,
   deviceBox,
   entityCollisionBoxes,
+  benchGeometry,
   moveBody,
   safeBody,
   voxelBoxes,
@@ -31,6 +32,7 @@ import {
   mantleBoost,
   pushOut,
   supportY,
+  walkObstacles,
   type Obstacle,
 } from "@island/world-core";
 import { specFor } from "../places/specs";
@@ -45,7 +47,6 @@ import {
 import { gatePrompt } from "./gatePrompt";
 import { gateLabel, sceneTransition } from "./SceneTransition";
 import { playerAction } from "./actions";
-import { obstaclesFor } from "./obstacles";
 import { reportAgent, dropAgent, nearestAgent } from "../animals/registry";
 import { emitGrowth } from "../progress/store";
 import { proximity } from "../dialogue/proximity";
@@ -101,7 +102,7 @@ export function PlayerRig({
     () => [
       ...creationObstacles(world?.creations ?? []),
       ...furnitureObstacles(world?.furniture ?? []),
-      ...obstaclesFor(
+      ...walkObstacles(
         scene,
         entities.filter(
           (e) => !world?.entityPlacements?.some((p) => p.entityId === e.id),
@@ -161,7 +162,7 @@ export function PlayerRig({
         const e = entities.find(
           (e) => e.id === p.entityId && e.kind === "bench",
         );
-        return e ? [{ x: e.x, z: e.z, standY: p.y + 1.575 }] : [];
+        return e ? [{ x: e.x, z: e.z, standY: p.y + benchGeometry.seatY }] : [];
       }),
     [world?.entityPlacements, entities],
   );

@@ -6,6 +6,7 @@ import {
 } from "@island/contracts";
 import { groundHeight, placementError } from "./index.js";
 import type { Obstacle } from "./physics.js";
+import { furnitureSurfaces } from "./surfaces.js";
 
 export function furnitureSize(f: FurniturePlacement) {
   const d = furnitureCatalog.find((d) => d.id === f.itemId)!;
@@ -56,9 +57,10 @@ export function furniturePlacementError(
 }
 export function furnitureObstacles(items: FurniturePlacement[]): Obstacle[] {
   return items
-    .filter(
-      (f) => furnitureCatalog.find((d) => d.id === f.itemId)!.shape !== "rug",
-    )
+    .filter((f) => {
+      const d = furnitureCatalog.find((d) => d.id === f.itemId)!;
+      return furnitureSurfaces[d.shape].pass !== "through";
+    })
     .map((f) => ({
       x: f.x,
       z: f.z,
