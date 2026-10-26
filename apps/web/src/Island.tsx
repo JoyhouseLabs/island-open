@@ -332,7 +332,11 @@ function Building({
           />
         </group>
       ))}
-      <Box position={[0, 0.35, 5.5]} scale={[5, 0.7, 3]} color="#b5a17c" />
+      {/* Stoop sits a hair above the plinth and clear of the wall face —
+          exact coplanarity with either makes the depth test flicker while
+          the camera moves. Keep the doorway clear: entering the interior
+          will be a click action on this area. */}
+      <Box position={[0, 0.36, 5.52]} scale={[5, 0.72, 3]} color="#b5a17c" />
       {style === 0 && (
         <Box
           position={[3.1, 8.4, -1.5]}
