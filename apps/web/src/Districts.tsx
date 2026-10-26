@@ -2,9 +2,12 @@ import { useEffect, useMemo } from "react";
 import * as T from "three";
 import {
   flowerBeds,
-  nurseryBeds,
   groundHeight,
+  islandRocks,
+  islandStatics,
   landmarks,
+  nurseryBeds,
+  picnicCrate,
   pond,
   random,
 } from "@island/world-core";
@@ -154,8 +157,7 @@ function Fence({
   );
 }
 function Arbor() {
-  const x = -28,
-    z = 38,
+  const { x, z } = islandStatics.arbor,
     y = groundHeight(x, z);
   return (
     <group position={[x, y, z]}>
@@ -218,14 +220,8 @@ function CabinPlot({ x, z }: { x: number; z: number }) {
 function Mountain() {
   const peak = landmarks.find((p) => p.id === "mountain")!,
     cave = landmarks.find((p) => p.id === "cave")!;
-  const rock = useMemo(() => {
-    const rng = random(562);
-    return Array.from({ length: 16 }, () => {
-      const x = -40 + rng() * 90,
-        z = -72 - rng() * 19;
-      return { x, z, size: 1.8 + rng() * 3 };
-    });
-  }, []);
+  // Same seeded stream the colliders derive from, so rocks never disagree.
+  const rock = useMemo(() => islandRocks(), []);
   return (
     <>
       {rock.map((r, i) => (
@@ -310,7 +306,11 @@ function Mountain() {
   );
 }
 export function Districts() {
-  const plaza = useMemo(() => surface(-28, 27, 7, 7), []);
+  const well = islandStatics.well;
+  const plaza = useMemo(
+    () => surface(well.x, well.z, 7, 7),
+    [well.x, well.z],
+  );
   useEffect(() => () => plaza.dispose(), [plaza]);
   const reeds = useMemo(() => {
     const rng = random(281);
@@ -332,11 +332,11 @@ export function Districts() {
           side={T.DoubleSide}
         />
       </mesh>
-      <mesh position={[-28, 6.6, 27]}>
+      <mesh position={[well.x, 6.6, well.z]}>
         <cylinderGeometry args={[1.9, 2.3, 0.8, 16]} />
         <meshStandardMaterial color="#b1b8a1" roughness={0.9} />
       </mesh>
-      <mesh position={[-28, 7.1, 27]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[well.x, 7.1, well.z]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[1.65, 24]} />
         <meshStandardMaterial color="#7caaa0" roughness={0.25} />
       </mesh>
@@ -349,17 +349,27 @@ export function Districts() {
         <Bed key={`nursery-${i}`} {...b} nursery />
       ))}
       <Arbor />
-      <Fence x={-53} z={50} length={22} rotation={Math.PI / 2} />
-      <Fence x={-3} z={51} length={20} rotation={Math.PI / 2} />
-      <Fence x={-42} z={63} length={19} />
-      <Fence x={-14} z={63} length={19} />
-      <group position={[74, groundHeight(74, 45), 45]}>
+      {islandStatics.fences.map((f) => (
+        <Fence key={`${f.x}:${f.z}`} {...f} />
+      ))}
+      <group
+        position={[
+          islandStatics.shed.x,
+          groundHeight(islandStatics.shed.x, islandStatics.shed.z),
+          islandStatics.shed.z,
+        ]}
+      >
         <Block x={0} y={1.1} z={0} w={3} h={2.2} d={1.6} color="#99a58a" />
         <Block x={0} y={2.3} z={0} w={3.4} h={0.25} d={2} color="#d1c6a4" />
       </group>
       <group
-        position={[18, groundHeight(18, 72) + 0.15, 72]}
-        rotation={[0, -0.22, 0]}
+        position={[
+          islandStatics.picnicMat.x,
+          groundHeight(islandStatics.picnicMat.x, islandStatics.picnicMat.z) +
+            0.15,
+          islandStatics.picnicMat.z,
+        ]}
+        rotation={[0, islandStatics.picnicMat.rotation, 0]}
       >
         <Block x={0} y={0} z={0} w={7} h={0.08} d={5} color="#d6b28b" />
         {[-2, 0, 2].map((x) => (
@@ -374,7 +384,19 @@ export function Districts() {
             color="#e4d5b3"
           />
         ))}
-        <Block x={2} y={0.6} z={1} w={1.3} h={1.2} d={1} color="#a68c60" />
+      </group>
+      {/* The crate sits beside the mat in world space — the same position
+          the walk collider uses, so what you see is what blocks you. */}
+      <group
+        position={[
+          picnicCrate.x,
+          groundHeight(islandStatics.picnicMat.x, islandStatics.picnicMat.z) +
+            0.75,
+          picnicCrate.z,
+        ]}
+        rotation={[0, islandStatics.picnicMat.rotation, 0]}
+      >
+        <Block x={0} y={0} z={0} w={1.3} h={1.2} d={1} color="#a68c60" />
       </group>
       {reeds.map((r, i) => (
         <mesh

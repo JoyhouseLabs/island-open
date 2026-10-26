@@ -37,6 +37,8 @@ export type { SubSceneDef } from "./scenes.js";
 export { walkSpecs } from "./walk.js";
 export { tableTops } from "./furniture.js";
 export type { WalkSpec, Gate } from "./walk.js";
+export * from "./surfaces.js";
+export * from "./statics.js";
 export { residents } from "./residents.js";
 export type { Species, Interest, Resident } from "./residents.js";
 export {

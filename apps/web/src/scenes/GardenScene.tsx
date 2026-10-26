@@ -6,6 +6,7 @@ import {
   gardenBeds,
   gardenPond,
   gardenGreenhouse,
+  gardenTeaNook,
 } from "@island/world-core";
 import { Plants, Box, palettes } from "../Plants";
 import { PlayerRig } from "../player/Player";
@@ -313,7 +314,9 @@ function Garden(props: SceneProps) {
           />
         ))}
       </group>
-      <group position={[-17, 0, -10]}>
+      <group
+        position={[gardenTeaNook.table.x, 0, gardenTeaNook.table.z]}
+      >
         <mesh
           position={[
             0,
@@ -333,7 +336,7 @@ function Garden(props: SceneProps) {
           <meshStandardMaterial color="#c6aa7c" />
         </mesh>
         <Box position={[0, 0.8, 0]} scale={[0.6, 1.6, 0.6]} color="#8c7254" />
-        {[-3.5, 3.5].map((x) => (
+        {[-gardenTeaNook.crateOffset, gardenTeaNook.crateOffset].map((x) => (
           <Box
             key={x}
             position={[x, 0.8, 0]}

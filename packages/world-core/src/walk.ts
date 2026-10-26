@@ -2,6 +2,8 @@ import type { SubSceneId } from "@island/contracts";
 import type { Point } from "./index.js";
 import { dinosaurPark, dinosaurWalkable } from "./dinosaur.js";
 import {
+  beachLagoon,
+  buildings,
   groundHeight,
   homeFeatures,
   island,
@@ -17,7 +19,6 @@ import {
   shoreline,
   starlightFeatures,
   subScenes,
-  beachLagoon,
   beachShore,
 } from "./index.js";
 
@@ -74,13 +75,8 @@ export const walkSpecs: Record<"island" | SubSceneId, WalkSpec> = {
       radial(x, z) <
         shoreline(Math.atan2(z / island.radiusZ, x / island.radiusX)) - 0.015 &&
       Math.hypot((x - 52) / 26, (z + 28) / 21) >= 1 &&
-      ![
-        [-28, 7],
-        [-48, 24],
-        [-9, 25],
-        [-80, 3],
-        [72, 6],
-      ].some(([bx, bz]) => disc(x, z, bx!, bz!, 9)),
+      // Building hulls are unwalkable disks around each island building.
+      !buildings.some((b) => disc(x, z, b.x, b.z, 9)),
     height: groundHeight,
     get gates() {
       return islandGateList();
