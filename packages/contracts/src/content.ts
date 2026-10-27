@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SPECIES } from "./species.js";
 import { sceneIds } from "./scenes.js";
 
 /**
@@ -11,6 +12,8 @@ export type ContentScene = (typeof sceneIds)[number];
 
 const slug = z.string().regex(/^[a-z0-9-]{2,40}$/, "id 只能用小写字母、数字和连字符");
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, "颜色需为 #rrggbb 格式");
+// Animal species derive from the registry; "custom" means an uploaded GLB.
+const animalSpecies = [...SPECIES, "custom"] as const;
 const mediaUrl = z
   .string()
   .max(500)
@@ -74,7 +77,7 @@ export const animalConfigSchema = z
   .object({
     id: slug,
     name: z.string().trim().min(1).max(24),
-    species: z.enum(["fox", "panda", "giraffe", "wolf", "custom"]),
+    species: z.enum(animalSpecies),
     assetId: z.string().uuid().optional(),
     placement: z
       .object({

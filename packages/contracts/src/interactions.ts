@@ -1,39 +1,14 @@
 import { z } from "zod";
 import { animalPersonaSchema } from "./content.js";
 import { subjectSchema } from "./subject.js";
+// Species personalities live in the species registry (species.ts); they are
+// re-exported here so existing `from "@island/contracts"` imports keep working.
+export { builtinPersonas } from "./species.js";
 /**
  * The unified interaction model: everything a child can point at has a
  * subject id (subject.ts), and every later layer (knowledge card, chat
  * persona, ecology traits) hangs off that id.
  */
-
-/** Default personalities for the four built-in species, shared by the
- *  server prompt builder and the client deep-chat entry. */
-export const builtinPersonas: Record<
-  "fox" | "panda" | "giraffe" | "wolf",
-  { temperament: string; speechStyle: string; likes: string }
-> = {
-  fox: {
-    temperament: "机灵、热情，有一点点小得意",
-    speechStyle: "语速快，爱用感叹号，喜欢先卖个关子",
-    likes: "巡岛送信、新鲜事的气味、和每个伙伴打招呼",
-  },
-  panda: {
-    temperament: "慢悠悠、温和，特别有耐心",
-    speechStyle: "句子短短的、软软的，偶尔说到一半打个哈欠",
-    likes: "竹子的咔嚓声、午后晒太阳、听孩子慢慢讲话",
-  },
-  giraffe: {
-    temperament: "安静、周到，看得比别人远",
-    speechStyle: "语气平缓温柔，喜欢提醒小伙伴注意小细节",
-    likes: "高处的新鲜风、数星星、帮小个子够高处的果子",
-  },
-  wolf: {
-    temperament: "认真、讲义气，外冷内热",
-    speechStyle: "话不多但每句都算数，偶尔冒出很酷的短句",
-    likes: "月光下的长跑、和伙伴并肩、守着岛上的约定",
-  },
-};
 
 /** Safety rules every chat speaker on the island follows, whatever it is. */
 export const CHILD_SAFETY_RULES: string[] = [

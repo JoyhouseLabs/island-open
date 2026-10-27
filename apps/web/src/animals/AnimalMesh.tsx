@@ -311,6 +311,149 @@ function WolfMesh({ anim }: { anim: AnimalAnim }) {
   );
 }
 
+/** A water-loving creature in the island's flat-colour style: pale blue
+ *  body, a navy head crest and ear fins, a cream neck frill and a split
+ *  fish tail that sways while it walks. */
+function VaporeonMesh({ anim }: { anim: AnimalAnim }) {
+  const body = useRef<T.Group>(null),
+    head = useRef<T.Group>(null),
+    tail = useRef<T.Group>(null);
+  useFrame(() => {
+    const pose = poses[anim.action];
+    if (body.current) {
+      const hop =
+        anim.action === "greet" || anim.action === "pet"
+          ? Math.abs(Math.sin(anim.phase * 10)) * 0.15
+          : anim.moving
+            ? Math.abs(Math.sin(anim.phase * 8)) * 0.03
+            : 0;
+      body.current.position.y = -pose.sink + hop;
+      body.current.rotation.x += (pose.body - body.current.rotation.x) * 0.12;
+    }
+    if (head.current)
+      head.current.rotation.x +=
+        (pose.neck + (anim.action === "sniff" ? Math.sin(anim.phase * 5) * 0.13 : 0) -
+          head.current.rotation.x) *
+        0.12;
+    if (tail.current) {
+      tail.current.rotation.y = Math.sin(anim.phase * 3.1) * 0.4;
+      tail.current.rotation.x = -0.2 + (anim.moving ? Math.sin(anim.phase * 7) * 0.15 : 0);
+    }
+  });
+  return (
+    <group ref={body}>
+      <mesh position={[0, 0.7, -0.04]} scale={[0.46, 0.4, 0.74]} castShadow>
+        <sphereGeometry args={[1, 14, 12]} />
+        <meshStandardMaterial color="#7cc8e8" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 0.58, 0.3]} scale={[0.3, 0.27, 0.38]}>
+        <sphereGeometry args={[1, 12, 10]} />
+        <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
+      </mesh>
+      {/* Cream frill ringing the neck like a collar of little fins. */}
+      <group position={[0, 0.88, 0.26]}>
+        {Array.from({ length: 8 }, (_, i) => {
+          const a = (i / 8) * Math.PI * 2;
+          return (
+            <group key={i} rotation={[0, a, 0]}>
+              <mesh position={[0.27, 0.05, 0]} rotation={[0.35, 0, -1.15]}>
+                <coneGeometry args={[0.055, 0.26, 4]} />
+                <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
+              </mesh>
+            </group>
+          );
+        })}
+      </group>
+      {/* Navy fins standing along the spine. */}
+      {(
+        [
+          [1.03, 0.02, 0.22],
+          [1.06, -0.24, 0.18],
+          [1.04, -0.48, 0.15],
+        ] as [number, number, number][]
+      ).map(([y, z, h], i) => (
+        <mesh key={i} position={[0, y, z]} rotation={[-0.25, 0, 0]} castShadow>
+          <coneGeometry args={[0.07, h, 4]} />
+          <meshStandardMaterial color="#2f5d94" roughness={0.9} />
+        </mesh>
+      ))}
+      <group ref={head} position={[0, 1.0, 0.5]}>
+        <mesh castShadow>
+          <sphereGeometry args={[0.28, 14, 12]} />
+          <meshStandardMaterial color="#7cc8e8" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, -0.07, 0.22]} scale={[0.13, 0.09, 0.13]}>
+          <sphereGeometry args={[1, 10, 8]} />
+          <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, -0.005, 0.3]}>
+          <sphereGeometry args={[0.045, 8, 8]} />
+          <meshStandardMaterial color="#2a3a55" roughness={1} />
+        </mesh>
+        <Mouth anim={anim} position={[0, -0.115, 0.262]} width={0.11} color="#2a3a55" />
+        {[-1, 1].map((s) => (
+          <mesh key={s} position={[s * 0.12, 0.07, 0.235]}>
+            <sphereGeometry args={[0.05, 10, 8]} />
+            <meshStandardMaterial color="#26334d" roughness={1} />
+          </mesh>
+        ))}
+        {/* The swept-back head crest. */}
+        <mesh position={[0, 0.3, 0.02]} rotation={[-0.45, 0, 0]} castShadow>
+          <coneGeometry args={[0.11, 0.34, 4]} />
+          <meshStandardMaterial color="#2f5d94" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, 0.27, -0.19]} rotation={[-0.6, 0, 0]} castShadow>
+          <coneGeometry args={[0.09, 0.24, 4]} />
+          <meshStandardMaterial color="#2f5d94" roughness={0.9} />
+        </mesh>
+        {[-1, 1].map((s) => (
+          <mesh
+            key={s}
+            position={[s * 0.24, 0.12, -0.02]}
+            rotation={[-0.3, 0, s * 1.15]}
+            castShadow
+          >
+            <coneGeometry args={[0.07, 0.24, 4]} />
+            <meshStandardMaterial color="#2f5d94" roughness={0.9} />
+          </mesh>
+        ))}
+      </group>
+      <group ref={tail} position={[0, 0.74, -0.6]}>
+        {[-1, 1].map((s) => (
+          <mesh
+            key={s}
+            position={[s * 0.1, 0.14, -0.08]}
+            rotation={[-0.5, 0, s * 0.55]}
+            castShadow
+          >
+            <coneGeometry args={[0.11, 0.46, 4]} />
+            <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
+          </mesh>
+        ))}
+      </group>
+      <QuadLeg x={-0.17} z={0.32} w={0.12} h={0.48} color="#57b0da" anim={anim} flip={0} />
+      <QuadLeg x={0.17} z={0.32} w={0.12} h={0.48} color="#57b0da" anim={anim} flip={1} />
+      <QuadLeg x={-0.17} z={-0.28} w={0.13} h={0.48} color="#57b0da" anim={anim} flip={1} />
+      <QuadLeg x={0.17} z={-0.28} w={0.13} h={0.48} color="#57b0da" anim={anim} flip={0} />
+    </group>
+  );
+}
+
+/** Which mesh each species renders with. The walking fox is the shared GLB
+ *  (useFox); admin-placed "fox" animals reuse the panda build, as before.
+ *  Adding a species without a mesh entry is a compile error here — the
+ *  bespoke geometry lives in this file, one function per species. */
+const meshes: Record<
+  Species,
+  (props: { anim: AnimalAnim }) => ReturnType<typeof PandaMesh>
+> = {
+  fox: PandaMesh,
+  panda: PandaMesh,
+  giraffe: GiraffeMesh,
+  wolf: WolfMesh,
+  vaporeon: VaporeonMesh,
+};
+
 export function AnimalMesh({
   species,
   anim,
@@ -318,7 +461,6 @@ export function AnimalMesh({
   species: Species;
   anim: AnimalAnim;
 }) {
-  if (species === "giraffe") return <GiraffeMesh anim={anim} />;
-  if (species === "wolf") return <WolfMesh anim={anim} />;
-  return <PandaMesh anim={anim} />;
+  const Mesh = meshes[species];
+  return <Mesh anim={anim} />;
 }

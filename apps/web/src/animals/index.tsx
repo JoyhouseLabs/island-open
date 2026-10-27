@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { SubSceneId, IslandEntity, AnimalConfig } from "@island/contracts";
+import { speciesProfiles } from "@island/contracts";
 import { residents, type Resident } from "@island/world-core";
 import { Animal } from "./Animal";
 import { CustomAnimal } from "./CustomAnimal";
@@ -47,11 +48,11 @@ export function Residents({
   );
   const born = (ecology ?? [])
     .filter((m) => m.bornTick > 0)
-    // A born wolf still waits on the same unlock as 风哨.
-    .filter(
-      (m) =>
-        m.species !== "wolf" || state.owned["resident-wolf"],
-    );
+    // A born friend of a gated species waits on the same unlock as its kin.
+    .filter((m) => {
+      const unlock = speciesProfiles[m.species].unlockId;
+      return !unlock || state.owned[unlock];
+    });
   return (
     <>
       <HostAgentsSender />

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 
 import type { SubSceneId, IslandEntity } from "@island/contracts";
+import { speciesProfiles } from "@island/contracts";
 import {
+  pond,
   pondShape,
   random,
   type Interest,
@@ -17,20 +19,13 @@ import { playVoice } from "./voices";
 import { emitGrowth } from "../progress/store";
 import { dialogue } from "../dialogue/store";
 
-const speeds: Record<string, number> = {
-  panda: 1.7,
-  giraffe: 1.3,
-  wolf: 2.3,
-  fox: 1.8,
+const actionFor = (prefer: Interest, species: Resident["species"]): AnimalAction => {
+  const { behavior } = speciesProfiles[species];
+  if (prefer === "bench") return "rest";
+  if (prefer === "water") return "drink";
+  if (behavior.browse && prefer === behavior.browse) return "browse";
+  return "sniff";
 };
-const actionFor = (prefer: Interest, species: string): AnimalAction =>
-  prefer === "bench"
-    ? "rest"
-    : prefer === "water"
-      ? "drink"
-      : prefer === "tree" && species === "giraffe"
-        ? "browse"
-        : "sniff";
 const emoteFor: Record<AnimalAction, EmoteKind> = {
   none: "sparkle",
   sniff: "sparkle",
@@ -108,11 +103,18 @@ export function Animal({
   const pickTarget = () => {
     const s = st.current;
     // Water dwellers walk to the pond rim; others visit a favourite object.
+    // The main island's pond sits east with a wide unwalkable shore margin,
+    // so its rim target is scaled past that margin; the pond scene's basin
+    // is pondShape itself.
     if (resident.prefer === "water") {
-      const dx = s.x - pondShape.x,
-        dz = s.z - pondShape.z,
-        k = 1 / Math.hypot(dx / (pondShape.rx + 1.4), dz / (pondShape.rz + 1.4));
-      return { x: pondShape.x + dx * k, z: pondShape.z + dz * k };
+      const pool =
+        scene === "island"
+          ? { x: pond.x, z: pond.z, rx: pond.rx + 6.4, rz: pond.rz + 6.4 }
+          : pondShape;
+      const dx = s.x - pool.x,
+        dz = s.z - pool.z,
+        k = 1 / Math.hypot(dx / (pool.rx + 1.4), dz / (pool.rz + 1.4));
+      return { x: pool.x + dx * k, z: pool.z + dz * k };
     }
     const kind =
       resident.prefer === "flower" || resident.prefer === "grass"
@@ -159,7 +161,7 @@ export function Animal({
       dt = Math.min(rawDt, 0.05),
       t = clock.elapsedTime;
     const speed =
-      (s.mode === "play" ? 1.6 : 1) * (speeds[resident.species] ?? 1.5);
+      (s.mode === "play" ? 1.6 : 1) * speciesProfiles[resident.species].behavior.speed;
 
     // While this animal is the one being talked to, it stands still,
     // faces the player and listens; the walk resumes afterwards.
@@ -441,8 +443,7 @@ export function Animal({
       });
   });
 
-  const headY =
-    resident.species === "giraffe" ? 3.5 : resident.species === "wolf" ? 1.6 : 1.5;
+  const headY = speciesProfiles[resident.species].behavior.headY;
   return (
     <group ref={root} onClick={pet}>
       <AnimalMesh species={resident.species} anim={anim.current} />
@@ -450,7 +451,7 @@ export function Animal({
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
         <circleGeometry args={[0.7, 20]} />
         <meshBasicMaterial
-          color={resident.species === "panda" ? "#9db8a4" : "#c9b184"}
+          color={speciesProfiles[resident.species].behavior.shadow ?? "#c9b184"}
           transparent
           opacity={0.28}
           depthWrite={false}

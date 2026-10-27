@@ -81,6 +81,14 @@
       "sha256": "5b0e2d1b2346f60fdb61ee496a3332dd8b5d35133e39968b3a94df3243567add",
       "bytes": 22976,
       "mime": "audio/wav"
+    },
+    {
+      "id": "voice-vaporeon",
+      "file": "voice-vaporeon.wav",
+      "url": "/api/content/core/voice-vaporeon",
+      "sha256": "29a64b6cdbadf73b7959640bbd04f4ebb512849db8a8d73087a8bfc3f3994321",
+      "bytes": 25622,
+      "mime": "audio/wav"
     }
   ]
 }
