@@ -171,12 +171,22 @@ class PresenceClient {
       }
       this.receive(msg);
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (this.socket !== socket) return; // replaced or disconnected
       this.socket = null;
       this.poses.clear();
       this.commit({ status: "offline", players: [] });
       if (!this.room) return;
+      // 4401/4403 are deliberate refusals (session ended, sharing closed,
+      // bad token or origin): retrying cannot succeed, so drop to offline
+      // for good instead of hammering the server. A fresh connect() — new
+      // page or re-entered scene — starts over.
+      if (event.code === 4401 || event.code === 4403) {
+        this.agents.clear();
+        this.hostConnId = null;
+        this.agentsAt = 0;
+        return;
+      }
       const wait = Math.min(15000, 1000 * 2 ** this.retry++);
       this.retryTimer = setTimeout(() => this.open(), wait);
     };

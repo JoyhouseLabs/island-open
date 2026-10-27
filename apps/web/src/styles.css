@@ -3526,6 +3526,17 @@ a.place {
   }
 }
 
+/* WebGL context-loss guard: covers the frozen canvas while three rebuilds
+   the context; the reload button takes over if it never returns. */
+.webgl-lost { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: #223a30cc; }
+.webgl-lost-card { display: flex; flex-direction: column; gap: 8px; align-items: center; max-width: min(320px, calc(100vw - 40px)); padding: 20px 24px; border-radius: 18px; background: #f8f9eff7; color: #40503f; text-align: center; box-shadow: 0 10px 30px #16352a33; }
+.webgl-lost-card strong { font-size: 15px; }
+.webgl-lost-card small { font-size: 12px; color: #809275; line-height: 1.6; }
+.webgl-lost-card button { border: 0; border-radius: 999px; padding: 8px 18px; background: #7fa06a; color: #f8f9ef; font-size: 13px; cursor: pointer; opacity: .8; }
+.webgl-lost.webgl-lost-stalled .webgl-lost-card strong::after { content: "（等得有点久了）"; font-size: 12px; color: #a2653f; }
+.webgl-lost.webgl-lost-stalled .webgl-lost-card button { opacity: 1; animation: webgl-lost-pulse 1.6s infinite; }
+@keyframes webgl-lost-pulse { 50% { transform: scale(1.05); } }
+
 /* Activity menus: one short row to play, a wrapped tool palette to decorate. */
 .activity-toolbar { flex-wrap: nowrap; }
 .activity-toolbar .tool { width: 72px; flex-shrink: 0; letter-spacing: 0; }
