@@ -1,7 +1,11 @@
 import { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Group } from "three";
-import { terrainHeightAt, type PhysicsTerrainTile } from "@island/contracts";
+import {
+  speciesProfiles,
+  terrainHeightAt,
+  type PhysicsTerrainTile,
+} from "@island/contracts";
 import { random, residents, type Resident } from "@island/world-core";
 import {
   AnimalMesh,
@@ -10,12 +14,6 @@ import {
 } from "../animals/AnimalMesh";
 import { dialogue } from "../dialogue/store";
 
-const speeds: Record<Resident["species"], number> = {
-  panda: 1.7,
-  giraffe: 1.3,
-  wolf: 2.3,
-  fox: 1.8,
-};
 const idleAction = (prefer: Resident["prefer"]): AnimalAction =>
   prefer === "bench"
     ? "rest"
@@ -111,7 +109,10 @@ function ResidentAnimal({
           s.target = null;
           s.until = 2 + rng() * 4;
         } else {
-          const step = Math.min(speeds[resident.species] * dt, d);
+          const step = Math.min(
+            speciesProfiles[resident.species].behavior.speed * dt,
+            d,
+          );
           s.x += (dx / d) * step;
           s.z += (dz / d) * step;
           s.yaw = lerpAngle(s.yaw, Math.atan2(dx, dz), 1 - Math.exp(-dt * 5));
