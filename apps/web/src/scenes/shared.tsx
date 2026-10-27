@@ -459,6 +459,9 @@ export function GrassField({
 }) {
   const blades = useRef<T.InstancedMesh>(null);
   // A gentle 0.13 amplitude: tufts nod a few degrees, never lean over.
+  // Attached via <primitive>, which R3F does not auto-dispose — release the
+  // material and geometry ourselves or every scene re-entry leaks GPU
+  // memory (one material + one tuft geometry per GrassField mount).
   const material = useMemo(
     () =>
       swayingMaterial(
@@ -469,6 +472,13 @@ export function GrassField({
     [],
   );
   const geometry = useMemo(() => createGrassTuftGeometry(), []);
+  useEffect(
+    () => () => {
+      material.dispose();
+      geometry.dispose();
+    },
+    [material, geometry],
+  );
   const { matrices, colors } = useMemo(() => {
     const rng = random(seed),
       dummy = new T.Object3D(),
