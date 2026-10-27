@@ -104,30 +104,79 @@ const tone = (
   }
 };
 const silence = (seconds) => new Float32Array(Math.floor(sampleRate * seconds));
-// Panda: two soft rising chirps.
-const voicePanda = silence(0.62);
-tone(voicePanda, 0.02, 0.17, [620, 940], { vib: 0.012, vibHz: 5.5 });
-tone(voicePanda, 0.27, 0.24, [660, 1000], { vib: 0.012, vibHz: 5.5 });
-// Giraffe: a low hum with stacked harmonics and a slow swell.
-const voiceGiraffe = silence(1.2);
-for (const [h, g] of [
-  [1, 1],
-  [1.5, 0.45],
-  [2, 0.25],
-])
-  tone(voiceGiraffe, 0.04, 1.05, [88 * h, 96 * h], { curve: 1.2, gain: g });
-for (let i = 0; i < voiceGiraffe.length; i++)
-  voiceGiraffe[i] *= 0.72 + 0.28 * Math.sin((2 * Math.PI * 2.2 * i) / sampleRate);
-// Wolf: a smooth howl that rises, holds and falls, with a little breath.
-const voiceWolf = silence(1.5);
-tone(voiceWolf, 0.06, 1.32, [300, 520, 390], { vib: 0.014, vibHz: 6, noise: 0.05, curve: 1.1 });
-// Fox: one quick bright bark.
-const voiceFox = silence(0.26);
-tone(voiceFox, 0.01, 0.22, [820, 1180], { vib: 0.02, vibHz: 8, noise: 0.1, curve: 1.6 });
-// Friend: a generic happy two-hop chirp for custom companions.
-const voiceFriend = silence(0.52);
-tone(voiceFriend, 0.02, 0.14, [520, 640], { curve: 1.4 });
-tone(voiceFriend, 0.2, 0.2, [700, 880], { curve: 1.4 });
+// Species voices as data: each recipe is a clip length plus a list of
+// tone() notes [start, dur, glide, opts] and an optional slow amplitude
+// swell [hz, floor, depth]. Adding a species voice = one recipe here; the
+// id must match the species registry's `voice` field in
+// packages/contracts/src/species.ts.
+const voiceRecipes = [
+  // Panda: two soft rising chirps.
+  {
+    id: "voice-panda",
+    seconds: 0.62,
+    tones: [
+      [0.02, 0.17, [620, 940], { vib: 0.012, vibHz: 5.5 }],
+      [0.27, 0.24, [660, 1000], { vib: 0.012, vibHz: 5.5 }],
+    ],
+  },
+  // Giraffe: a low hum with stacked harmonics and a slow swell.
+  {
+    id: "voice-giraffe",
+    seconds: 1.2,
+    swell: [2.2, 0.72, 0.28],
+    tones: [
+      [0.04, 1.05, [88, 96], { curve: 1.2, gain: 1 }],
+      [0.04, 1.05, [132, 144], { curve: 1.2, gain: 0.45 }],
+      [0.04, 1.05, [176, 192], { curve: 1.2, gain: 0.25 }],
+    ],
+  },
+  // Wolf: a smooth howl that rises, holds and falls, with a little breath.
+  {
+    id: "voice-wolf",
+    seconds: 1.5,
+    tones: [
+      [0.06, 1.32, [300, 520, 390], { vib: 0.014, vibHz: 6, noise: 0.05, curve: 1.1 }],
+    ],
+  },
+  // Fox: one quick bright bark.
+  {
+    id: "voice-fox",
+    seconds: 0.26,
+    tones: [
+      [0.01, 0.22, [820, 1180], { vib: 0.02, vibHz: 8, noise: 0.1, curve: 1.6 }],
+    ],
+  },
+  // Friend: a generic happy two-hop chirp for custom companions.
+  {
+    id: "voice-friend",
+    seconds: 0.52,
+    tones: [
+      [0.02, 0.14, [520, 640], { curve: 1.4 }],
+      [0.2, 0.2, [700, 880], { curve: 1.4 }],
+    ],
+  },
+  // Vaporeon: bubbly water chirps — two droppy plips, then a splash.
+  {
+    id: "voice-vaporeon",
+    seconds: 0.58,
+    tones: [
+      [0.02, 0.16, [980, 640], { vib: 0.016, vibHz: 9, curve: 1.5 }],
+      [0.22, 0.14, [880, 560], { vib: 0.016, vibHz: 9, curve: 1.5 }],
+      [0.4, 0.14, [520, 760], { noise: 0.08, curve: 1.8 }],
+    ],
+  },
+];
+function renderVoice(recipe) {
+  const out = silence(recipe.seconds);
+  for (const [start, dur, glide, opts] of recipe.tones)
+    tone(out, start, dur, glide, opts);
+  if (recipe.swell) {
+    const [hz, floor, depth] = recipe.swell;
+    for (let i = 0; i < out.length; i++)
+      out[i] *= floor + depth * Math.sin((2 * Math.PI * hz * i) / sampleRate);
+  }
+  return out;
+}
 const normalize = (samples, peak) => {
   let max = 0;
   for (const v of samples) max = Math.max(max, Math.abs(v));
@@ -177,11 +226,7 @@ const files = [
   ["rain", wav(fadeLoop(normalize(rain, 0.5), 0.12))],
   ["wind", wav(fadeLoop(normalize(wind, 0.55), 0.12))],
   ["thunder", wav(fadeOut(normalize(thunder, 0.9), 0.05))],
-  ["voice-panda", wav(fadeOut(normalize(voicePanda, 0.5), 0.03))],
-  ["voice-giraffe", wav(fadeOut(normalize(voiceGiraffe, 0.5), 0.03))],
-  ["voice-wolf", wav(fadeOut(normalize(voiceWolf, 0.5), 0.03))],
-  ["voice-fox", wav(fadeOut(normalize(voiceFox, 0.5), 0.03))],
-  ["voice-friend", wav(fadeOut(normalize(voiceFriend, 0.5), 0.03))],
+  ...voiceRecipes.map((r) => [r.id, wav(fadeOut(normalize(renderVoice(r), 0.5), 0.03))]),
 ];
 for (const [id, data] of files) await writeFile(new URL(`${id}.wav`, root), data);
 const manifest = {

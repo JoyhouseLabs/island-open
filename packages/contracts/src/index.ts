@@ -13,6 +13,7 @@ export * from "./cards.js";
 export * from "./content.js";
 export * from "./interactions.js";
 export * from "./items.js";
+export * from "./species.js";
 export * from "./subject.js";
 export * from "./presence.js";
 export * from "./scenes.js";

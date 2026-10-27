@@ -1,5 +1,6 @@
 import { random } from "./random.js";
 import { residents, type Interest, type Species } from "./residents.js";
+import { speciesProfiles } from "@island/contracts";
 
 /**
  * The island's bounded ecology: a gentle population drift and one scheduled
@@ -45,31 +46,9 @@ export type EcologyState = {
 
 export type EcologySeason = "spring" | "summer" | "autumn" | "winter";
 
-/** Per-species name pieces for born friends; flavours match the residents. */
-const nameParts: Record<Species, { first: string[]; second: string[] }> = {
-  panda: {
-    first: ["小", "竹", "圆", "糯", "软"],
-    second: ["团子", "滚滚", "圆圆", "宝宝", "乎乎"],
-  },
-  giraffe: {
-    first: ["小", "云", "叶", "星", "金"],
-    second: ["高高", "梢梢", "望望", "点点", "长长"],
-  },
-  wolf: {
-    first: ["小", "风", "月", "雪", "影"],
-    second: ["哨哨", "牙牙", "步步", "鸣鸣", "影影"],
-  },
-  fox: {
-    first: ["小", "火", "绒"],
-    second: ["尾尾", "尖尖", "灵灵"],
-  },
-};
-const prefers: Record<Species, Interest> = {
-  panda: "flower",
-  giraffe: "tree",
-  wolf: "grass",
-  fox: "flower",
-};
+/** Per-species name pieces for born friends; flavours and preferences
+ *  come from the contracts species registry. */
+const nameParts = (species: Species) => speciesProfiles[species].ecology.nameParts;
 
 /** Deterministic tick rng: same seed and tick, same little world. */
 const tickRng = (seed: number, tick: number) =>
@@ -98,7 +77,7 @@ function bornMember(
   taken: Set<string>,
 ): EcologyMember {
   const rng = random((seed ^ Math.imul(tick, 0x85ebca6b) ^ 0x51ed) >>> 0);
-  const parts = nameParts[species];
+  const parts = nameParts(species);
   let name = "";
   // Try deterministic pairs until one is unused; fall back to a numbered cub.
   for (let i = 0; i < 12 && !name; i++) {
@@ -119,7 +98,7 @@ function bornMember(
     species,
     name,
     home,
-    prefer: prefers[species],
+    prefer: speciesProfiles[species].ecology.prefer,
     bornTick: tick,
   };
 }

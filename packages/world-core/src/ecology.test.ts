@@ -18,6 +18,7 @@ describe("baseEcology", () => {
       "island-团团",
       "island-高高",
       "island-风哨",
+      "island-水伊布",
     ]);
     expect(base.members.every((m) => m.bornTick === 0)).toBe(true);
   });
@@ -30,8 +31,8 @@ describe("stepEcology / ecologyState", () => {
     expect(a).toEqual(b);
     // A different seed is very likely a different little world.
     const c = ecologyState(SEED + 1, 500, "summer");
-    expect(JSON.stringify(c.members.slice(3))).not.toBe(
-      JSON.stringify(a.members.slice(3)),
+    expect(JSON.stringify(c.members.slice(4))).not.toBe(
+      JSON.stringify(a.members.slice(4)),
     );
   });
 
@@ -53,7 +54,7 @@ describe("stepEcology / ecologyState", () => {
       expect(born.length).toBeLessThanOrEqual(MAX_BORN);
       for (const b of base.members)
         expect(state.members.some((m) => m.id === b.id)).toBe(true);
-      for (const species of ["panda", "giraffe", "wolf"] as const) {
+      for (const species of ["panda", "giraffe", "wolf", "vaporeon"] as const) {
         const count = state.members.filter((m) => m.species === species).length;
         const baseCount = base.members.filter((m) => m.species === species).length;
         expect(count).toBeLessThanOrEqual(baseCount + 2);

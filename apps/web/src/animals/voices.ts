@@ -1,15 +1,15 @@
+import { SPECIES, speciesProfiles, type Species } from "@island/contracts";
 import { assetBytes } from "../api";
 import { playerAgent } from "./registry";
 
-type VoiceSpecies = "fox" | "panda" | "giraffe" | "wolf" | "custom" | "friend";
+type VoiceSpecies = Species | "custom" | "friend";
+// Which clip each species calls with; new species bring their own asset id
+// in the species registry, so nothing here changes per species anymore.
 const assetFor: Record<VoiceSpecies, string> = {
-  fox: "voice-fox",
-  panda: "voice-panda",
-  giraffe: "voice-giraffe",
-  wolf: "voice-wolf",
+  ...Object.fromEntries(SPECIES.map((s) => [s, speciesProfiles[s].voice])),
   custom: "voice-friend",
   friend: "voice-friend",
-};
+} as Record<VoiceSpecies, string>;
 
 const buffers = new Map<string, Promise<AudioBuffer>>();
 let context: AudioContext | null = null,
