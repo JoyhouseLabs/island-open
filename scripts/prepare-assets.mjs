@@ -155,6 +155,15 @@ const voiceRecipes = [
       [0.2, 0.2, [700, 880], { curve: 1.4 }],
     ],
   },
+  // Three soft original meows, with quiet gaps for the closed mouth.
+  {
+    id: "voice-cat",
+    seconds: 2.12,
+    tones: [0, 0.7, 1.4].flatMap((offset) => [
+      [offset + 0.02, 0.16, [530, 820], { vib: 0.012, vibHz: 6, curve: 1.3 }],
+      [offset + 0.15, 0.43, [820, 410], { vib: 0.018, vibHz: 7, curve: 1.4 }],
+    ]),
+  },
   // Vaporeon: bubbly water chirps — two droppy plips, then a splash.
   {
     id: "voice-vaporeon",

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as T from "three";
 import type { Species } from "@island/world-core";
@@ -439,6 +439,105 @@ function VaporeonMesh({ anim }: { anim: AnimalAnim }) {
   );
 }
 
+/** The child's geometric kitten: a chunky rectangular body, a smaller square
+ * face, triangle ears/mouth, square eyes, narrow rectangular limbs and tail.
+ * Each triangle has depth, so its silhouette survives rotating the camera. */
+function CatMesh({ anim }: { anim: AnimalAnim }) {
+  const body = useRef<T.Group>(null), head = useRef<T.Group>(null),
+    tail = useRef<T.Group>(null), mouth = useRef<T.Mesh>(null),
+    closedMouth = useRef<T.Mesh>(null);
+  const triangle = useMemo(() => {
+    const shape = new T.Shape();
+    shape.moveTo(-0.5, 0);
+    shape.lineTo(0.5, 0);
+    shape.lineTo(0, 1);
+    shape.closePath();
+    return shape;
+  }, []);
+  const fur = "#dfa064", paw = "#f4dab1", ink = "#3e4c40";
+  useFrame(() => {
+    const hello = anim.action === "greet" || anim.action === "pet";
+    if (body.current) {
+      const y = anim.action === "rest" ? -0.07 :
+        anim.moving ? Math.abs(Math.sin(anim.phase * 7)) * 0.02 : 0;
+      body.current.position.y += (y - body.current.position.y) * 0.15;
+    }
+    if (head.current) head.current.rotation.x +=
+      (poses[anim.action].neck * 0.35 - head.current.rotation.x) * 0.12;
+    if (tail.current) tail.current.rotation.y = Math.sin(anim.phase * 2.4) * (hello ? 0.45 : 0.18);
+    if (mouth.current) {
+      mouth.current.visible = anim.mouth > 0.08;
+      mouth.current.scale.y = 0.0375 * (1 + anim.mouth * 0.3);
+    }
+    if (closedMouth.current) closedMouth.current.visible = anim.mouth <= 0.08;
+  });
+  return (
+    <group ref={body} name="geometric-cat">
+      {/* A short, broad horizontal torso: this kitten always stands on four paws. */}
+      <mesh position={[0, 0.64, 0]} castShadow>
+        <boxGeometry args={[0.64, 0.58, 0.9]} />
+        <meshStandardMaterial color={fur} roughness={0.95} />
+      </mesh>
+      <mesh position={[0, 0.37, 0]}>
+        <boxGeometry args={[0.4, 0.12, 0.66]} />
+        <meshStandardMaterial color={paw} roughness={0.95} />
+      </mesh>
+      <group ref={head} position={[0, 0.98, 0.49]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.52, 0.52, 0.5]} />
+          <meshStandardMaterial color={fur} roughness={0.95} />
+        </mesh>
+        {[-1, 1].map((side) => (
+          <group key={side}>
+            <mesh position={[side * 0.17, 0.24, -0.02]} scale={[0.21, 0.24, 1]} castShadow>
+              <extrudeGeometry args={[triangle, { depth: 0.18, bevelEnabled: false }]} />
+              <meshStandardMaterial color={fur} roughness={0.95} />
+            </mesh>
+            <mesh position={[side * 0.17, 0.28, 0.185]} scale={[0.11, 0.14, 1]}>
+              <extrudeGeometry args={[triangle, { depth: 0.018, bevelEnabled: false }]} />
+              <meshStandardMaterial color="#d88f87" roughness={0.95} />
+            </mesh>
+            <mesh position={[side * 0.13, 0.055, 0.28]}>
+              <boxGeometry args={[0.105, 0.105, 0.025]} />
+              <meshStandardMaterial color={ink} roughness={1} />
+            </mesh>
+            {[-1, 0, 1].map((line) => (
+              <mesh key={line} position={[side * 0.3, -0.09 + line * 0.05, 0.29]}
+                rotation={[0, 0, side * line * 0.2]}>
+                <boxGeometry args={[0.29, 0.009, 0.012]} />
+                <meshStandardMaterial color={ink} roughness={1} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+        {/* A separate square nose above the triangular mouth. */}
+        <mesh position={[0, -0.025, 0.31]} name="cat-square-nose">
+          <boxGeometry args={[0.06, 0.06, 0.045]} />
+          <meshStandardMaterial color="#a76d5c" roughness={1} />
+        </mesh>
+        <mesh ref={mouth} name="cat-open-mouth" visible={false} position={[0, -0.17, 0.28]} scale={[0.055, 0.0375, 1]}>
+          <extrudeGeometry args={[triangle, { depth: 0.022, bevelEnabled: false }]} />
+          <meshStandardMaterial color="#875348" roughness={1} />
+        </mesh>
+        <mesh ref={closedMouth} name="cat-closed-mouth" position={[0, -0.15, 0.29]}>
+          <boxGeometry args={[0.065, 0.012, 0.022]} />
+          <meshStandardMaterial color="#875348" roughness={1} />
+        </mesh>
+      </group>
+      <QuadLeg x={-0.22} z={0.31} w={0.11} h={0.39} color={paw} anim={anim} flip={0} />
+      <QuadLeg x={0.22} z={0.31} w={0.11} h={0.39} color={paw} anim={anim} flip={1} />
+      <QuadLeg x={-0.22} z={-0.31} w={0.11} h={0.39} color={paw} anim={anim} flip={1} />
+      <QuadLeg x={0.22} z={-0.31} w={0.11} h={0.39} color={paw} anim={anim} flip={0} />
+      <group ref={tail} position={[0, 0.7, -0.43]}>
+        <mesh position={[0, 0.12, -0.34]} rotation={[0.35, 0, 0]} castShadow>
+          <boxGeometry args={[0.09, 0.09, 0.78]} />
+          <meshStandardMaterial color={fur} roughness={0.95} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 /** Which mesh each species renders with. The walking fox is the shared GLB
  *  (useFox); admin-placed "fox" animals reuse the panda build, as before.
  *  Adding a species without a mesh entry is a compile error here — the
@@ -452,6 +551,7 @@ const meshes: Record<
   giraffe: GiraffeMesh,
   wolf: WolfMesh,
   vaporeon: VaporeonMesh,
+  cat: CatMesh,
 };
 
 export function AnimalMesh({

@@ -88,7 +88,6 @@ export function Animal({
     followUntil: -1,
     petUntil: -1,
     voiceNext: 0,
-    callLeft: 0,
     pauseUntil: -1,
   });
   const anim = useRef<AnimalAnim>({ phase: 0, moving: false, action: "none", mouth: 0 });
@@ -144,14 +143,20 @@ export function Animal({
     return { x: resident.home.x, z: resident.home.z };
   };
 
+  const voiceMouth = useRef<(() => number) | null>(null);
+  const callVoice = (hold = false) => {
+    playVoice(resident.species, st.current.x, st.current.z, (mouth, duration) => {
+      voiceMouth.current = mouth;
+      if (hold) petFlag.current = Math.max(petFlag.current, duration);
+    });
+  };
+
   const pet = (e: ThreeEvent<MouseEvent>) => {
     if (e.delta > 5) return;
     e.stopPropagation();
     petFlag.current = 1.8;
     showEmote("heart");
-    // A tap is a user gesture, so the voice is always allowed to sound.
-    st.current.callLeft = 0.55;
-    playVoice(resident.species, st.current.x, st.current.z);
+    callVoice(true);
     emitGrowth({ type: "animal.petted", detail: resident.name });
   };
   const petFlag = useRef(0);
@@ -160,6 +165,8 @@ export function Animal({
     const s = st.current,
       dt = Math.min(rawDt, 0.05),
       t = clock.elapsedTime;
+    // Sample the audio clock even during petting or dialogue.
+    anim.current.mouth = voiceMouth.current?.() ?? 0;
     const speed =
       (s.mode === "play" ? 1.6 : 1) * speciesProfiles[resident.species].behavior.speed;
 
@@ -184,7 +191,6 @@ export function Animal({
         root.current.rotation.y = s.yaw;
       }
       emoteAge.current += dt;
-      if (anim.current.mouth > 0) anim.current.mouth *= 0.85;
       reportAgent(id, {
         kind: resident.species,
         x: s.x,
@@ -207,8 +213,8 @@ export function Animal({
       anim.current.action = "pet";
       const p = playerAgent();
       if (p) {
-        faceX = p.x;
-        faceZ = p.z;
+        faceX = p.x - s.x;
+        faceZ = p.z - s.z;
       }
     } else {
       if (s.action === "pet") s.action = "none";
@@ -220,8 +226,7 @@ export function Animal({
         s.lastPlayer = t;
         showEmote("heart");
         if (rng() < 0.5) {
-          s.callLeft = 0.55;
-          playVoice(resident.species, s.x, s.z);
+          callVoice();
         }
         if (rng() < 0.5) s.followUntil = t + 9;
       }
@@ -347,9 +352,8 @@ export function Animal({
         faceX = s.meetWith?.x ?? null;
         faceZ = s.meetWith?.z ?? null;
         if (t >= s.voiceNext) {
-          s.callLeft = 0.55;
           s.voiceNext = t + 1.3 + rng() * 0.8;
-          playVoice(resident.species, s.x, s.z);
+          callVoice();
           showEmote(chatEmotes[Math.floor(rng() * chatEmotes.length)]!);
         }
         if (t > s.until) {
@@ -383,9 +387,8 @@ export function Animal({
             if (gap <= 1.4) s.pauseUntil = t + 0.6;
           }
           if (t >= s.voiceNext) {
-            s.callLeft = 0.4;
             s.voiceNext = t + 1.4 + rng() * 0.6;
-            playVoice(resident.species, s.x, s.z);
+            callVoice();
             showEmote("sparkle");
           }
         } else {
@@ -412,12 +415,7 @@ export function Animal({
         s.until = t + 1;
       }
       anim.current.action = s.action;
-      // The mouth follows an envelope while a call sounds out, then settles.
-      if (s.callLeft > 0) {
-        s.callLeft -= dt;
-        anim.current.mouth = (Math.sin(t * 18) + 1) / 2;
-      } else if (anim.current.mouth > 0.01) anim.current.mouth *= 0.85;
-      else anim.current.mouth = 0;
+
     }
 
     if (faceX !== null && faceZ !== null)

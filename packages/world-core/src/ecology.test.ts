@@ -19,6 +19,7 @@ describe("baseEcology", () => {
       "island-高高",
       "island-风哨",
       "island-水伊布",
+      "island-方方",
     ]);
     expect(base.members.every((m) => m.bornTick === 0)).toBe(true);
   });
@@ -31,8 +32,8 @@ describe("stepEcology / ecologyState", () => {
     expect(a).toEqual(b);
     // A different seed is very likely a different little world.
     const c = ecologyState(SEED + 1, 500, "summer");
-    expect(JSON.stringify(c.members.slice(4))).not.toBe(
-      JSON.stringify(a.members.slice(4)),
+    expect(JSON.stringify(c.members.slice(baseEcology().members.length))).not.toBe(
+      JSON.stringify(a.members.slice(baseEcology().members.length)),
     );
   });
 

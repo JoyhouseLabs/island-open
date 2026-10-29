@@ -7,7 +7,7 @@
  * every other consumer derives from this table and must not grow its own
  * species lists.
  */
-export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon"] as const;
+export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon", "cat"] as const;
 export type Species = (typeof SPECIES)[number];
 
 export type Interest = "flower" | "tree" | "bench" | "water" | "grass";
@@ -32,6 +32,8 @@ export type SpeciesProfile = {
   };
   /** 叫声素材 id（prepare-assets 合成）。 */
   voice: string;
+  /** Mouth-open intervals in the voice asset, in seconds. */
+  voiceBeats?: readonly (readonly [number, number])[];
   behavior: {
     /** 常规游荡速度。 */
     speed: number;
@@ -161,6 +163,33 @@ export const speciesProfiles: Record<Species, SpeciesProfile> = {
       },
     },
     unlockId: "resident-wolf",
+  },
+  cat: {
+    label: "几何小猫",
+    persona: {
+      temperament: "温柔、好奇，是用方块和三角形拼成的小伙伴",
+      speechStyle: "短句轻轻地说，偶尔喵一声，喜欢陪孩子观察形状",
+      likes: "晒太阳、线条胡须、搭积木、和朋友找找身边的图形",
+    },
+    lines: {
+      greeting: ["喵！${name}摇了摇细长的尾巴，迈着四只小脚朝你走来。"],
+      smallTalk: [
+        "我的脸方方的，耳朵尖尖的。你还发现了什么形状？",
+        "我的身体像一块小积木，抱起来软乎乎的。",
+        "胡须细细长长的，吹来一阵风，就想跟着你去散步。",
+      ],
+      taskHint: "喵，要不要一起找找岛上的长方形和三角形？",
+    },
+    voice: "voice-cat",
+    voiceBeats: [[0.02, 0.58], [0.72, 1.28], [1.42, 1.98]],
+    behavior: { speed: 1.5, headY: 1.65, shadow: "#c7b393" },
+    ecology: {
+      prefer: "flower",
+      nameParts: {
+        first: ["小", "方", "暖", "橘"],
+        second: ["方", "米", "喵", "团"],
+      },
+    },
   },
   vaporeon: {
     label: "水伊布",

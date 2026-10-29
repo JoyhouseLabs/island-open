@@ -23,6 +23,7 @@ export const residents: Partial<
     { species: "giraffe", name: "高高", home: { x: 26, z: 60, r: 15 }, prefer: "tree" },
     { species: "wolf", name: "风哨", home: { x: 8, z: -60, r: 12 }, prefer: "grass", unlockId: "resident-wolf" },
     { species: "vaporeon", name: "水伊布", home: { x: 36, z: 0, r: 9 }, prefer: "water" },
+    { species: "cat", name: "方方", home: { x: 6, z: 76, r: 6 }, prefer: "flower" },
   ],
   mountain: [
     { species: "wolf", name: "风哨", home: { x: 12, z: -16, r: 8 }, prefer: "grass", unlockId: "resident-wolf" },

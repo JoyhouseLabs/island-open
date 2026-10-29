@@ -76,7 +76,8 @@ function load(species: VoiceSpecies) {
  * walking player. Skips silently before the first gesture, when muted, when
  * too far away, or when the same species just called (avoiding a barnyard).
  */
-export function playVoice(species: VoiceSpecies, x: number, z: number) {
+export function playVoice(species: VoiceSpecies, x: number, z: number,
+  onStart?: (mouth: () => number, duration: number) => void) {
   if (!enabled || !unlocked) return;
   const now = performance.now();
   if (now - (lastPlay.get(species) ?? 0) < 280) return;
@@ -103,6 +104,15 @@ export function playVoice(species: VoiceSpecies, x: number, z: number) {
       };
       live++;
       source.start();
+      const started = ctx.currentTime;
+      const rate = source.playbackRate.value;
+      const beats = species === "custom" || species === "friend" ? undefined : speciesProfiles[species].voiceBeats;
+      onStart?.(() => {
+        const elapsed = (ctx.currentTime - started) * rate;
+        if (elapsed >= buffer.duration || !enabled) return 0;
+        if (beats) return beats.some(([from, to]) => elapsed >= from && elapsed < to) ? 1 : 0;
+        return (Math.sin(elapsed * 18) + 1) / 2;
+      }, buffer.duration / rate);
     })
     .catch(() => {
       /* A missing voice never interrupts the island. */

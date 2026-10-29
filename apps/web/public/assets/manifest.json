@@ -83,6 +83,14 @@
       "mime": "audio/wav"
     },
     {
+      "id": "voice-cat",
+      "file": "voice-cat.wav",
+      "url": "/api/content/core/voice-cat",
+      "sha256": "5b90b009f1ae1ebbc736bab81e7121a811c0fcd3b9f18cb3ab24c741507a621d",
+      "bytes": 93536,
+      "mime": "audio/wav"
+    },
+    {
       "id": "voice-vaporeon",
       "file": "voice-vaporeon.wav",
       "url": "/api/content/core/voice-vaporeon",
