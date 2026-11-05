@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as T from "three";
 import type { Species } from "@island/world-core";
@@ -311,13 +311,173 @@ function WolfMesh({ anim }: { anim: AnimalAnim }) {
   );
 }
 
+/** Vaporeon's small curved smile opens into a rounded mouth with a tongue. */
+function VaporeonMouth({ anim }: { anim: AnimalAnim }) {
+  const closed = useRef<T.Mesh>(null), open = useRef<T.Group>(null);
+  const smile = useMemo(() => new T.CatmullRomCurve3([
+    new T.Vector3(-0.048, 0, 0),
+    new T.Vector3(-0.026, -0.003, 0),
+    new T.Vector3(0, 0.008, 0),
+    new T.Vector3(0.025, -0.009, 0),
+    new T.Vector3(0.047, -0.012, 0),
+  ]), []);
+  const cavity = useMemo(() => {
+    const shape = new T.Shape();
+    shape.moveTo(-0.052, 0.012);
+    shape.quadraticCurveTo(0, 0.03, 0.052, 0.012);
+    shape.bezierCurveTo(0.05, -0.035, 0.032, -0.075, 0, -0.077);
+    shape.bezierCurveTo(-0.032, -0.075, -0.05, -0.035, -0.052, 0.012);
+    shape.closePath();
+    return shape;
+  }, []);
+  const tongue = useMemo(() => {
+    const shape = new T.Shape();
+    shape.moveTo(-0.03, -0.047);
+    shape.quadraticCurveTo(0, -0.027, 0.03, -0.047);
+    shape.quadraticCurveTo(0.021, -0.069, 0, -0.07);
+    shape.quadraticCurveTo(-0.021, -0.069, -0.03, -0.047);
+    shape.closePath();
+    return shape;
+  }, []);
+  useFrame(() => {
+    const amount = T.MathUtils.clamp(anim.mouth, 0, 1);
+    if (closed.current) closed.current.visible = amount <= 0.08;
+    if (open.current) {
+      open.current.visible = amount > 0.08;
+      open.current.scale.set(1 - amount * 0.06, 0.55 + amount * 0.45, 1);
+    }
+  });
+  return <group position={[0, -0.075, 0.283]}>
+    <mesh ref={closed}>
+      <tubeGeometry args={[smile, 20, 0.0045, 6, false]} />
+      <meshBasicMaterial color="#26323d" />
+    </mesh>
+    <group ref={open} visible={false}>
+      <mesh>
+        <extrudeGeometry args={[cavity, { depth: 0.012, bevelEnabled: false, curveSegments: 12 }]} />
+        <meshBasicMaterial color="#522c3d" />
+      </mesh>
+      <mesh position={[0, 0, 0.032]}>
+        <shapeGeometry args={[tongue, 12]} />
+        <meshBasicMaterial color="#e7899d" />
+      </mesh>
+    </group>
+  </group>;
+}
+
 /** A water-loving creature in the island's flat-colour style: pale blue
  *  body, a navy head crest and ear fins, a cream neck frill and a split
  *  fish tail that sways while it walks. */
 function VaporeonMesh({ anim }: { anim: AnimalAnim }) {
   const body = useRef<T.Group>(null),
     head = useRef<T.Group>(null),
-    tail = useRef<T.Group>(null);
+    tail = useRef<T.Group>(null),
+    tailFin = useRef<T.Group>(null);
+  const eye = useMemo(() => {
+    // Soft, slightly angular eyes matching the reference's rounded silhouette.
+    const shape = new T.Shape();
+    shape.moveTo(-0.046, 0.05);
+    shape.quadraticCurveTo(-0.002, 0.066, 0.04, 0.043);
+    shape.quadraticCurveTo(0.056, 0.032, 0.05, 0.01);
+    shape.lineTo(0.04, -0.045);
+    shape.quadraticCurveTo(-0.002, -0.06, -0.042, -0.04);
+    shape.quadraticCurveTo(-0.058, -0.005, -0.046, 0.05);
+    shape.closePath();
+    return shape;
+  }, []);
+  const earFin = useMemo(() => {
+    const shape = new T.Shape();
+    shape.moveTo(0, 0.07);
+    shape.lineTo(0.52, 0.34);
+    shape.quadraticCurveTo(0.4, 0.08, 0.4, -0.16);
+    shape.quadraticCurveTo(0.3, -0.12, 0.25, -0.23);
+    shape.quadraticCurveTo(0.15, -0.16, 0.05, -0.2);
+    shape.closePath();
+    return shape;
+  }, []);
+  const collar = useMemo(() => {
+    const shape = new T.Shape();
+    for (let i = 0; i < 24; i++) {
+      const angle = i / 24 * Math.PI * 2;
+      const radius = i % 2 === 0 ? 0.38 : 0.33;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (i === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    }
+    shape.closePath();
+    return shape;
+  }, []);
+  const fluke = useMemo(() => {
+    // Broad, forked fish fin in the horizontal plane, with a narrow root.
+    const shape = new T.Shape();
+    shape.moveTo(-0.055, 0);
+    shape.bezierCurveTo(-0.25, -0.01, -0.51, 0.12, -0.5, 0.55);
+    shape.bezierCurveTo(-0.25, 0.56, -0.06, 0.35, 0, 0.13);
+    shape.bezierCurveTo(0.06, 0.35, 0.25, 0.56, 0.5, 0.55);
+    shape.bezierCurveTo(0.51, 0.12, 0.25, -0.01, 0.055, 0);
+    shape.closePath();
+    return shape;
+  }, []);
+  const { tailGeometry, tailRidgeGeometry } = useMemo(() => {
+    const curve = new T.CatmullRomCurve3([
+      new T.Vector3(0, 0, 0),
+      new T.Vector3(0.15, -0.12, -0.5),
+      new T.Vector3(0.68, -0.18, -0.6),
+      new T.Vector3(0.95, -0.08, 0.12),
+      new T.Vector3(0.95, 0.16, 1.05),
+    ]);
+    const geometry = new T.TubeGeometry(curve, 24, 1, 8, false);
+    const positions = geometry.getAttribute("position");
+    for (let ring = 0; ring <= 24; ring++) {
+      const t = ring / 24;
+      const center = curve.getPointAt(t);
+      const radius = 0.15 * (1 - t) + 0.055 * t;
+      for (let side = 0; side <= 8; side++) {
+        const i = ring * 9 + side;
+        positions.setXYZ(i,
+          center.x + (positions.getX(i) - center.x) * radius,
+          center.y + (positions.getY(i) - center.y) * radius,
+          center.z + (positions.getZ(i) - center.z) * radius);
+      }
+    }
+    geometry.computeVertexNormals();
+    // A continuous, thick dorsal ridge follows the same curve as the tail.
+    // Four vertices per cross-section form a closed strip with 14 tapered spikes.
+    const ridgePositions: number[] = [], ridgeIndices: number[] = [];
+    const sections = 28;
+    for (let i = 0; i <= sections; i++) {
+      const t = 0.02 + 0.94 * i / sections;
+      const center = curve.getPointAt(t);
+      const tangent = curve.getTangentAt(t);
+      const across = new T.Vector3(tangent.z, 0, -tangent.x).normalize();
+      const radius = 0.15 * (1 - t) + 0.055 * t;
+      const halfWidth = 0.018 * (1 - 0.45 * t);
+      const spike = i % 2 === 1 ? 0.14 * (1 - t) + 0.05 * t : 0.025;
+      const top = i === sections ? 0.005 : spike;
+      for (const [side, height] of [[-1, -0.03], [1, -0.03], [1, top], [-1, top]] as const) {
+        ridgePositions.push(center.x + across.x * side * halfWidth,
+          center.y + radius + height, center.z + across.z * side * halfWidth);
+      }
+      if (i < sections) {
+        for (let side = 0; side < 4; side++) {
+          const a = i * 4 + side, b = i * 4 + (side + 1) % 4;
+          ridgeIndices.push(a, b, b + 4, a, b + 4, a + 4);
+        }
+      }
+    }
+    const end = sections * 4;
+    ridgeIndices.push(0, 2, 1, 0, 3, 2, end, end + 1, end + 2, end, end + 2, end + 3);
+    const ridge = new T.BufferGeometry();
+    ridge.setAttribute("position", new T.Float32BufferAttribute(ridgePositions, 3));
+    ridge.setIndex(ridgeIndices);
+    ridge.computeVertexNormals();
+    return { tailGeometry: geometry, tailRidgeGeometry: ridge };
+  }, []);
+  useEffect(() => () => {
+    tailGeometry.dispose();
+    tailRidgeGeometry.dispose();
+  }, [tailGeometry, tailRidgeGeometry]);
   useFrame(() => {
     const pose = poses[anim.action];
     if (body.current) {
@@ -336,40 +496,24 @@ function VaporeonMesh({ anim }: { anim: AnimalAnim }) {
           head.current.rotation.x) *
         0.12;
     if (tail.current) {
-      tail.current.rotation.y = Math.sin(anim.phase * 3.1) * 0.4;
-      tail.current.rotation.x = -0.2 + (anim.moving ? Math.sin(anim.phase * 7) * 0.15 : 0);
+      tail.current.rotation.y = Math.sin(anim.phase * 3.1) * 0.14;
+      tail.current.rotation.x = 0.02 + (anim.moving ? Math.sin(anim.phase * 7) * 0.04 : 0);
     }
+    if (tailFin.current)
+      tailFin.current.rotation.y = Math.PI + Math.sin(anim.phase * 3.1 - 0.65) * 0.22;
   });
   return (
     <group ref={body}>
-      <mesh position={[0, 0.7, -0.04]} scale={[0.46, 0.4, 0.74]} castShadow>
+      <mesh position={[0, 0.7, -0.04]} scale={[0.4, 0.36, 0.74]} castShadow>
         <sphereGeometry args={[1, 14, 12]} />
         <meshStandardMaterial color="#7cc8e8" roughness={0.9} />
       </mesh>
-      <mesh position={[0, 0.58, 0.3]} scale={[0.3, 0.27, 0.38]}>
-        <sphereGeometry args={[1, 12, 10]} />
-        <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
-      </mesh>
-      {/* Cream frill ringing the neck like a collar of little fins. */}
-      <group position={[0, 0.88, 0.26]}>
-        {Array.from({ length: 8 }, (_, i) => {
-          const a = (i / 8) * Math.PI * 2;
-          return (
-            <group key={i} rotation={[0, a, 0]}>
-              <mesh position={[0.27, 0.05, 0]} rotation={[0.35, 0, -1.15]}>
-                <coneGeometry args={[0.055, 0.26, 4]} />
-                <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
-              </mesh>
-            </group>
-          );
-        })}
-      </group>
       {/* Navy fins standing along the spine. */}
       {(
         [
-          [1.03, 0.02, 0.22],
-          [1.06, -0.24, 0.18],
-          [1.04, -0.48, 0.15],
+          [1.12, 0.02, 0.4],
+          [1.13, -0.24, 0.32],
+          [1.1, -0.48, 0.27],
         ] as [number, number, number][]
       ).map(([y, z, h], i) => (
         <mesh key={i} position={[0, y, z]} rotation={[-0.25, 0, 0]} castShadow>
@@ -377,59 +521,77 @@ function VaporeonMesh({ anim }: { anim: AnimalAnim }) {
           <meshStandardMaterial color="#2f5d94" roughness={0.9} />
         </mesh>
       ))}
-      <group ref={head} position={[0, 1.0, 0.5]}>
+      <group ref={head} position={[0, 1.15, 0.5]}>
+        {/* A broad white neck ruff behind the blue face. */}
+        <mesh position={[0, -0.12, 0.015]} rotation={[-0.35, 0, 0]} castShadow>
+          <extrudeGeometry args={[collar, { depth: 0.045, bevelEnabled: false }]} />
+          <meshStandardMaterial color="#f2f0e8" roughness={0.9} />
+        </mesh>
         <mesh castShadow>
           <sphereGeometry args={[0.28, 14, 12]} />
           <meshStandardMaterial color="#7cc8e8" roughness={0.9} />
         </mesh>
-        <mesh position={[0, -0.07, 0.22]} scale={[0.13, 0.09, 0.13]}>
-          <sphereGeometry args={[1, 10, 8]} />
-          <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
-        </mesh>
-        <mesh position={[0, -0.005, 0.3]}>
-          <sphereGeometry args={[0.045, 8, 8]} />
+        <mesh position={[0, -0.005, 0.278]}>
+          <sphereGeometry args={[0.025, 8, 8]} />
           <meshStandardMaterial color="#2a3a55" roughness={1} />
         </mesh>
-        <Mouth anim={anim} position={[0, -0.115, 0.262]} width={0.11} color="#2a3a55" />
+        <VaporeonMouth anim={anim} />
         {[-1, 1].map((s) => (
-          <mesh key={s} position={[s * 0.12, 0.07, 0.235]}>
-            <sphereGeometry args={[0.05, 10, 8]} />
-            <meshStandardMaterial color="#26334d" roughness={1} />
-          </mesh>
+          <group key={s} position={[s * 0.12, 0.067, 0.25]} rotation={[0, s * 0.38, -s * 0.14]}>
+            <mesh>
+              <extrudeGeometry args={[eye, { depth: 0.018, bevelEnabled: false, curveSegments: 12 }]} />
+              <meshBasicMaterial color="#18242c" />
+            </mesh>
+            <mesh position={[0, 0, 0.038]} scale={[0.84, 0.84, 1]}>
+              <shapeGeometry args={[eye, 12]} />
+              <meshBasicMaterial color="#343d42" />
+            </mesh>
+            {/* Both catchlights sit high and toward the nose, like the reference. */}
+            <mesh position={[-s * 0.012, 0.023, 0.058]} scale={[0.011, 0.018, 1]} rotation={[0, 0, -0.15]}>
+              <circleGeometry args={[1, 20]} />
+              <meshBasicMaterial color="#ffffff" toneMapped={false} />
+            </mesh>
+          </group>
         ))}
         {/* The swept-back head crest. */}
-        <mesh position={[0, 0.3, 0.02]} rotation={[-0.45, 0, 0]} castShadow>
-          <coneGeometry args={[0.11, 0.34, 4]} />
-          <meshStandardMaterial color="#2f5d94" roughness={0.9} />
-        </mesh>
-        <mesh position={[0, 0.27, -0.19]} rotation={[-0.6, 0, 0]} castShadow>
-          <coneGeometry args={[0.09, 0.24, 4]} />
+        <mesh position={[0, 0.39, -0.02]} rotation={[-0.45, 0, 0]} castShadow>
+          <coneGeometry args={[0.065, 0.54, 4]} />
           <meshStandardMaterial color="#2f5d94" roughness={0.9} />
         </mesh>
         {[-1, 1].map((s) => (
-          <mesh
-            key={s}
-            position={[s * 0.24, 0.12, -0.02]}
-            rotation={[-0.3, 0, s * 1.15]}
-            castShadow
-          >
-            <coneGeometry args={[0.07, 0.24, 4]} />
-            <meshStandardMaterial color="#2f5d94" roughness={0.9} />
-          </mesh>
+          <group key={s} position={[s * 0.2, 0.08, -0.04]} scale={[s, 1, 1]} rotation={[0, s * -0.16, 0]}>
+            <mesh castShadow>
+              <extrudeGeometry args={[earFin, { depth: 0.04, bevelEnabled: false, curveSegments: 6 }]} />
+              <meshStandardMaterial color="#2f5d94" roughness={0.9} />
+            </mesh>
+            <mesh position={[0.025, -0.012, 0.06]} scale={[0.88, 0.84, 1]}>
+              <extrudeGeometry args={[earFin, { depth: 0.018, bevelEnabled: false, curveSegments: 6 }]} />
+              <meshStandardMaterial color="#eee3a2" roughness={0.9} />
+            </mesh>
+            {[[0.34, -0.13], [0.37, 0.02], [0.42, 0.17]].map(([x, y], i) => {
+              const end = new T.Vector3(x!, y!, 0);
+              const rotation = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), end.clone().normalize());
+              return <mesh key={i} position={[x! / 2, y! / 2, 0.09]} quaternion={rotation}>
+                <cylinderGeometry args={[0.006, 0.009, end.length(), 5]} />
+                <meshStandardMaterial color="#b6b888" roughness={0.9} />
+              </mesh>;
+            })}
+          </group>
         ))}
       </group>
       <group ref={tail} position={[0, 0.74, -0.6]}>
-        {[-1, 1].map((s) => (
-          <mesh
-            key={s}
-            position={[s * 0.1, 0.14, -0.08]}
-            rotation={[-0.5, 0, s * 0.55]}
-            castShadow
-          >
-            <coneGeometry args={[0.11, 0.46, 4]} />
-            <meshStandardMaterial color="#f2ecd9" roughness={0.9} />
+        <mesh geometry={tailGeometry} castShadow>
+          <meshStandardMaterial color="#7cc8e8" roughness={0.9} />
+        </mesh>
+        <mesh geometry={tailRidgeGeometry} castShadow>
+          <meshStandardMaterial color="#2f5d94" roughness={0.9} />
+        </mesh>
+        <group ref={tailFin} position={[0.95, 0.16, 1.05]} rotation={[0, Math.PI, 0.45]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.025, 0.025]} castShadow>
+            <extrudeGeometry args={[fluke, { depth: 0.05, bevelEnabled: false, curveSegments: 8 }]} />
+            <meshStandardMaterial color="#57b0da" roughness={0.9} />
           </mesh>
-        ))}
+        </group>
       </group>
       <QuadLeg x={-0.17} z={0.32} w={0.12} h={0.48} color="#57b0da" anim={anim} flip={0} />
       <QuadLeg x={0.17} z={0.32} w={0.12} h={0.48} color="#57b0da" anim={anim} flip={1} />
