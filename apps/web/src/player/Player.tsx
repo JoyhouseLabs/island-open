@@ -1,3 +1,4 @@
+import { animalDetails } from "../animals/detailsStore";
 import { creationSeatPrompt } from "./creationSeatPrompt";
 import { learningTravel } from "../learning/travel";
 import { useEffect, useMemo, useRef } from "react";
@@ -334,6 +335,7 @@ export function PlayerRig({
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (animalDetails.selected) return;
       const el = document.activeElement;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
       const k = e.key.toLowerCase();
@@ -390,6 +392,12 @@ export function PlayerRig({
         gateNear = gate;
         break;
       }
+
+    if (animalDetails.selected) {
+      keys.current.clear();
+      target.current = null;
+      wantJump.current = false;
+    }
 
     // Keyboard direction is relative to where the camera looks.
     let vx = 0,
@@ -453,6 +461,7 @@ export function PlayerRig({
     for (;;) {
       const action = playerAction.take();
       if (!action) break;
+      if (animalDetails.selected) continue;
       if (action === "jump") {
         wantJump.current = true;
         explicitJump = true;

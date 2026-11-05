@@ -1,3 +1,4 @@
+import { animalDetails } from "../animals/detailsStore";
 import { useSyncExternalStore } from "react";
 import type { NearSpeaker } from "./proximity";
 import { greeting, replyTo, type DialogueNode, type SpeakerKind } from "./scripts";
@@ -68,11 +69,13 @@ class DialogueStore {
     if (persona && this.llmOn)
       node.choices = [...(node.choices ?? []), { label: "再多聊聊" }];
     this.open = { speaker, node, pending: null };
+    animalDetails.append(speaker.id, { role: "assistant", text: node.text, source: "script" });
     this.bump();
   }
 
   choose(label: string) {
     if (!this.open) return;
+    animalDetails.append(this.open.speaker.id, { role: "user", text: label, source: "script" });
     if (label === "再多聊聊") {
       const persona = personaFor(this.open.speaker.id);
       if (persona) {
@@ -91,6 +94,7 @@ class DialogueStore {
       this.open = null;
     } else {
       this.open = { ...this.open, node: { text: reply ?? "……" }, pending: null };
+      animalDetails.append(this.open.speaker.id, { role: "assistant", text: this.open.node.text, source: "script" });
     }
     this.bump();
   }
@@ -106,6 +110,7 @@ class DialogueStore {
       ),
       pending: null,
     };
+    animalDetails.append(this.open.speaker.id, { role: "assistant", text: this.open.node.text, source: "script" });
     this.bump();
   }
 

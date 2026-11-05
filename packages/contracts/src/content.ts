@@ -195,7 +195,7 @@ export interface AssetInfo {
   kind: "model" | "audio" | "image" | "pdf";
   filename: string;
 }
-/** Whether the island's LLM backends can actually answer (keys configured). */
+/** Configured capabilities only; this endpoint does not validate upstream credentials. */
 export interface IntelligenceStatus {
   tutor: boolean;
   npc: boolean;

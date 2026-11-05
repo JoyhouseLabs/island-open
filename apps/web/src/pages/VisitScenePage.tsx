@@ -14,6 +14,7 @@ import { useVisitSession } from "../VisitSession";
 import { cameraMode, useFirstPerson } from "../player/avatar";
 import TalkPrompt from "../dialogue/TalkPrompt";
 import DialogueBox from "../dialogue/DialogueBox";
+import NpcChat from "../dialogue/NpcChat";
 import { emitGrowth } from "../progress/store";
 import { RequestError } from "../api";
 import { cursorStyle, glyphForTool, ItemGlyph } from "../building/itemGlyphs";
@@ -232,6 +233,7 @@ export default function VisitScenePage() {
       </div>
       <TalkPrompt />
       <DialogueBox />
+      <NpcChat />
     </main>
   );
 }

@@ -14,6 +14,7 @@ import { presence, usePresence } from "./presence/client";
 import { growth } from "./progress/store";
 import { IslandConfigProvider } from "./contentStore";
 import CardModal from "./cards/CardModal";
+import AnimalDetails from "./animals/AnimalDetails";
 import type { User, VisitIsland } from "@island/contracts";
 
 type Quality = "auto" | "low" | "high";
@@ -145,6 +146,7 @@ export default function VisitSession() {
       >
         <Outlet />
         <CardModal />
+          <AnimalDetails scope={`visit:${visit.user?.id ?? "guest"}:${worldId}`} />
       </IslandConfigProvider>
     </Context.Provider>
   );

@@ -1,3 +1,4 @@
+import { animalDetails } from "../animals/detailsStore";
 import { useEffect } from "react";
 import { Footprints } from "lucide-react";
 import { proximity, useNearSpeaker } from "./proximity";
@@ -16,7 +17,7 @@ export default function TalkPrompt() {
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.code !== "Space" || dialogue.open || dialogue.npc || dialogue.playerChat)
+      if (e.code !== "Space" || animalDetails.selected || dialogue.open || dialogue.npc || dialogue.playerChat)
         return;
       const tag = (document.activeElement?.tagName ?? "").toLowerCase();
       if (tag === "input" || tag === "textarea") return;

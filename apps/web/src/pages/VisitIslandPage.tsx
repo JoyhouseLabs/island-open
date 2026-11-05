@@ -8,6 +8,7 @@ import { useVisitSession } from "../VisitSession";
 import { cameraMode, useFirstPerson } from "../player/avatar";
 import TalkPrompt from "../dialogue/TalkPrompt";
 import DialogueBox from "../dialogue/DialogueBox";
+import NpcChat from "../dialogue/NpcChat";
 import { emitGrowth } from "../progress/store";
 import { RequestError } from "../api";
 import { useContentFeed } from "../contentStore";
@@ -151,6 +152,7 @@ export default function VisitIslandPage() {
       </div>
       <TalkPrompt />
       <DialogueBox />
+      <NpcChat />
     </main>
   );
 }

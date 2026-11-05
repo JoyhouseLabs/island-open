@@ -17,6 +17,7 @@ import { presence, usePresence } from "./presence/client";
 import { growth } from "./progress/store";
 import { IslandConfigProvider } from "./contentStore";
 import CardModal from "./cards/CardModal";
+import AnimalDetails from "./animals/AnimalDetails";
 
 type Quality = "auto" | "low" | "high";
 type Session = {
@@ -111,6 +112,7 @@ export default function HomeSession() {
         <IslandConfigProvider userId={world.user?.id ?? null}>
           <Outlet />
           <CardModal />
+          <AnimalDetails scope={`home:${world.user?.id ?? "local"}:${world.record?.id ?? "draft"}`} />
         </IslandConfigProvider>
       ) : (
         <div className="scene-loading" role="status">

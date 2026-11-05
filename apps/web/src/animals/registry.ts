@@ -1,3 +1,4 @@
+import { animalDetails } from "./detailsStore";
 import type { Species } from "@island/world-core";
 
 export type AgentInfo = {
@@ -21,6 +22,7 @@ export function reportAgent(id: string, info: AgentInfo) {
 }
 export function dropAgent(id: string) {
   registry.delete(id);
+  animalDetails.remove(id);
 }
 export function nearbyAgents(
   x: number,

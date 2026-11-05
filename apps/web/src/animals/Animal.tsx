@@ -18,6 +18,7 @@ import { activeEncounter } from "./ecologyStore";
 import { playVoice } from "./voices";
 import { emitGrowth } from "../progress/store";
 import { dialogue } from "../dialogue/store";
+import { animalDetails } from "./detailsStore";
 
 const actionFor = (prefer: Interest, species: Resident["species"]): AnimalAction => {
   const { behavior } = speciesProfiles[species];
@@ -151,13 +152,18 @@ export function Animal({
     });
   };
 
-  const pet = (e: ThreeEvent<MouseEvent>) => {
-    if (e.delta > 5) return;
-    e.stopPropagation();
+  const petAnimal = () => {
     petFlag.current = 1.8;
     showEmote("heart");
     callVoice(true);
     emitGrowth({ type: "animal.petted", detail: resident.name });
+  };
+  const pet = (e: ThreeEvent<MouseEvent>) => {
+    if (e.delta > 5) return;
+    e.stopPropagation();
+    petAnimal();
+    animalDetails.select({ id, name: resident.name, species: resident.species, scene,
+      prefer: resident.prefer, pet: petAnimal });
   };
   const petFlag = useRef(0);
 
