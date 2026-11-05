@@ -1,6 +1,12 @@
+import { residentWorld } from "./mindState";
+import { agentById } from "./registry";
 import { builtinPersonas } from "@island/contracts";
 import { residents } from "@island/world-core";
-import { featuresStatus, npcSpeakers, type FeatureFlags } from "../contentStore";
+import {
+  featuresStatus,
+  npcSpeakers,
+  type FeatureFlags,
+} from "../contentStore";
 
 /**
  * One deep-chat speaker as the client sees it: the subject key sent to
@@ -16,9 +22,16 @@ export type SpeakerPersona = {
 };
 
 /** Where each registered sign lives; filled in by <SpeakingSigns>. */
-export const signWorlds = new Map<string, { worldId: string; token?: string }>();
+export const signWorlds = new Map<
+  string,
+  { worldId: string; token?: string }
+>();
 
-let flags: FeatureFlags = { cards: false, speakingEntities: false, ecology: false };
+let flags: FeatureFlags = {
+  cards: false,
+  speakingEntities: false,
+  ecology: false,
+};
 void featuresStatus().then((f) => {
   flags = f;
 });
@@ -30,22 +43,37 @@ const residentAgents = new Map<
 >();
 for (const [scene, roster] of Object.entries(residents))
   for (const r of roster ?? [])
-    residentAgents.set(`${scene}-${r.name}`, { name: r.name, species: r.species });
+    residentAgents.set(`${scene}-${r.name}`, {
+      name: r.name,
+      species: r.species,
+    });
 
 /**
  * Whether one live agent id can deep-chat, and under which subject. Admin
  * animals follow their configured persona; built-in species, named residents
  * and sign devices arrive with the speaking-entities flag.
  */
-export function personaFor(agentId: string): SpeakerPersona | null {
+function basePersona(agentId: string): SpeakerPersona | null {
   if (agentId === "fox")
     return flags.speakingEntities
       ? { subject: "species:fox", name: "小狐狸", persona: builtinPersonas.fox }
       : null;
   if (agentId.startsWith("content-")) {
     const config = npcSpeakers.get(agentId);
-    return config?.persona
-      ? { subject: config.id, name: config.name, persona: config.persona }
+    return config
+      ? {
+          subject: config.id,
+          name: config.name,
+          persona:
+            config.persona ??
+            (config.species !== "custom"
+              ? builtinPersonas[config.species]
+              : {
+                  temperament: "温和好奇",
+                  speechStyle: "简短友善",
+                  likes: "岛上的朋友",
+                }),
+        }
       : null;
   }
   if (agentId.startsWith("device:")) {
@@ -64,6 +92,18 @@ export function personaFor(agentId: string): SpeakerPersona | null {
   if (!flags.speakingEntities) return null;
   // Built-in residents register as `${scene}-${name}`; same name across
   // scenes is the same character with one continuous memory.
+  if (/^eco-[a-z]+-\d+$/.test(agentId)) {
+    const agent = agentById(agentId);
+    const persona = agent
+      ? builtinPersonas[agent.kind as keyof typeof builtinPersonas]
+      : null;
+    if (persona && residentWorld.current)
+      return {
+        subject: `eco:${agentId}`,
+        name: agent?.name ?? "新居民",
+        persona,
+      };
+  }
   const resident = residentAgents.get(agentId);
   if (resident)
     return {
@@ -72,4 +112,11 @@ export function personaFor(agentId: string): SpeakerPersona | null {
       persona: builtinPersonas[resident.species],
     };
   return null;
+}
+
+export function personaFor(agentId: string): SpeakerPersona | null {
+  const persona = basePersona(agentId);
+  return persona
+    ? { ...persona, world: persona.world ?? residentWorld.current ?? undefined }
+    : null;
 }

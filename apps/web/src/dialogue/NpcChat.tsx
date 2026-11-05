@@ -1,5 +1,6 @@
+import { ResidentMemory } from "../animals/mind";
 import { animalDetails } from "../animals/detailsStore";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Mic,
   Send,
@@ -45,9 +46,23 @@ export default function NpcChat() {
     [asrOn, setAsrOn] = useState(false),
     [showPrefs, setShowPrefs] = useState(false),
     [mic, setMic] = useState<"idle" | "recording" | "recognizing">("idle");
+  const memoryGeneration = useSyncExternalStore(animalDetails.subscribe, () =>
+    animalDetails.historyToken(),
+  );
   const request = useRef<AbortController | null>(null);
   const currentSession = useRef(session);
   currentSession.current = session;
+  const [showMemory, setShowMemory] = useState(false);
+  useEffect(() => {
+    request.current?.abort();
+    request.current = null;
+    setStreaming(false);
+    setMessages([]);
+    micSession.current?.cancel();
+    micAbort.current?.abort();
+    setMic("idle");
+    stopSpeaking();
+  }, [memoryGeneration]);
   const scroller = useRef<HTMLDivElement>(null);
   const micSession = useRef<DictationSession | null>(null);
   const micAbort = useRef<AbortController | null>(null);
@@ -76,10 +91,14 @@ export default function NpcChat() {
     setMic("idle");
     setStreaming(false);
     setMessages([]);
+    setShowMemory(false);
     setInput("");
     setError("");
     stopSpeaking();
-    return () => { request.current?.abort(); request.current = null; };
+    return () => {
+      request.current?.abort();
+      request.current = null;
+    };
   }, [session]);
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
@@ -115,7 +134,11 @@ export default function NpcChat() {
     const abort = new AbortController();
     request.current = abort;
     const historyToken = animalDetails.historyToken();
-    animalDetails.append(session.speakerId, { role: "user", text, source: "ai" }, historyToken);
+    animalDetails.append(
+      session.speakerId,
+      { role: "user", text, source: "ai" },
+      historyToken,
+    );
     const env = {
       weather: proximity.env.weather as Weather,
       season: proximity.env.season as Season,
@@ -135,19 +158,36 @@ export default function NpcChat() {
       },
       {
         delta: (chunk) => {
-          if (request.current !== abort || abort.signal.aborted || currentSession.current !== session) return;
+          if (
+            request.current !== abort ||
+            abort.signal.aborted ||
+            currentSession.current !== session
+          )
+            return;
           reply += chunk;
           setMessages((m) => {
             const last = m[m.length - 1]!;
             return last.role === "assistant"
-              ? [...m.slice(0, -1), { role: "assistant", content: last.content + chunk }]
+              ? [
+                  ...m.slice(0, -1),
+                  { role: "assistant", content: last.content + chunk },
+                ]
               : [...m, { role: "assistant", content: chunk }];
           });
         },
         done: () => {
-          if (request.current !== abort || abort.signal.aborted || currentSession.current !== session) return;
+          if (
+            request.current !== abort ||
+            abort.signal.aborted ||
+            currentSession.current !== session
+          )
+            return;
           request.current = null;
-          animalDetails.append(session.speakerId, { role: "assistant", text: reply, source: "ai" }, historyToken);
+          animalDetails.append(
+            session.speakerId,
+            { role: "assistant", text: reply, source: "ai" },
+            historyToken,
+          );
           setStreaming(false);
           const p = getVoicePrefs();
           if (reply && p.autoTts && !isSpeaking())
@@ -156,12 +196,23 @@ export default function NpcChat() {
                 const q = getVoicePrefs();
                 // Hands-free: when the reply is read out, the mic reopens —
                 // unless the child is already typing something.
-                if (currentSession.current === session && q.autoListen && !inputRef.current) openMicRef.current();
+                if (
+                  currentSession.current === session &&
+                  historyToken === animalDetails.historyToken() &&
+                  q.autoListen &&
+                  !inputRef.current
+                )
+                  openMicRef.current();
               },
             });
         },
         error: (code, message) => {
-          if (request.current !== abort || abort.signal.aborted || currentSession.current !== session) return;
+          if (
+            request.current !== abort ||
+            abort.signal.aborted ||
+            currentSession.current !== session
+          )
+            return;
           request.current = null;
           setStreaming(false);
           setError(message);
@@ -191,15 +242,26 @@ export default function NpcChat() {
     // The tail of a read-aloud must not leak into the recording.
     stopSpeaking();
     const owner = currentSession.current;
+    const memoryOwner = animalDetails.historyToken();
     startDictation()
       .then((session) => {
-        if (currentSession.current !== owner) { session.cancel(); return; }
+        if (
+          currentSession.current !== owner ||
+          memoryOwner !== animalDetails.historyToken()
+        ) {
+          session.cancel();
+          return;
+        }
         micSession.current = session;
         setMic("recording");
         session.onAutoStop = () => stopMicRef.current();
       })
       .catch((e: unknown) => {
-        if (currentSession.current !== owner) return;
+        if (
+          currentSession.current !== owner ||
+          memoryOwner !== animalDetails.historyToken()
+        )
+          return;
         setError(
           e instanceof DOMException && e.name === "NotAllowedError"
             ? "麦克风没有打开，请让爸爸妈妈在浏览器里允许麦克风。"
@@ -213,10 +275,15 @@ export default function NpcChat() {
     micSession.current = null;
     setMic("recognizing");
     const owner = currentSession.current;
+    const memoryOwner = animalDetails.historyToken();
     void (async () => {
       try {
         const blob = await session.stop();
-        if (currentSession.current !== owner) return;
+        if (
+          currentSession.current !== owner ||
+          memoryOwner !== animalDetails.historyToken()
+        )
+          return;
         if (!blob) {
           // A stray tap, not speech — not worth an error.
           setMic("idle");
@@ -225,7 +292,12 @@ export default function NpcChat() {
         const abort = new AbortController();
         micAbort.current = abort;
         const text = await transcribe(blob, abort.signal);
-        if (abort.signal.aborted || currentSession.current !== owner) return;
+        if (
+          abort.signal.aborted ||
+          currentSession.current !== owner ||
+          memoryOwner !== animalDetails.historyToken()
+        )
+          return;
         micAbort.current = null;
         setMic("idle");
         const trimmed = text.trim();
@@ -236,7 +308,11 @@ export default function NpcChat() {
         if (getVoicePrefs().autoSend) send(trimmed);
         else setInput(trimmed);
       } catch {
-        if (currentSession.current !== owner) return;
+        if (
+          currentSession.current !== owner ||
+          memoryOwner !== animalDetails.historyToken()
+        )
+          return;
         micAbort.current = null;
         setMic("idle");
         setError("没听清，再说一次试试。");
@@ -247,10 +323,22 @@ export default function NpcChat() {
   stopMicRef.current = stopMic;
 
   return (
-    <div className="npc-chat" role="dialog" aria-label={`和${session.name}聊天`}>
+    <div
+      className="npc-chat"
+      role="dialog"
+      aria-label={`和${session.name}聊天`}
+    >
       <header>
         <strong>{session.name}</strong>
         <span className="npc-chat-hint">智能对话</span>
+        {!session.subject.startsWith("device:") && (
+          <button
+            aria-label="记忆与技能"
+            onClick={() => setShowMemory(!showMemory)}
+          >
+            记忆
+          </button>
+        )}
         <button
           aria-label="语音设置"
           title="语音设置"
@@ -280,6 +368,9 @@ export default function NpcChat() {
         </button>
       </header>
       {showPrefs && <VoicePrefsPanel />}
+      {showMemory && (
+        <ResidentMemory key={session.speakerId} agentId={session.speakerId} />
+      )}
       <div className="npc-chat-log" ref={scroller}>
         {messages.map((m, i) => (
           <p key={i} className={m.role}>
@@ -336,7 +427,11 @@ export default function NpcChat() {
           maxLength={400}
           autoFocus
         />
-        <button type="submit" disabled={!input.trim() || streaming} aria-label="发送">
+        <button
+          type="submit"
+          disabled={!input.trim() || streaming}
+          aria-label="发送"
+        >
           <Send size={15} />
         </button>
       </form>

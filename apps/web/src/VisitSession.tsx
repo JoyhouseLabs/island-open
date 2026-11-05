@@ -1,3 +1,4 @@
+import { residentWorld } from "./animals/mindState";
 import {
   createContext,
   useContext,
@@ -44,6 +45,12 @@ export default function VisitSession() {
   const { worldId = "", "*": splat } = useParams();
   const location = useLocation();
   const token = new URLSearchParams(location.search).get("t") ?? "";
+  useEffect(() => {
+    residentWorld.current = { worldId, token: token || undefined };
+    return () => {
+      residentWorld.current = null;
+    };
+  }, [worldId, token]);
   const sceneParam = location.pathname.split("/")[3] ?? "island";
   const visit = useVisit(worldId, token);
   const [walking, setWalking] = useState(true);
@@ -69,8 +76,7 @@ export default function VisitSession() {
   useEffect(() => () => presence.disconnect(), []);
 
   useEffect(() => {
-    if (island)
-      document.title = `${island.world.snapshot.name} · 心灵家园`;
+    if (island) document.title = `${island.world.snapshot.name} · 心灵家园`;
   }, [island]);
 
   // Co-play refresh: the host (or another visitor) changed the world —
@@ -146,7 +152,9 @@ export default function VisitSession() {
       >
         <Outlet />
         <CardModal />
-          <AnimalDetails scope={`visit:${visit.user?.id ?? "guest"}:${worldId}`} />
+        <AnimalDetails
+          scope={`visit:${visit.user?.id ?? "guest"}:${worldId}`}
+        />
       </IslandConfigProvider>
     </Context.Provider>
   );

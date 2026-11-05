@@ -1,3 +1,4 @@
+import { consumeResidentRest } from "./mindState";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 
@@ -208,6 +209,16 @@ export function Animal({
       return;
     }
 
+    if (consumeResidentRest(id)) {
+      s.mode = "act";
+      s.action = "rest";
+      s.until = t + 8;
+      s.target = null;
+      s.followUntil = -1;
+      s.meetWith = null;
+      s.lastPlayer = t;
+      showEmote("zzz");
+    }
     let moving = false;
     let faceX: number | null = null,
       faceZ: number | null = null;

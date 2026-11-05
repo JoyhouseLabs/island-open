@@ -1,3 +1,5 @@
+import { ResidentLife } from "./animals/mind";
+import { residentWorld } from "./animals/mindState";
 import { learningTravel } from "./learning/travel";
 import {
   createContext,
@@ -43,7 +45,8 @@ export default function HomeSession() {
     location = useLocation();
   const audio = useAudio(world.notify, {
     weather: world.snapshot.environment.weather ?? "sun",
-    coastal: location.pathname === paths.island || location.pathname === paths.beach,
+    coastal:
+      location.pathname === paths.island || location.pathname === paths.beach,
   });
   const [quality, setQuality] = useState<Quality>("auto");
   const [islandEntry, setIslandEntry] = useState<Focus>(null);
@@ -61,16 +64,28 @@ export default function HomeSession() {
   // Owner-side presence: connect every scene of one's own island (no share
   // token needed) so visiting players can see and greet the host. The room
   // key is <island world id>:<scene>, so both sides land together.
+  useEffect(() => {
+    residentWorld.current = world.record?.id
+      ? { worldId: world.record.id }
+      : null;
+    return () => {
+      residentWorld.current = null;
+    };
+  }, [world.record?.id, world.user?.id]);
   const recordId = world.record?.id,
     userName = world.user?.name,
     scene =
-      Object.entries(paths).find(([, p]) => p === location.pathname.replace(/\/+$/, ""))?.[0] ??
-      "island";
+      Object.entries(paths).find(
+        ([, p]) => p === location.pathname.replace(/\/+$/, ""),
+      )?.[0] ?? "island";
   useEffect(() => {
     growth.bind(world.user?.id ?? null);
   }, [world.user?.id]);
   useEffect(() => {
-    if (scene === "wilderness") { presence.disconnect(); return; }
+    if (scene === "wilderness") {
+      presence.disconnect();
+      return;
+    }
     if (!recordId || !avatar || !userName) return;
     presence.connect({
       worldId: recordId,
@@ -88,7 +103,9 @@ export default function HomeSession() {
     if (!worldEvent || worldEvent.scene !== "island") return;
     if (world.record && worldEvent.revision <= world.record.revision) return;
     if (world.status === "dirty" || world.status === "saving")
-      world.notify("岛上有了新变化（朋友种下了什么）。记得先保存，再载入云端。");
+      world.notify(
+        "岛上有了新变化（朋友种下了什么）。记得先保存，再载入云端。",
+      );
     else void world.reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldEvent?.at]);
@@ -112,7 +129,13 @@ export default function HomeSession() {
         <IslandConfigProvider userId={world.user?.id ?? null}>
           <Outlet />
           <CardModal />
-          <AnimalDetails scope={`home:${world.user?.id ?? "local"}:${world.record?.id ?? "draft"}`} />
+          <ResidentLife
+            worldId={world.record?.id}
+            enabled={!!world.user && world.user.provider !== "guest"}
+          />
+          <AnimalDetails
+            scope={`home:${world.user?.id ?? "local"}:${world.record?.id ?? "draft"}`}
+          />
         </IslandConfigProvider>
       ) : (
         <div className="scene-loading" role="status">
