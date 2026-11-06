@@ -1,4 +1,5 @@
 import { ResidentMemoryContent, useResidentMind } from "./mind";
+import { ResidentChain } from "./ResidentChain";
 import {
   Component,
   Suspense,
@@ -300,6 +301,7 @@ function Details({ animal }: { animal: AnimalSelection }) {
         {tab === "model" && (
           <>
             <ResidentMemoryContent mind={mind} />
+            <ResidentChain />
           </>
         )}
       </div>

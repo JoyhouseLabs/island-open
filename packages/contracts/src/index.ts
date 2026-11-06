@@ -238,3 +238,4 @@ export * from "./learning.js";
 export * from "./exploration.js";
 
 export * from "./training.js";
+export * from "./resident-chain.js";

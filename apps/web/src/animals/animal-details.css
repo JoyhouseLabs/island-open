@@ -287,3 +287,6 @@
   max-height: 50vh;
   padding: 16px;
 }
+.resident-chain { overflow-wrap: anywhere; }
+.resident-chain-links { display: flex; flex-wrap: wrap; gap: 12px; }
+.resident-chain-links a { color: #416447; text-decoration: underline; text-underline-offset: 3px; }
