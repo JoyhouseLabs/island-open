@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "network": "BSC mainnet",
+  "chainId": 56,
+  "deployedOn": "2026-11-06",
+  "sourceCommit": "1d39936394c750454f8cdf9e62b09ea71826afc7",
+  "compiler": "0.8.30+commit.73712a01",
+  "evmVersion": "cancun",
+  "optimizerRuns": 200,
+  "bytecodeHash": "none",
+  "deployer": "0x8Ac5fa920d2539a41c35660787e1258132D65949",
+  "administrator": "0x8Ac5fa920d2539a41c35660787e1258132D65949",
+  "registry": "0x000000006551c19487814612e58FE06813775758",
+  "registryRuntimeCodeHash": "0xda1d5b06e579f9e42e59b00fbc22939896ecb38dc8830d40de0a2508fecd6735",
+  "accountSalt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "contracts": {
+    "ResidentAccount": {
+      "address": "0x3A459C721e6dEa062DDD0Cc6917A41f0295cA9BD",
+      "transactionHash": "0xdbbc925bdd08055629810da27aa4f76f5b1652b333bba803c94f0f32f68153a0",
+      "blockNumber": 131994626,
+      "nonce": 0,
+      "gasUsed": "1350353",
+      "gasPriceWei": "50000000",
+      "feeWei": "67517650000000",
+      "explorer": "https://bscscan.com/address/0x3A459C721e6dEa062DDD0Cc6917A41f0295cA9BD",
+      "sourceVerification": {
+        "provider": "Sourcify",
+        "creationMatch": "match",
+        "runtimeMatch": "match",
+        "verifiedAt": "2026-11-06T10:43:25Z",
+        "url": "https://repo.sourcify.dev/56/0x3A459C721e6dEa062DDD0Cc6917A41f0295cA9BD",
+        "api": "https://sourcify.dev/server/v2/contract/56/0x3A459C721e6dEa062DDD0Cc6917A41f0295cA9BD"
+      }
+    },
+    "ResidentNFT": {
+      "address": "0xb35d63e3766A8A7855A5890013DA24b2A1E0434d",
+      "transactionHash": "0x7005e847c420e508c16a536c68272d230e000d243316b5cdf383ae6e360d80c8",
+      "blockNumber": 131994742,
+      "nonce": 1,
+      "gasUsed": "1536630",
+      "gasPriceWei": "50000000",
+      "feeWei": "76831500000000",
+      "explorer": "https://bscscan.com/address/0xb35d63e3766A8A7855A5890013DA24b2A1E0434d",
+      "sourceVerification": {
+        "provider": "Sourcify",
+        "creationMatch": "match",
+        "runtimeMatch": "match",
+        "verifiedAt": "2026-11-06T10:43:42Z",
+        "url": "https://repo.sourcify.dev/56/0xb35d63e3766A8A7855A5890013DA24b2A1E0434d",
+        "api": "https://sourcify.dev/server/v2/contract/56/0xb35d63e3766A8A7855A5890013DA24b2A1E0434d"
+      }
+    }
+  },
+  "totalGasUsed": 2886983,
+  "totalFeeWei": "144349150000000",
+  "islandIntegration": "not connected",
+  "mintedDuringDeployment": 0
+}
