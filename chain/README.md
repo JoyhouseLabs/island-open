@@ -1,6 +1,6 @@
 # Island 居民 NFT 与 ERC-6551 账户
 
-2026-11-06，按用户确认采用 **ERC-721 居民身份 + ERC-6551 Token Bound Account（TBA）**。当前交付为独立合约模块、测试、公共 ABI、测试网部署脚本与未签名铸造工具；**尚未部署居民合约，尚未接入 Island 登录、角色实例或后台，不代表现有动物已经成为 NFT。**
+2026-11-06，按用户确认采用 **ERC-721 居民身份 + ERC-6551 Token Bound Account（TBA）**。当前交付为独立合约模块、测试、公共 ABI、测试网/主网分离的部署脚本与未签名测试网铸造工具；**尚未部署居民合约，尚未接入 Island 登录、角色实例或后台，不代表现有动物已经成为 NFT。**
 
 ## 已实现
 
@@ -54,16 +54,33 @@ forge script script/DeployResidents.s.sol:DeployResidents \
 5. 先上传只含公开信息的角色元数据，持久化居民 UUID；运行 `node tools/prepare-mint.mjs <collection> <recipient> <UUID-v4> <ipfs://metadata>` 生成可审查的未签名交易。该工具不发送交易、不申请签名、不自动创建 UUID。管理员确认后再用钱包签名。
 6. 确认 receipt 成功后，核对 `ownerOf`、`accountOf`、账户 `token()`、`owner()`、implementation 和链；链下绑定不能只信客户端提交的交易哈希。
 
+## BSC 主网部署准备（2026-11-06）
+
+用户提出改用正式网，新增 `script/DeployResidentsMainnet.s.sol:DeployResidentsMainnet`，固定 chainId **56**。原测试网脚本继续只允许 97；主网入口通过 `run(address administrator)` 显式接收公开管理员地址，不依赖测试网的管理员环境变量。两者均核验标准 Registry 的完整 runtime code hash。
+
+先模拟（不加 `--broadcast`）：
+
+```bash
+forge script script/DeployResidentsMainnet.s.sol:DeployResidentsMainnet \
+  --sig 'run(address)' "$ISLAND_NFT_ADMIN" \
+  --rpc-url "$BSC_MAINNET_RPC" \
+  --keystore "$ISLAND_DEPLOY_KEYSTORE" --password-file "$ISLAND_DEPLOY_PASSWORD_FILE"
+```
+
+使用本机加密 keystore，密钥和口令不写命令参数、不提交仓库、不上传生产服务器。只有实际发送时才增加 `--broadcast`；应保存两笔交易的 receipt、合约地址、部署区块、构造参数与代码验证结果。当前没有发送交易、没有部署地址。主网脚本不是新的合约审计，也没有激活岛屿的钱包/NFT 功能。
+
+主网只读核验：标准 Registry runtime 与规范一致。费用必须用发送前的 RPC gasPrice 和部署模拟重算；历史 gas 报价不是固定价格。`tools/prepare-mint.mjs` 仍固定测试网，不能把它生成的交易直接发到主网；本次准备只涉及部署两份基础合约。
+
 ## 已验证与边界
 
-- 30 项本地 EVM 测试通过，含 2 项各 256 轮 fuzz；覆盖标准接口、原子铸造、确定性地址、持有人控制、资产保持、管理员隔离、转让/转回撤权、精确参数授权、额度/次数/过期、失败回滚、重入、签名重放、合约持有人、错误链、部署脚本模拟与主网拒绝。
+- 35 项本地 EVM 测试通过，含 2 项各 256 轮 fuzz；覆盖标准接口、原子铸造、确定性地址、持有人控制、资产保持、管理员隔离、转让/转回撤权、精确参数授权、额度/次数/过期、失败回滚、重入、签名重放、合约持有人、错误链、部署脚本模拟、测试网/主网相互拒绝以及主网配置下铸造、转移和旧授权失效。
 - 3 项 Node 身份测试通过；未签名铸造交易编码与 ABI 解码一致。
 - 通过 BSC 测试网公共 RPC 读取标准 Registry 字节码，与规范 runtime 完全一致；没有发送链上交易。当前运行环境阻止直接 Node 网络访问，RPC 检查使用允许的独立 HTTPS 请求验证，不能把它描述为部署成功。
 - 本模块没有接入生产 API、用户钱包绑定、实例化居民、所有权同步、MCP 到链上技能执行器或记忆迁移。这些是后续 Island 接入工作。
 - 技能委托签名者是单独执行钱包/服务，不是 LLM；模型只提出动作，执行器还需校验当前授权再签名。资金与 MCP 凭据不得交给模型。
 - calldata 授权可包含代币转移或 approve：原生币额度不会限制其中的 ERC-20 数量，必须审查完整参数。旧持有人通过通用 execute 留下的 ERC-20/NFT 外部批准不会因 NFT 转让自动撤销；此版转让失效的是本合约的技能授权和所有权绑定签名。
 - 阻止 NFT 转入自己的主 TBA（含 unsafe transfer）；不保证识别任意多层、跨收藏品或第三方账户的循环所有权。当前产品不开放居民 NFT 嵌套持有。
-- 自定义账户和权限逻辑尚未经独立安全审计，当前交付定位为测试网原型；不提供主网发行/交易市场/真实资金托管功能。
+- 自定义账户和权限逻辑尚未经独立安全审计，当前仍为未审计的原型，已提供主网部署入口但尚未执行；不提供交易市场或已接入游戏的真实资金托管功能。
 
 规范与实现来源：[ERC-6551](https://eips.ethereum.org/EIPS/eip-6551)、[ERC-721](https://eips.ethereum.org/EIPS/eip-721)、[OpenZeppelin 5.7.0](https://github.com/OpenZeppelin/openzeppelin-contracts/releases/tag/v5.7.0)、[BSC RPC](https://docs.bnbchain.org/bnb-smart-chain/developers/json_rpc/json-rpc-endpoint/)。
 

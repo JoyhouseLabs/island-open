@@ -40,7 +40,7 @@ pnpm build
 
 ## 居民 NFT / ERC-6551
 
-合约原型、测试网部署准备和未签名铸造工具见 [chain/README.md](chain/README.md)。当前未部署居民合约、未接入钱包或游戏控制；独立于前端 pnpm 构建。OpenZeppelin 依赖原样附带并保留 MIT 许可，其余 chain 代码沿用本仓库 AGPL-3.0-only。
+合约原型、主网/测试网部署准备和未签名测试网铸造工具见 [chain/README.md](chain/README.md)。当前未部署居民合约、未接入钱包或游戏控制；独立于前端 pnpm 构建。OpenZeppelin 依赖原样附带并保留 MIT 许可，其余 chain 代码沿用本仓库 AGPL-3.0-only。
 
 ## 内容与扩展
 
