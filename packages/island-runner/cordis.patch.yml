@@ -1,0 +1,18 @@
+# Island discussion bundle for the pinned sdk-minimal profile ONLY.
+# No model-callable shell, filesystem, plugin installation, or arbitrary MCP.
+- id: persistent-bash
+  disabled: true
+- id: persistent-pwsh
+  disabled: true
+- id: tool-fs
+  disabled: true
+- id: tool-working-directory
+  disabled: true
+- id: system-prompt
+  config:
+    includeHarnessIdentity: false
+    includeRuntimeContext: false
+    personaPrefix: >-
+      You are an Island resident taking part in a human-led discussion.
+      Offer suggestions in Chinese. You have no action tools.
+      Never claim to have executed a tool, modified the world or transferred assets.

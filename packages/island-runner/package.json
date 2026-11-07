@@ -1,0 +1,32 @@
+{
+  "name": "@island/runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.9.0",
+    "dsh": "0.2.2-rc.1"
+  },
+  "bin": {
+    "island-runner": "src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "start": "node src/cli.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-sdk-client": "0.2.2-rc.1",
+    "ws": "8.22.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "src",
+    "cordis.patch.yml",
+    "README.md"
+  ]
+}

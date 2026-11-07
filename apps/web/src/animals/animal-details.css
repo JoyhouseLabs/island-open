@@ -290,3 +290,7 @@
 .resident-chain { overflow-wrap: anywhere; }
 .resident-chain-links { display: flex; flex-wrap: wrap; gap: 12px; }
 .resident-chain-links a { color: #416447; text-decoration: underline; text-underline-offset: 3px; }
+.resident-collaboration select,
+.resident-collaboration input { width: 100%; padding: .6rem; border: 1px solid #bdc9ab; border-radius: .6rem; background: #fffef8; color: inherit; font: inherit; box-sizing: border-box; }
+.resident-collaboration label { display: grid; gap: .4rem; margin: .8rem 0; }
+.collaboration-output { white-space: pre-wrap; overflow-wrap: anywhere; }

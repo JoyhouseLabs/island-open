@@ -9,6 +9,7 @@
 | `apps/web` | React 界面、R3F 场景、音频、本地草稿与同步客户端 |
 | `packages/contracts` | 客户端与服务端共用的接口协议和 Zod 运行时校验 |
 | `packages/world-core` | 确定性生成、地形采样、摆放规则、成长与行走，不依赖 WebGL |
+| `packages/island-runner` | 本地 DeepSeek Harness 协同讨论实验，独立 Node 24 运行时；[安装说明](packages/island-runner/README.md) |
 | `chain` | ERC-721 居民 NFT、ERC-6551 账户、技能授权与本地 EVM 测试；未接入生产 |
 | `scripts/prepare-assets.mjs` | 下载狐狸 GLB、生成原创环境声与资源清单 |
 

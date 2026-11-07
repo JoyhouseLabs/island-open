@@ -1,5 +1,6 @@
 import { ResidentMemoryContent, useResidentMind } from "./mind";
 import { ResidentChain } from "./ResidentChain";
+import { ResidentCollaboration } from "./ResidentCollaboration";
 import {
   Component,
   Suspense,
@@ -63,7 +64,7 @@ class PortraitBoundary extends Component<
 function Details({ animal }: { animal: AnimalSelection }) {
   const mind = useResidentMind(animal.id);
   const displayName = mind.view?.config.name || animal.name;
-  const [tab, setTab] = useState<"profile" | "history" | "model">("profile");
+  const [tab, setTab] = useState<"profile" | "history" | "model" | "collaboration">("profile");
   const [status, setStatus] = useState<IntelligenceStatus | null>(null);
   const [live, setLive] = useState(() => agentById(animal.id));
   const [feedback, setFeedback] = useState("");
@@ -179,6 +180,7 @@ function Details({ animal }: { animal: AnimalSelection }) {
             ["profile", "属性与能力"],
             ["history", "对话记录"],
             ["model", "角色与模型"],
+            ["collaboration", "协同"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -191,6 +193,7 @@ function Details({ animal }: { animal: AnimalSelection }) {
         ))}
       </nav>
       <div className="animal-details-body">
+        {tab === "collaboration" && <ResidentCollaboration agentId={animal.id} name={displayName} />}
         {tab === "profile" && (
           <>
             <section>
