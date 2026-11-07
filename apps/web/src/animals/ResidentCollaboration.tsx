@@ -305,6 +305,7 @@ export function ResidentCollaboration({
                   void act(async () => {
                     await api(`/collaboration/rooms/${roomId}`, {
                       method: "DELETE",
+                      body: JSON.stringify({}),
                     });
                     if (alive.current) {
                       setRoomId("");
@@ -399,6 +400,7 @@ export function ResidentCollaboration({
                       void act(async () => {
                         await api(`/collaboration/devices/${d.id}`, {
                           method: "DELETE",
+                          body: JSON.stringify({}),
                         });
                         if (alive.current && runnerId === d.id) setRunnerId("");
                       })
