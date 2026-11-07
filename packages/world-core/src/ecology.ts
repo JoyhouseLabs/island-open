@@ -13,7 +13,7 @@ import { speciesProfiles } from "@island/contracts";
  */
 export const ECOLOGY_TICK_MS = 6 * 3600_000;
 export const ECOLOGY_SLOT_MS = 10 * 60_000;
-/** A cold cache replays at most this many ticks; before that the world
+/** Derivation replays at most this many ticks; before that the world
  *  simply "began" that long ago (arrivals/departures are low-frequency, so
  *  the result stays close to a full replay). */
 export const MAX_REPLAY_TICKS = 240;
@@ -48,7 +48,8 @@ export type EcologySeason = "spring" | "summer" | "autumn" | "winter";
 
 /** Per-species name pieces for born friends; flavours and preferences
  *  come from the contracts species registry. */
-const nameParts = (species: Species) => speciesProfiles[species].ecology.nameParts;
+const nameParts = (species: Species) =>
+  speciesProfiles[species].ecology.nameParts;
 
 /** Deterministic tick rng: same seed and tick, same little world. */
 const tickRng = (seed: number, tick: number) =>
@@ -142,7 +143,9 @@ export function stepEcology(
       const speciesList = base.members.map((m) => m.species);
       const species = speciesList[Math.floor(rng() * speciesList.length)]!;
       const count = members.filter((m) => m.species === species).length;
-      const baseCount = base.members.filter((m) => m.species === species).length;
+      const baseCount = base.members.filter(
+        (m) => m.species === species,
+      ).length;
       if (count < baseCount + 2) {
         const member = bornMember(
           species,
@@ -159,19 +162,19 @@ export function stepEcology(
   return s;
 }
 
-/** Derives the state for a wall-clock tick, replaying from a cached state
- *  when possible (and from the replay floor when the cache is too old). */
+/** Canonical bounded replay, identical on the client and server.
+ * A previous state may have a different season or replay floor, so resuming
+ * it can invent residents the server does not recognize. Keep the optional
+ * argument for callers of older versions, but never trust it as a roster. */
 export function ecologyState(
   seed: number,
   tick: number,
   season: EcologySeason,
-  last?: EcologyState,
+  _last?: EcologyState,
 ): EcologyState {
   const base = baseEcology();
   if (tick <= 0) return base;
-  let from: EcologyState = last && last.tick <= tick && last.tick >= 0 ? last : base;
-  if (tick - from.tick > MAX_REPLAY_TICKS)
-    from = { ...base, tick: Math.max(0, tick - MAX_REPLAY_TICKS) };
+  const from = { ...base, tick: Math.max(0, tick - MAX_REPLAY_TICKS) };
   return stepEcology(from, tick, seed, season);
 }
 

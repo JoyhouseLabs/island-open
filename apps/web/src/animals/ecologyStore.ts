@@ -16,13 +16,22 @@ import { emitGrowth, growth } from "../progress/store";
  * The main island's bounded ecology, derived per frame-family from the
  * world seed and the wall clock — the host and every visitor compute the
  * same population with nothing synced (the fox's clock patrol, one layer
- * up). A localStorage cache keeps the replay short and the arrival log
- * readable across sessions; it is never authoritative.
+ * up). Only memoize a canonical result for the exact seed, season and tick.
+ * Older localStorage rosters are deliberately ignored: resuming one can
+ * disagree with the server after a season change or replay-window shift.
  */
-const CACHE_KEY = "island-ecology-v1";
-type Cache = { seed: number; tick: number; state: EcologyState };
+let derived: {
+  seed: number;
+  tick: number;
+  season: EcologySeason;
+  state: EcologyState;
+} | null = null;
 
-let flags: FeatureFlags = { cards: false, speakingEntities: false, ecology: false };
+let flags: FeatureFlags = {
+  cards: false,
+  speakingEntities: false,
+  ecology: false,
+};
 void featuresStatus().then((f) => {
   flags = f;
 });
@@ -32,29 +41,17 @@ let current: { seed: number; members: EcologyMember[] } | null = null;
 /** Seen log entries, so a tick change announces only what is new. */
 let seenLog: EcologyState["log"] | null = null;
 
-function readCache(seed: number): Cache | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Cache) : null;
-    return parsed && parsed.seed === seed ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 function derive(seed: number, season: EcologySeason): EcologyState {
   const tick = Math.floor(Date.now() / ECOLOGY_TICK_MS);
-  const cached = readCache(seed);
-  const state = ecologyState(seed, tick, season, cached?.state);
-  try {
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({ seed, tick, state } satisfies Cache),
-    );
-  } catch {
-    /* the cache is an optimisation, nothing more */
+  if (
+    !derived ||
+    derived.seed !== seed ||
+    derived.tick !== tick ||
+    derived.season !== season
+  ) {
+    derived = { seed, tick, season, state: ecologyState(seed, tick, season) };
   }
-  return state;
+  return derived.state;
 }
 
 /** Announces events that happened since the last look. The first look only
@@ -93,8 +90,10 @@ export function useEcology(
       current = null;
       return;
     }
+    seenLog = null;
     const update = () => {
       const state = derive(seed, season);
+      if (current?.members !== state.members) planCache = null;
       current = { seed, members: state.members };
       announce(state);
       setMembers(state.members);
@@ -109,17 +108,28 @@ export function useEcology(
   return flags.ecology && seed !== null ? members : null;
 }
 
-let planCache: { slot: number; seed: number; plan: EcologyEncounter | null } | null =
-  null;
+let planCache: {
+  slot: number;
+  seed: number;
+  plan: EcologyEncounter | null;
+} | null = null;
 
 /** This animal's scheduled encounter for the current ten-minute slot, if
  *  any. Deterministic per (seed, slot), so host and visitors agree. */
 export function activeEncounter(
   id: string,
-): { behavior: EcologyEncounter["behavior"]; at: { x: number; z: number }; partnerId: string } | null {
+): {
+  behavior: EcologyEncounter["behavior"];
+  at: { x: number; z: number };
+  partnerId: string;
+} | null {
   if (!flags.ecology || !current) return null;
   const slot = Math.floor(Date.now() / ECOLOGY_SLOT_MS);
-  if (!planCache || planCache.slot !== slot || planCache.seed !== current.seed) {
+  if (
+    !planCache ||
+    planCache.slot !== slot ||
+    planCache.seed !== current.seed
+  ) {
     planCache = {
       slot,
       seed: current.seed,

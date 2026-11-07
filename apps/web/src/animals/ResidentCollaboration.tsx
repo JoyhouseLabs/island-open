@@ -4,7 +4,7 @@ import type {
   CollaborationTask,
   RunnerDevice,
 } from "@island/contracts";
-import { api } from "../api";
+import { api, RequestError } from "../api";
 import { mindRequest } from "./mind";
 
 const labels: Record<CollaborationTask["status"], string> = {
@@ -41,7 +41,11 @@ export function ResidentCollaboration({
   const [version, setVersion] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const alive = useRef(true);
+  const errorRef = useRef<HTMLParagraphElement>(null);
   const retry = useRef<{ fingerprint: string; id: string } | null>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: "nearest" });
+  }, [error]);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -92,7 +96,13 @@ export function ResidentCollaboration({
       if (alive.current) setVersion((v) => v + 1);
     } catch (e) {
       if (alive.current)
-        setError(e instanceof Error ? e.message : "操作暂未完成。");
+        setError(
+          e instanceof RequestError && e.code === "NPC_NOT_FOUND"
+            ? `${e.message} 请先复制任务内容，再刷新小岛并重新选择居民。`
+            : e instanceof Error
+              ? e.message
+              : "操作暂未完成。",
+        );
     } finally {
       if (alive.current) setBusy(false);
     }
@@ -110,7 +120,11 @@ export function ResidentCollaboration({
       <p className="animal-note">
         这里只共享本讨论中已采纳的内容，不自动读取私人聊天记忆。采纳表示保留建议，不会执行岛屿操作。
       </p>
-      {error && <p role="alert">{error}</p>}
+      {error && !roomId && (
+        <p role="alert" ref={errorRef}>
+          {error}
+        </p>
+      )}
       {!loaded && <p role="status">正在读取讨论…</p>}
       <label>
         继续已有讨论
@@ -285,8 +299,13 @@ export function ResidentCollaboration({
               })
             }
           >
-            邀请{name}思考
+            {busy ? "正在提交…" : `邀请${name}思考`}
           </button>
+          {error && (
+            <p role="alert" ref={errorRef}>
+              {error}
+            </p>
+          )}
           <p className="animal-note">
             要换一位伙伴，点选岛上的另一只动物，在“协同”中选择这份讨论。
           </p>

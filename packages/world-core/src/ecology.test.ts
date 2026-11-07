@@ -32,9 +32,9 @@ describe("stepEcology / ecologyState", () => {
     expect(a).toEqual(b);
     // A different seed is very likely a different little world.
     const c = ecologyState(SEED + 1, 500, "summer");
-    expect(JSON.stringify(c.members.slice(baseEcology().members.length))).not.toBe(
-      JSON.stringify(a.members.slice(baseEcology().members.length)),
-    );
+    expect(
+      JSON.stringify(c.members.slice(baseEcology().members.length)),
+    ).not.toBe(JSON.stringify(a.members.slice(baseEcology().members.length)));
   });
 
   it("never drops a baseline resident and stays within bounds over a year", () => {
@@ -57,7 +57,9 @@ describe("stepEcology / ecologyState", () => {
         expect(state.members.some((m) => m.id === b.id)).toBe(true);
       for (const species of ["panda", "giraffe", "wolf", "vaporeon"] as const) {
         const count = state.members.filter((m) => m.species === species).length;
-        const baseCount = base.members.filter((m) => m.species === species).length;
+        const baseCount = base.members.filter(
+          (m) => m.species === species,
+        ).length;
         expect(count).toBeLessThanOrEqual(baseCount + 2);
       }
     }
@@ -65,10 +67,14 @@ describe("stepEcology / ecologyState", () => {
     expect(state.log.length).toBeGreaterThan(0);
     expect(state.log.length).toBeLessThanOrEqual(12);
     // Drift actually happened somewhere in the year.
-    const states = [ecologyState(SEED, 90, "spring"), ecologyState(SEED, 180, "summer"), ecologyState(SEED, 365 * 4, "winter")];
-    expect(
-      states.some((s) => s.members.some((m) => m.bornTick > 0)),
-    ).toBe(true);
+    const states = [
+      ecologyState(SEED, 90, "spring"),
+      ecologyState(SEED, 180, "summer"),
+      ecologyState(SEED, 365 * 4, "winter"),
+    ];
+    expect(states.some((s) => s.members.some((m) => m.bornTick > 0))).toBe(
+      true,
+    );
   });
 
   it("replaying tick-by-tick matches a one-shot replay", () => {
@@ -79,7 +85,7 @@ describe("stepEcology / ecologyState", () => {
     expect(stepped).toEqual(oneShot);
   });
 
-  it("resumes from a cached state and clamps ancient replays", () => {
+  it("accepts legacy cache arguments without changing canonical replay", () => {
     const early = ecologyState(SEED, 10, "spring");
     const resumed = ecologyState(SEED, 12, "spring", early);
     expect(resumed.tick).toBe(12);
@@ -88,9 +94,37 @@ describe("stepEcology / ecologyState", () => {
     const far = ecologyState(SEED, 100_000, "summer");
     expect(far.tick).toBe(100_000);
     // Every event still respects the replay window bound.
-    expect(
-      far.log.every((e) => e.tick >= 100_000 - MAX_REPLAY_TICKS - 1),
-    ).toBe(true);
+    expect(far.log.every((e) => e.tick >= 100_000 - MAX_REPLAY_TICKS - 1)).toBe(
+      true,
+    );
+  });
+
+  it("does not retain winter residents when the island changes to autumn", () => {
+    const tick = Math.floor(
+      Date.parse("2026-11-08T00:21:44+08:00") / (6 * 3600_000),
+    );
+    const winter = ecologyState(SEED, tick, "winter");
+    expect(winter.members.some((m) => m.name === "橘米")).toBe(true);
+    const autumn = ecologyState(SEED, tick, "autumn", winter);
+    expect(autumn).toEqual(ecologyState(SEED, tick, "autumn"));
+    expect(autumn.members.some((m) => m.name === "橘米")).toBe(false);
+  });
+
+  it("matches a cold server after the replay window moves", () => {
+    const tick = Math.floor(
+      Date.parse("2026-11-08T00:21:44+08:00") / (6 * 3600_000),
+    );
+    const previous = ecologyState(SEED, tick - 21, "autumn");
+    expect(ecologyState(SEED, tick, "autumn", previous)).toEqual(
+      ecologyState(SEED, tick, "autumn"),
+    );
+  });
+
+  it("does not let a cached roster from another island determine identity", () => {
+    const foreign = ecologyState(SEED + 1, 2000, "summer");
+    expect(ecologyState(SEED, 2000, "summer", foreign)).toEqual(
+      ecologyState(SEED, 2000, "summer"),
+    );
   });
 
   it("gives born friends unique names and ids", () => {
