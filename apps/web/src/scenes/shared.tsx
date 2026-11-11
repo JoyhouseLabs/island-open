@@ -1,3 +1,4 @@
+import type { PlaySceneBindings } from "../starlight/StarlightPlay";
 import RendererCleanup from "../RendererCleanup";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
@@ -19,6 +20,7 @@ import { acquireStorm, onStormFlash } from "../storm";
 import { swayingMaterial } from "../Plants";
 
 export type SceneProps = {
+  starlightPlay?: PlaySceneBindings;
   unknownSnapshot?: WorldSnapshot;
   building?: BuildingEditor;
   onDevicePositions?: (

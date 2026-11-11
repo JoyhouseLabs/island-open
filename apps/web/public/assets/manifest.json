@@ -91,6 +91,14 @@
       "mime": "audio/wav"
     },
     {
+      "id": "voice-umbreon",
+      "file": "voice-umbreon.wav",
+      "url": "/api/content/core/voice-umbreon",
+      "sha256": "06718be5eb9b8f2a22b4f01c788b1e1e727cddfa5960da0c5e71bd5fed764f17",
+      "bytes": 45026,
+      "mime": "audio/wav"
+    },
+    {
       "id": "voice-vaporeon",
       "file": "voice-vaporeon.wav",
       "url": "/api/content/core/voice-vaporeon",

@@ -38,6 +38,9 @@ export const residents: Partial<
     { species: "giraffe", name: "高高", home: { x: -24, z: 16, r: 10 }, prefer: "water" },
     { species: "vaporeon", name: "水伊布", home: { x: -26, z: 8, r: 9 }, prefer: "water" },
   ],
+  starlight: [
+    { species: "umbreon", name: "月亮伊布", home: { x: 7, z: 12, r: 4 }, prefer: "grass" },
+  ],
   home: [
     { species: "panda", name: "团团", home: { x: 6, z: 8, r: 7 }, prefer: "bench" },
   ],

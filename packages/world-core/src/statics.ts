@@ -1,4 +1,4 @@
-import type { IslandEntity, PlaceProp } from "@island/contracts";
+import type { IslandEntity, MaterialId, PlaceProp } from "@island/contracts";
 import { gardenGreenhouse } from "./garden.js";
 import { tableTops } from "./furniture.js";
 import { random } from "./random.js";
@@ -18,6 +18,15 @@ import {
   nurseryFeatures,
   starlightFeatures,
 } from "./scenes.js";
+
+export const playResourceNodes: { id: string; material: MaterialId; x: number; z: number; quantity: number }[] = [
+  { id: "fruit-east", material: "moonfruit", x: 11, z: 8, quantity: 2 },
+  { id: "fruit-west", material: "moonfruit", x: -10, z: 10, quantity: 2 },
+  { id: "branch-east", material: "branch", x: 13, z: 14, quantity: 3 },
+  { id: "branch-west", material: "branch", x: -12, z: 15, quantity: 3 },
+  { id: "stone-east", material: "pebble", x: 6, z: 18, quantity: 2 },
+  { id: "stone-west", material: "pebble", x: -6, z: 18, quantity: 2 },
+];
 
 /** Static scene structures: one table per scene saying what stands there
  *  AND what it does to the walking player. Renderers position the visuals
@@ -267,6 +276,7 @@ export const sceneStatics: Record<string, SceneStatic[]> = {
     },
   ],
   starlight: [
+    ...playResourceNodes.map(n => ({ kind: `resource-${n.material}`, x: n.x, z: n.z, pass: "through" as const })),
     { kind: "cave", x: starlightFeatures.cave.x, z: starlightFeatures.cave.z, r: 2.6 },
     ...starlightFeatures.stones.map((s) => ({
       kind: "stone",

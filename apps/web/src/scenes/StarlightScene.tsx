@@ -1,3 +1,5 @@
+import StarlightObjects from "../starlight/StarlightObjects";
+import { playObstacles } from "@island/world-core";
 import { useMemo, useRef } from "react";
 import * as T from "three";
 import { useFrame } from "@react-three/fiber";
@@ -292,13 +294,14 @@ function CaveExit({
     </group>
   );
 }
-import { ContentAnimals } from "../animals";
+import { Residents } from "../animals";
 import Collectibles from "../collect/Collectibles";
 
 function Starlight(props: SceneProps) {
   const { world, tool, onPlace, onExit, low } = props,
     weather = world.environment.weather ?? "sun";
   const place = usePlacer(tool, onPlace);
+  const extraObstacles = useMemo(() => playObstacles(props.starlightPlay?.state.structures ?? []), [props.starlightPlay?.state.structures]);
   return (
     <>
       {/* The clearing sleeps in its own night, whatever the island's clock says. */}
@@ -315,7 +318,11 @@ function Starlight(props: SceneProps) {
         forceNight
         weather={weather}
       />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow onClick={place}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow onClick={e => {
+        if (e.delta > 5) return;
+        if (props.starlightPlay?.preview) { e.stopPropagation(); props.starlightPlay.onGround(e.point.x, e.point.z); }
+        else place(e);
+      }}>
         <circleGeometry args={[36.5, 64]} />
         <meshStandardMaterial color="#2f4041" roughness={1} />
       </mesh>
@@ -358,11 +365,12 @@ function Starlight(props: SceneProps) {
         height={() => 0}
         wind={Math.min(1, weatherWind[weather] + 0.15)}
       />
-      <ContentAnimals scene="starlight" entities={world.entities} />
+      {props.starlightPlay && <StarlightObjects play={props.starlightPlay} low={low} />}
+      <Residents scene="starlight" entities={world.entities} />
       <Collectibles scene="starlight" seed={world.seed} />
       {/* A low, level camera keeps the horizon in frame so the stars show. */}
       {props.walk && props.avatar && props.onGate && (
-        <PlayerRig scene="starlight" avatar={props.avatar} entities={world.entities} onGate={props.onGate} />
+        <PlayerRig paused={props.starlightPlay?.frozen} extraObstacles={extraObstacles} scene="starlight" avatar={props.avatar} entities={world.entities} onGate={props.onGate} />
       )}
       <SceneFrame reset={props.reset} position={[40, 18, 74]} max={300} />
     </>

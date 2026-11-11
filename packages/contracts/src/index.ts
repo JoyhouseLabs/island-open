@@ -241,3 +241,4 @@ export * from "./training.js";
 export * from "./resident-chain.js";
 
 export * from "./collaboration.js";
+export * from "./starlight-play.js";

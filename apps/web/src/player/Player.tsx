@@ -58,6 +58,7 @@ const SPRINT_MULT = 1.7;
 const GRAVITY = -22;
 const JUMP_V = 7.2;
 const PLAYER_R = playerBody.radius;
+const NO_EXTRA_OBSTACLES: Obstacle[] = [];
 const walkKeys = new Set([
   "w",
   "a",
@@ -88,19 +89,26 @@ export function PlayerRig({
   place,
   onGate,
   world,
+  extraObstacles = NO_EXTRA_OBSTACLES,
+  paused = false,
 }: {
   /** Built-in scene, or "place-<id>" for a published place. */
   scene: "island" | SubSceneId | (string & {});
   avatar: AvatarConfig;
   world?: WorldSnapshot;
+  extraObstacles?: Obstacle[];
+  paused?: boolean;
   entities: IslandEntity[];
   /** Present when the scene is a published place (props collide too). */
   place?: PlaceConfig;
   onGate: (dest: "island" | SubSceneId) => void;
 }) {
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   const spec = specFor(scene);
   const obstacles = useMemo<Obstacle[]>(
     () => [
+      ...extraObstacles,
       ...creationObstacles(world?.creations ?? []),
       ...furnitureObstacles(world?.furniture ?? []),
       ...walkObstacles(
@@ -118,6 +126,7 @@ export function PlayerRig({
       world?.entityPlacements,
       world?.furniture,
       world?.creations,
+      extraObstacles,
     ],
   );
   const cells = useMemo(
@@ -335,7 +344,8 @@ export function PlayerRig({
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (animalDetails.selected) return;
+      if (pausedRef.current || animalDetails.selected) return;
+      if ((e.target as HTMLElement)?.closest("button,select,[contenteditable=true]")) return;
       const el = document.activeElement;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
       const k = e.key.toLowerCase();
@@ -375,6 +385,10 @@ export function PlayerRig({
 
   useFrame(({ clock }, rawDt) => {
     if (!group.current) return;
+    if (pausedRef.current) {
+      keys.current.clear(); target.current = null; wantJump.current = false; moveBus.take();
+      return;
+    }
     const dt = Math.min(rawDt, 0.05);
     const frameStart = { x: pos.current.x, y: pos.current.y, z: pos.current.z };
 

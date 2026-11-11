@@ -1,4 +1,5 @@
 import type {
+  BlueprintId,
   FurnitureDefinition,
   IslandEntity,
   PlaceProp,
@@ -102,3 +103,10 @@ export function surfaceObstacle(
   if (profile.standY !== undefined) o.standY = profile.standY * scale;
   return o;
 }
+
+/** Material-built starlight furniture; dimensions match PlayModel. */
+export const playSurfaces: Record<BlueprintId, SurfaceProfile> = {
+  lantern: { pass: "solid", r: 0.32 },
+  basket: { pass: "solid", r: 0.55 },
+  mat: { pass: "through" },
+};

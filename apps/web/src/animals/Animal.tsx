@@ -1,4 +1,4 @@
-import { consumeResidentRest } from "./mindState";
+import { consumeResidentRest, restDestinations, greetings } from "./mindState";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 
@@ -208,6 +208,28 @@ export function Animal({
       });
       return;
     }
+
+    const greetUntil = greetings.get(id);
+    if (greetUntil) {
+      greetings.delete(id);
+      if (greetUntil > Date.now()) { petFlag.current = 1.8; showEmote("heart"); callVoice(true); }
+    }
+    const restAt = restDestinations.get(id);
+    if (restAt && restAt.until > Date.now() && !petFlag.current) {
+      const dx = restAt.x - s.x, dz = restAt.z - s.z, dist = Math.hypot(dx, dz);
+      const walking = dist > 0.3;
+      if (walking) {
+        const nx = s.x + dx / dist * Math.min(dist, speed * dt), nz = s.z + dz / dist * Math.min(dist, speed * dt);
+        if (spec.walkable(nx, nz)) { s.x = nx; s.z = nz; }
+        s.yaw = lerpAngle(s.yaw, Math.atan2(dx, dz), 1 - Math.exp(-dt * 6));
+      }
+      s.phase += dt; anim.current.phase = s.phase;
+      anim.current.moving = walking; anim.current.action = walking ? "none" : "rest";
+      s.target = null; s.mode = "idle"; s.until = t + 2;
+      if (root.current) { root.current.position.set(s.x, spec.height(s.x,s.z), s.z); root.current.rotation.y = s.yaw; }
+      reportAgent(id, { kind: resident.species, x: s.x, z: s.z, name: resident.name, yaw: s.yaw, action: anim.current.action });
+      return;
+    } else if (restAt) restDestinations.delete(id);
 
     if (consumeResidentRest(id)) {
       s.mode = "act";

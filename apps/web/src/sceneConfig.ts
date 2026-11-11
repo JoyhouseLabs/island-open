@@ -272,9 +272,9 @@ export const sceneConfig: Record<SubSceneId, SceneUI> = {
     saveTitle: "星光照过的地方",
     noteCaption: "石盆里的星辉不会熄灭",
     noteBody: ["每隔一会儿，", "有一颗流星替你许愿。"],
-    noteHint: "立石 · 光苔 · 流星",
+    noteHint: "月亮伊布 · 立石 · 流星",
     hints: {
-      explore: "拖动环顾 · 等一颗流星",
+      explore: "拖动环顾 · 点击月亮伊布打招呼",
       flower: "在空地里种一点发光的花",
       tree: "在立石后面种一棵夜树",
       bench: "在石环里放一把看星的长椅",

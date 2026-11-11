@@ -1,3 +1,4 @@
+import { StarlightControls, useStarlightActivity } from "./starlight/StarlightPlay";
 import SceneMenu from "./SceneMenu";
 import LearningInvitation from "./learning/LearningInvitation";
 import DeviceLabels, { type DeviceScreenPoint } from "./building/DeviceLabels";
@@ -110,6 +111,13 @@ export default function SceneExperience({
   const [editing, setEditing] = useState(false);
   const [guideRequest, setGuideRequest] = useState(0);
   const previousWalking = useRef(walking);
+  const starlight = useStarlightActivity({
+    enabled: scene === "starlight" && room.ready && !room.unsupported,
+    worldId: room.record?.id ?? null,
+    localKey: String(parent.snapshot.seed), entities: room.snapshot.entities,
+    walking, onWalk: () => { if (avatar) setWalking(true); else room.notify("先回主岛选择一个化身吧。"); },
+    editing,
+  });
   const editReason = !room.ready
     ? "场景正在加载，请稍等"
     : leaving
@@ -125,7 +133,7 @@ export default function SceneExperience({
     setWalking(previousWalking.current);
   };
   const startEditing = (plant = false) => {
-    if (editReason) return;
+    if (editReason || starlight.activeTrial || starlight.busy || starlight.preview) return;
     previousWalking.current = walking;
     setGuideRequest(0);
     setEditing(true);
@@ -148,11 +156,11 @@ export default function SceneExperience({
   // In walk mode the ground taps drive the resident instead of being ignored.
   useEffect(() => {
     playerIntent.active =
-      walking && !!avatar && tool === "explore" && !leaving && !deviceId;
+      walking && !!avatar && tool === "explore" && !leaving && !deviceId && !starlight.preview && !starlight.activeTrial;
     return () => {
       playerIntent.active = false;
     };
-  }, [walking, avatar, tool, leaving, deviceId]);
+  }, [walking, avatar, tool, leaving, deviceId, starlight.preview, starlight.activeTrial]);
   const upload = useRef<HTMLInputElement>(null),
     back = useRef<HTMLButtonElement>(null);
   const [narrow, setNarrow] = useState(() => window.innerWidth < 700);
@@ -237,6 +245,7 @@ export default function SceneExperience({
       className={`app scene-room${night ? " night" : ""}`}
       style={{ ["--room-accent" as string]: config.accent }}
     >
+      <StarlightControls play={starlight} />
       <DeviceLabels
         world={room.snapshot}
         points={devicePoints}
@@ -260,6 +269,7 @@ export default function SceneExperience({
         {room.ready ? (
           <SceneBoundary label={config.short}>
             <Visual
+              starlightPlay={scene === "starlight" ? starlight.scene : undefined}
               world={{
                 ...room.snapshot,
                 environment: parent.snapshot.environment,
@@ -687,7 +697,7 @@ export default function SceneExperience({
               />
               <p className="tiny-note">
                 编辑停下 2
-                秒后自动保存；断网时保留本地草稿。此处导出仅含当前场景布局；书屋作品请使用完整书屋备份。
+                秒后自动保存；断网时保留本地草稿。此处导出仅含原有场景布局，不含观星角材料、蓝图作品与试炼记录；书屋作品请使用完整书屋备份。
               </p>
             </>
           ) : (

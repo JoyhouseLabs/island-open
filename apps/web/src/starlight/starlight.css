@@ -1,0 +1,233 @@
+.starlight-ui {
+  position: relative;
+  z-index: 45;
+  color: #f3edda;
+  font-family: inherit;
+}
+.starlight-ui button,
+.starlight-ui select {
+  min-height: 44px;
+  border: 1px solid #697a80;
+  border-radius: 12px;
+  background: #243b48;
+  color: #fff2ce;
+  padding: 9px 13px;
+  font: inherit;
+  cursor: pointer;
+}
+.starlight-ui button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+.starlight-ui button:focus-visible,
+.starlight-ui select:focus-visible {
+  outline: 3px solid #f6d889;
+  outline-offset: 3px;
+}
+.starlight-ui button[aria-pressed="true"],
+.starlight-ui .star-primary {
+  background: #efdb9d;
+  color: #213441;
+  border-color: #efdb9d;
+}
+.star-launch {
+  position: fixed;
+  bottom: 105px;
+  left: 24px;
+  box-shadow: 0 6px 28px #07132155;
+}
+.star-panel {
+  position: fixed;
+  right: 20px;
+  top: 86px;
+  bottom: 100px;
+  width: min(365px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid #70878c;
+  border-radius: 22px;
+  background: linear-gradient(160deg, #172e3bf5, #14232ef8);
+  box-shadow: 0 18px 60px #0005;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  box-sizing: border-box;
+}
+.star-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.star-panel h2 {
+  font-size: 23px;
+  margin: 4px 0 0;
+}
+.star-panel h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.star-panel p {
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 9px 0;
+}
+.star-eyebrow,
+.star-save {
+  font-size: 11px;
+  color: #aec7c6;
+}
+.star-quest {
+  padding: 12px;
+  background: #8ea59c19;
+  border-left: 3px solid #e6cc87;
+  border-radius: 5px;
+}
+.star-panel nav {
+  display: flex;
+  gap: 5px;
+  margin: 14px 0;
+}
+.star-panel nav button {
+  padding: 8px;
+  font-size: 12px;
+  flex: 1;
+}
+.star-card {
+  padding: 14px;
+  margin: 12px 0;
+  border: 1px solid #64818b55;
+  border-radius: 15px;
+  background: #c3d3cc08;
+}
+.star-materials {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.star-materials > div {
+  background: #7caba01b;
+  border-radius: 12px;
+  padding: 12px 8px;
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  font-size: 12px;
+}
+.star-materials strong {
+  font-size: 23px;
+  color: #f1d996;
+}
+.star-materials small {
+  font-size: 11px;
+  color: #a8beb9;
+  font-weight: normal;
+}
+.star-node-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.star-node-list button {
+  font-size: 12px;
+  padding: 7px;
+}
+.star-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.star-error {
+  background: #7e363b66;
+  padding: 10px;
+  border-radius: 10px;
+  color: #ffe0dc;
+}
+.star-feedback {
+  color: #d8e8be;
+  min-height: 20px;
+}
+.star-skills {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+.star-skills button {
+  padding: 10px 4px;
+  font-size: 14px;
+}
+.star-skills small {
+  display: block;
+  font-size: 10px;
+  margin-top: 7px;
+  line-height: 1.5;
+}
+.star-intent {
+  color: #ffe296;
+  border-left: 2px solid #ffe296;
+  padding-left: 9px;
+}
+.star-energy {
+  display: flex;
+  gap: 12px;
+}
+.star-energy progress {
+  width: 48%;
+  height: 8px;
+  accent-color: #dbc67d;
+}
+.star-log {
+  font-size: 12px;
+  line-height: 1.8;
+  padding-left: 20px;
+  color: #bbcdd0;
+}
+.star-trial > button {
+  margin: 5px 5px 5px 0;
+}
+.star-arena {
+  height: 170px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+.star-panel label {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.star-panel select {
+  flex: 1;
+}
+.star-panel:focus {
+  outline: none;
+}
+@media (max-width: 699px) {
+  .star-launch {
+    left: 12px;
+    bottom: 105px;
+    font-size: 13px !important;
+  }
+  .star-panel {
+    top: auto;
+    bottom: 12px;
+    right: 10px;
+    width: calc(100vw - 20px);
+    max-height: 73dvh;
+    padding: 16px;
+    border-radius: 20px;
+  }
+  .star-node-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .star-panel h2 {
+    font-size: 21px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .starlight-ui * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

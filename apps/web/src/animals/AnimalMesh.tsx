@@ -700,6 +700,120 @@ function CatMesh({ anim }: { anim: AnimalAnim }) {
   );
 }
 
+/** Reference-inspired, code-built model: charcoal coat, red eyes and
+ * gold markings. All motion consumes AnimalAnim, including remote residents. */
+function UmbreonMesh({ anim }: { anim: AnimalAnim }) {
+  const body = useRef<T.Group>(null), head = useRef<T.Group>(null),
+    tail = useRef<T.Group>(null), ears = useRef<T.Group>(null);
+  const legs = useRef<(T.Group | null)[]>([]);
+  const eyes = useRef<T.Group>(null);
+  const reduced = useRef(false);
+  const gold = useMemo(() => new T.MeshStandardMaterial({
+    color: "#ffe080", emissive: "#f3bd43", emissiveIntensity: 0.7, roughness: 0.65,
+  }), []);
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => { reduced.current = preference.matches; };
+    sync();
+    preference.addEventListener("change", sync);
+    return () => { preference.removeEventListener("change", sync); };
+  }, []);
+  useEffect(() => () => gold.dispose(), [gold]);
+  useFrame((_, dt) => {
+    const t = reduced.current ? 0 : anim.phase;
+    const pose = poses[anim.action];
+    const happy = anim.action === "pet" || anim.action === "greet";
+    const blend = 1 - Math.exp(-Math.min(dt, 0.05) * 9);
+    if (body.current) {
+      body.current.position.y = -pose.sink + Math.sin(t * 2) * 0.012;
+      body.current.rotation.x = T.MathUtils.lerp(body.current.rotation.x, pose.body * 0.3, blend);
+    }
+    if (head.current) {
+      head.current.rotation.x = T.MathUtils.lerp(head.current.rotation.x, pose.neck * 0.65, blend);
+      head.current.rotation.z = happy ? Math.sin(t * 3) * 0.09 : Math.sin(t * 0.7) * 0.025;
+    }
+    if (tail.current) tail.current.rotation.z = Math.sin(t * (happy ? 5 : 1.8)) * (happy ? 0.3 : 0.13);
+    if (ears.current) ears.current.rotation.z = Math.sin(t * 1.2) * 0.035;
+    legs.current.forEach((leg, i) => {
+      if (leg) leg.rotation.x = anim.moving ? Math.sin(t * 7 + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.43 : 0;
+    });
+    if (eyes.current) eyes.current.scale.y = t % 5.6 > 5.42 ? 0.13 : 1;
+    gold.emissiveIntensity = 0.65 + (Math.sin(t * 1.6) + 1) * (happy ? 0.4 : 0.16);
+  });
+  const fur = "#28363f";
+  // A tapered leaf silhouette, made of joined rings instead of cone ears.
+  const leaf = useMemo(() => new T.LatheGeometry([
+    new T.Vector2(0.07, 0), new T.Vector2(0.16, 0.16),
+    new T.Vector2(0.175, 0.36), new T.Vector2(0.145, 0.57),
+    new T.Vector2(0.08, 0.8), new T.Vector2(0, 1.04),
+  ], 12), []);
+  useEffect(() => () => leaf.dispose(), [leaf]);
+  return <group ref={body} name="umbreon-model">
+    <mesh position={[0, 0.76, -0.08]} scale={[0.32, 0.37, 0.61]} castShadow>
+      <sphereGeometry args={[1, 16, 12]} /><meshStandardMaterial color={fur} roughness={0.86} />
+    </mesh>
+    <mesh position={[0, 0.94, 0.36]} rotation={[-0.25, 0, 0]} scale={[0.27, 0.44, 0.28]} castShadow>
+      <sphereGeometry args={[1, 14, 12]} /><meshStandardMaterial color={fur} roughness={0.86} />
+    </mesh>
+    <group ref={head} position={[0, 1.28, 0.4]}>
+      <mesh scale={[0.32, 0.3, 0.33]} castShadow>
+        <sphereGeometry args={[1, 18, 14]} /><meshStandardMaterial color={fur} roughness={0.86} />
+      </mesh>
+      <mesh position={[0, -0.09, 0.24]} scale={[0.2, 0.14, 0.21]} castShadow>
+        <sphereGeometry args={[1, 12, 10]} /><meshStandardMaterial color={fur} roughness={0.86} />
+      </mesh>
+      <mesh position={[0, -0.07, 0.44]} scale={[0.045, 0.026, 0.028]}>
+        <sphereGeometry args={[1, 10, 8]} /><meshStandardMaterial color="#101920" />
+      </mesh>
+      <Mouth anim={anim} position={[0, -0.15, 0.411]} width={0.07} color="#101920" />
+      <mesh position={[0, 0.14, 0.286]} rotation={[-0.4, 0, 0]} scale={[0.82, 1.1, 0.45]} material={gold}>
+        <torusGeometry args={[0.105, 0.031, 8, 24]} />
+      </mesh>
+      <group ref={eyes} position={[0, -0.015, 0]}>
+        {[-1, 1].map(s => <group key={s} position={[s * 0.215, 0, 0.245]} rotation={[0, s * 0.55, s * -0.16]}>
+          <mesh scale={[0.095, 0.062, 0.026]}>
+            <sphereGeometry args={[1, 12, 10]} /><meshStandardMaterial color="#ee8056" emissive="#a43a1b" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[0, 0, 0.025]} scale={[0.02, 0.051, 0.01]}>
+            <sphereGeometry args={[1, 10, 8]} /><meshStandardMaterial color="#151c22" />
+          </mesh>
+          <mesh position={[-0.022, 0.026, 0.033]}>
+            <sphereGeometry args={[0.015, 8, 6]} /><meshBasicMaterial color="#fff5df" />
+          </mesh>
+        </group>)}
+      </group>
+      <group ref={ears}>
+        {[-1, 1].map(s => <group key={s} position={[s * 0.19, 0.2, -0.025]} rotation={[-0.18, 0, -s * 0.42]} scale={[1, 0.82, 0.58]}>
+          <mesh geometry={leaf} castShadow><meshStandardMaterial color={fur} roughness={0.86} /></mesh>
+          <mesh position={[0, 0.49, 0]} material={gold}>
+            <cylinderGeometry args={[0.145, 0.168, 0.145, 12, 1, true]} />
+          </mesh>
+        </group>)}
+      </group>
+    </group>
+    {([[-0.23, 0.32], [0.23, 0.32], [-0.23, -0.43], [0.23, -0.43]] as const).map(([x, z], i) =>
+      <group key={i} ref={el => { legs.current[i] = el; }} position={[x, 0.69, z]}>
+        <mesh position={[0, -0.27, 0]} scale={[0.105, 0.36, 0.13]} castShadow>
+          <sphereGeometry args={[1, 12, 10]} /><meshStandardMaterial color={fur} roughness={0.86} />
+        </mesh>
+        <mesh position={[0, -0.625, 0.075]} scale={[0.11, 0.065, 0.18]} castShadow>
+          <sphereGeometry args={[1, 12, 8]} /><meshStandardMaterial color={fur} roughness={0.86} />
+        </mesh>
+        <mesh position={[Math.sign(x) * 0.106, -0.16, 0]} rotation={[0, Math.PI / 2, 0]} scale={[0.75, 1.35, 0.45]} material={gold}>
+          <torusGeometry args={[0.093, 0.025, 8, 20]} />
+        </mesh>
+      </group>)}
+    <group ref={tail} position={[0, 0.87, -0.57]}>
+      <group rotation={[-0.87, 0, 0]} scale={[1.25, 1.12, 0.8]}>
+        <mesh geometry={leaf} castShadow><meshStandardMaterial color={fur} roughness={0.86} /></mesh>
+        <mesh position={[0, 0.5, 0]} material={gold}>
+          <cylinderGeometry args={[0.14, 0.17, 0.19, 12, 1, true]} />
+        </mesh>
+      </group>
+    </group>
+  </group>;
+}
+
 /** Which mesh each species renders with. The walking fox is the shared GLB
  *  (useFox); admin-placed "fox" animals reuse the panda build, as before.
  *  Adding a species without a mesh entry is a compile error here — the
@@ -714,6 +828,7 @@ const meshes: Record<
   wolf: WolfMesh,
   vaporeon: VaporeonMesh,
   cat: CatMesh,
+  umbreon: UmbreonMesh,
 };
 
 export function AnimalMesh({

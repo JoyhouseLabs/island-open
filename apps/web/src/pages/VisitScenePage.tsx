@@ -1,3 +1,4 @@
+import { useStarlightActivity } from "../starlight/StarlightPlay";
 import DeviceLabels, { type DeviceScreenPoint } from "../building/DeviceLabels";
 import { readSnapshot } from "../building/readSnapshot";
 import DevicePanel from "../devices/DevicePanel";
@@ -53,6 +54,12 @@ export default function VisitScenePage() {
   const [note, setNote] = useState("");
   const [devicePoints, setDevicePoints] = useState<DeviceScreenPoint[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const starlight = useStarlightActivity({
+    enabled: scene === "starlight" && !!record && record !== 404,
+    worldId: record && record !== 404 ? record.id : null,
+    localKey: "visit", entities: record && record !== 404 ? record.snapshot.entities : [],
+    walking, onWalk: () => {}, editing: false, readOnly: true, token,
+  });
 
   useEffect(() => {
     if (scene && record === undefined) void visit.loadScene(scene);
@@ -204,6 +211,7 @@ export default function VisitScenePage() {
         aria-label={`${config.title}（参观）`}
       >
         <Visual
+          starlightPlay={scene === "starlight" ? starlight.scene : undefined}
           world={{
             ...record.snapshot,
             environment: island.world.snapshot.environment,

@@ -164,6 +164,15 @@ const voiceRecipes = [
       [offset + 0.15, 0.43, [820, 410], { vib: 0.018, vibHz: 7, curve: 1.4 }],
     ]),
   },
+  // Umbreon: an original soft two-note night call (not a game recording).
+  {
+    id: "voice-umbreon",
+    seconds: 1.02,
+    tones: [
+      [0.04, 0.34, [390, 610, 490], { vib: 0.012, vibHz: 5, curve: 1.3 }],
+      [0.5, 0.4, [490, 680, 370], { vib: 0.014, vibHz: 6, curve: 1.4 }],
+    ],
+  },
   // Vaporeon: bubbly water chirps — two droppy plips, then a splash.
   {
     id: "voice-vaporeon",

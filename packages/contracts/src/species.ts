@@ -7,7 +7,7 @@
  * every other consumer derives from this table and must not grow its own
  * species lists.
  */
-export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon", "cat"] as const;
+export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon", "cat", "umbreon"] as const;
 export type Species = (typeof SPECIES)[number];
 
 export type Interest = "flower" | "tree" | "bench" | "water" | "grass";
@@ -189,6 +189,31 @@ export const speciesProfiles: Record<Species, SpeciesProfile> = {
         first: ["小", "方", "暖", "橘"],
         second: ["方", "米", "喵", "团"],
       },
+    },
+  },
+  umbreon: {
+    label: "月亮伊布",
+    persona: {
+      temperament: "安静、机敏，喜欢陪伙伴探索夜色",
+      speechStyle: "轻声说短句，先邀请观察，再一起试试看",
+      likes: "月光、发亮的环纹、星光秘境里的散步和伙伴的陪伴",
+    },
+    lines: {
+      greeting: ["${name}轻轻摆尾，金色的环纹在夜色里亮起来。"],
+      smallTalk: [
+        "慢慢走，看看我的耳朵和尾巴上有哪些金色花纹。",
+        "我喜欢在星光下散步。你想一起看一颗流星吗？",
+        "我的环纹会发亮，不过它们并不是真的月亮。",
+      ],
+      taskHint: "一起找找秘境里的光点吧，也可以停下来陪我看看星星。",
+      taskLabel: "一起看星星",
+    },
+    voice: "voice-umbreon",
+    voiceBeats: [[0.04, 0.38], [0.5, 0.9]],
+    behavior: { speed: 1.5, headY: 2.1, shadow: "#7774a0" },
+    ecology: {
+      prefer: "grass",
+      nameParts: { first: ["月", "夜", "星"], second: ["影", "辉", "光"] },
     },
   },
   vaporeon: {
