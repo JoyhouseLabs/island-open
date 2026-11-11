@@ -152,8 +152,9 @@ test("garden tea-nook crates sit symmetric beside the table", () => {
 
 test("walkObstacles stacks statics, entities and place props", () => {
   const list = walkObstacles("starlight", [{ kind: "tree", x: 3, z: 4 }]);
-  // cave + nine standing stones + one tree trunk
-  expect(list).toHaveLength(1 + 9 + 1);
+  // original basin/trial stage + cave + nine standing stones + one tree trunk
+  expect(list).toHaveLength(1 + 1 + 9 + 1);
+  expect(list).toContainEqual({ x: 0, z: 0, r: 2.3 });
 });
 
 test("unknown scenes fall back to no static obstacles", () => {

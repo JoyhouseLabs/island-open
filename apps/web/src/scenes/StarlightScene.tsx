@@ -1,6 +1,8 @@
+import TrialArena from "../starlight/TrialArena";
+import TrialCamera from "../starlight/TrialCamera";
 import StarlightObjects from "../starlight/StarlightObjects";
 import { playObstacles } from "@island/world-core";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as T from "three";
 import { useFrame } from "@react-three/fiber";
 import { random, starlightFeatures } from "@island/world-core";
@@ -160,13 +162,6 @@ function GlowFlora() {
 }
 /** The ring of standing stones and the star basin at the clearing's heart. */
 function Stones() {
-  const orb = useRef<T.Group>(null);
-  useFrame(({ clock }) => {
-    if (orb.current) {
-      orb.current.position.y = 2.5 + Math.sin(clock.elapsedTime * 0.8) * 0.3;
-      orb.current.rotation.y = clock.elapsedTime * 0.4;
-    }
-  });
   return (
     <>
       {starlightFeatures.stones.map((s, i) => (
@@ -183,36 +178,7 @@ function Stones() {
           />
         </group>
       ))}
-      <group>
-        <mesh position={[0, 0.5, 0]} castShadow>
-          <cylinderGeometry args={[1.9, 2.3, 1, 12]} />
-          <meshStandardMaterial color="#4d5a6b" flatShading roughness={1} />
-        </mesh>
-        <mesh position={[0, 1.02, 0]}>
-          <cylinderGeometry args={[1.6, 1.6, 0.1, 12]} />
-          <meshStandardMaterial color="#2c3644" roughness={0.9} />
-        </mesh>
-        <group ref={orb} position={[0, 2.5, 0]}>
-          <mesh>
-            <sphereGeometry args={[0.55, 14, 12]} />
-            <meshStandardMaterial
-              color="#d8f6e8"
-              emissive="#9fe8d8"
-              emissiveIntensity={2.2}
-            />
-          </mesh>
-          {[0.9, 1.2].map((r, i) => (
-            <mesh key={r} rotation={[i * 0.9, i * 0.6, 0.4]}>
-              <torusGeometry args={[r, 0.035, 6, 40]} />
-              <meshStandardMaterial
-                color="#bfe9d8"
-                emissive="#7fd8c0"
-                emissiveIntensity={0.9}
-              />
-            </mesh>
-          ))}
-        </group>
-      </group>
+
     </>
   );
 }
@@ -301,6 +267,8 @@ function Starlight(props: SceneProps) {
   const { world, tool, onPlace, onExit, low } = props,
     weather = world.environment.weather ?? "sun";
   const place = usePlacer(tool, onPlace);
+  const focused = !!props.starlightPlay?.trialView;
+  const [cameraBusy, setCameraBusy] = useState(false);
   const extraObstacles = useMemo(() => playObstacles(props.starlightPlay?.state.structures ?? []), [props.starlightPlay?.state.structures]);
   return (
     <>
@@ -311,12 +279,12 @@ function Starlight(props: SceneProps) {
         sky={{ day: "#241a3d", night: "#1b1430" }}
         fog={[130, 430]}
         hemi="#2f3f56"
-        ambient={[0.75, 0.75]}
-        sun={[0.9, 0.9]}
+        ambient={focused ? [0.3, 0.3] : [0.75, 0.75]}
+        sun={focused ? [0.45, 0.45] : [0.9, 0.9]}
         shadowHalf={40}
         stars={2600}
         forceNight
-        weather={weather}
+        weather={focused ? "sun" : weather}
       />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow onClick={e => {
         if (e.delta > 5) return;
@@ -354,9 +322,9 @@ function Starlight(props: SceneProps) {
       </group>
       <GlowFlora />
       <Stones />
+      <TrialArena play={props.starlightPlay} low={low} />
       <WishLantern />
-      <Fireflies low={low} />
-      <ShootingStar />
+      {(!focused || props.starlightPlay?.motion) && <><Fireflies low={low} /><ShootingStar /></>}
       <CaveExit tool={tool} onExit={onExit} />
       <Plants
         entities={world.entities}
@@ -370,9 +338,10 @@ function Starlight(props: SceneProps) {
       <Collectibles scene="starlight" seed={world.seed} />
       {/* A low, level camera keeps the horizon in frame so the stars show. */}
       {props.walk && props.avatar && props.onGate && (
-        <PlayerRig paused={props.starlightPlay?.frozen} extraObstacles={extraObstacles} scene="starlight" avatar={props.avatar} entities={world.entities} onGate={props.onGate} />
+        <PlayerRig paused={props.starlightPlay?.frozen || cameraBusy || focused} extraObstacles={extraObstacles} scene="starlight" avatar={props.avatar} entities={world.entities} onGate={props.onGate} />
       )}
-      <SceneFrame reset={props.reset} position={[40, 18, 74]} max={300} />
+      <SceneFrame locked={focused || cameraBusy} reset={props.reset} position={[40, 18, 74]} max={300} />
+      <TrialCamera focused={focused} motion={props.starlightPlay?.motion ?? false} onBusy={setCameraBusy} />
     </>
   );
 }

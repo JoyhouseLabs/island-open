@@ -220,6 +220,9 @@ export default function SceneExperience({
       }[room.status];
   const exit = async (destination?: string) => {
     if (leaving) return;
+    if (starlight.state.trial?.phase === "active") {
+      if (starlight.busy || starlight.pending || !await starlight.act({ op: "trial.pause" })) { room.notify("请先确认试炼操作，再离开。"); return; }
+    }
     setLeaving(true);
     if (
       room.ready &&
@@ -259,7 +262,7 @@ export default function SceneExperience({
   });
   return (
     <main
-      className={`app scene-room${night ? " night" : ""}`}
+      className={`app scene-room${night ? " night" : ""}${starlight.trialView ? " star-battle-mode" : ""}`}
       style={{ ["--room-accent" as string]: config.accent }}
     >
       <StarlightControls play={starlight} />

@@ -19,6 +19,9 @@ import {
   starlightFeatures,
 } from "./scenes.js";
 
+/** Central star basin footprint is unchanged; the friendly trial uses its top. */
+export const starlightTrialStage = { x: 0, z: 0, radius: 2.3, top: 1.08 } as const;
+
 export const playResourceNodes: { id: string; material: MaterialId; x: number; z: number; quantity: number }[] = [
   { id: "fruit-east", material: "moonfruit", x: 11, z: 8, quantity: 2 },
   { id: "fruit-west", material: "moonfruit", x: -10, z: 10, quantity: 2 },
@@ -276,6 +279,7 @@ export const sceneStatics: Record<string, SceneStatic[]> = {
     },
   ],
   starlight: [
+    { kind: "trial-stage", x: starlightTrialStage.x, z: starlightTrialStage.z, r: starlightTrialStage.radius },
     ...playResourceNodes.map(n => ({ kind: `resource-${n.material}`, x: n.x, z: n.z, pass: "through" as const })),
     { kind: "cave", x: starlightFeatures.cave.x, z: starlightFeatures.cave.z, r: 2.6 },
     ...starlightFeatures.stones.map((s) => ({

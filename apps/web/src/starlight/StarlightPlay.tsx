@@ -1,6 +1,11 @@
-import { menus } from "../navigation/store";
+import {
+  confirmedTrialEffect,
+  TRIAL_EFFECT_SECONDS,
+  type TrialEffect,
+} from "./trialEffects";
+import { useTrialMotion } from "./useTrialMotion";
+import { menus, useMenuPanel } from "../navigation/store";
 import { animalDetails } from "../animals/detailsStore";
-import TrialArena from "./TrialArena";
 import { useEffect, useRef, useState } from "react";
 import type {
   BlueprintId,
@@ -9,6 +14,7 @@ import type {
   PlayPlacement,
   PlayStructure,
   StarlightState,
+  StarlightAction,
 } from "@island/contracts";
 import {
   HARVEST_REACH,
@@ -35,6 +41,11 @@ export type PlaySceneBindings = {
   now: number;
   enabled: boolean;
   frozen: boolean;
+  trialView: boolean;
+  motion: boolean;
+  effect: TrialEffect | null;
+  effectsPaused: boolean;
+  onTrial: () => void;
   selectedNode: string | null;
   preview: PlayPreview | null;
   onGround: (x: number, z: number) => void;
@@ -53,6 +64,45 @@ export function useStarlightActivity(options: {
   readOnly?: boolean;
 }) {
   const data = useStarlightState(options);
+  const { motion, setMotion } = useTrialMotion();
+  const menu = useMenuPanel();
+  const [effect, setEffect] = useState<TrialEffect | null>(null);
+  const [effectBusy, setEffectBusy] = useState(false);
+  useEffect(() => {
+    if (!effect) {
+      setEffectBusy(false);
+      return;
+    }
+    setEffectBusy(motion);
+    const timer = window.setTimeout(
+      () => {
+        setEffectBusy(false);
+        if (motion) setEffect(null);
+      },
+      motion ? TRIAL_EFFECT_SECONDS * 1000 : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [effect?.id, motion]);
+  const act = async (action: StarlightAction) => {
+    if (action.op === "trial.turn" && effectBusy) return null;
+    const before = data.state.trial;
+    const result = await data.act(action);
+    if (result && action.op === "trial.turn") {
+      const next = confirmedTrialEffect(
+        before,
+        result.state.trial,
+        action.skill,
+      );
+      if (next) {
+        setEffect(next);
+        setEffectBusy(motion);
+      }
+    } else if (result && action.op.startsWith("trial.")) {
+      setEffect(null);
+      setEffectBusy(false);
+    }
+    return result;
+  };
   const [open, setOpen] = useState(false),
     [tab, setTab] = useState<"materials" | "build" | "trial">("materials");
   const [nodeId, setNodeId] = useState<string | null>(null),
@@ -84,6 +134,8 @@ export function useStarlightActivity(options: {
     return () => clearInterval(timer);
   }, [options.enabled, options.walking, node]);
   useEffect(() => {
+    setEffect(null);
+    setEffectBusy(false);
     setPreview(null);
     setNodeId(null);
     setNotice("");
@@ -118,7 +170,10 @@ export function useStarlightActivity(options: {
       setRestingAt(id);
       setNotice("已邀请月亮伊布来休息垫，路上遇到障碍时可换个位置。");
     }
-    if (item?.blueprint === "basket") { menus.open("bag", "materials"); return; }
+    if (item?.blueprint === "basket") {
+      menus.open("bag", "materials");
+      return;
+    }
     setTab("build");
     setOpen(true);
   };
@@ -201,10 +256,18 @@ export function useStarlightActivity(options: {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   });
+  const onTrial = () => {
+    if (options.readOnly || options.editing || preview) return;
+    animalDetails.close();
+    setTab("trial");
+    setOpen(true);
+  };
+  const trialView =
+    options.enabled && !options.readOnly && open && tab === "trial";
   const close = async () => {
     if (data.busy) return;
     if (data.state.trial?.phase === "active") {
-      const result = await data.act({ op: "trial.pause" });
+      const result = await act({ op: "trial.pause" });
       if (!result) return;
     }
     setOpen(false);
@@ -212,6 +275,12 @@ export function useStarlightActivity(options: {
   };
   return {
     ...data,
+    act,
+    motion,
+    setMotion,
+    effectBusy,
+    trialView,
+    onTrial,
     panel,
     open,
     setOpen,
@@ -245,7 +314,12 @@ export function useStarlightActivity(options: {
       state: data.state,
       now,
       preview,
-      frozen: !!activeTrial || !!preview,
+      frozen: !!activeTrial || !!preview || trialView,
+      trialView,
+      motion,
+      effect,
+      effectsPaused: !!menu || data.state.trial?.phase === "paused",
+      onTrial,
       selectedNode: nodeId,
       enabled: !options.readOnly && !options.editing && !activeTrial,
       onNode,
@@ -262,6 +336,7 @@ export type StarlightActivity = ReturnType<typeof useStarlightActivity>;
 export function StarlightControls({ play: p }: { play: StarlightActivity }) {
   if (!p.enabled || p.readOnly) return null;
   const locked = p.busy || !p.ready || !!p.pending;
+  const skillLocked = locked || p.effectBusy;
   const trial = p.state.trial;
   const placed = p.state.structures.some(
     (s) => s.blueprint === "lantern" && s.placement,
@@ -270,20 +345,29 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
   return (
     <div className="starlight-ui">
       {!p.open && (
-        <button
-          className="star-launch"
-          disabled={p.editing}
-          onClick={() => {
-            p.setOpen(true);
-            if (p.activeTrial) p.setTab("trial");
-          }}
-        >
-          ☾ {p.activeTrial ? "继续星影试炼" : "我的观星角"}
-        </button>
+        <div className="star-launch-group">
+          <button
+            className="star-launch"
+            disabled={p.editing}
+            onClick={() => {
+              p.setOpen(true);
+              if (p.activeTrial) p.setTab("trial");
+            }}
+          >
+            ☾ {p.activeTrial ? "继续星影试炼" : "我的观星角"}
+          </button>
+          <button
+            className="star-trial-launch"
+            disabled={p.editing || !!p.preview}
+            onClick={p.onTrial}
+          >
+            ✧ 星影试炼台
+          </button>
+        </div>
       )}
       {p.open && (
         <section
-          className="star-panel"
+          className={`star-panel${p.trialView ? " star-battle-panel" : ""}`}
           ref={p.panel}
           tabIndex={-1}
           aria-label="我的观星角"
@@ -297,7 +381,7 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
           <header>
             <div>
               <span className="star-eyebrow">与月亮伊布一起</span>
-              <h2>我的观星角</h2>
+              <h2>{p.trialView ? "星影试炼台" : "我的观星角"}</h2>
             </div>
             <button
               aria-label="关闭观星角"
@@ -307,16 +391,20 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
               ×
             </button>
           </header>
-          <p className="star-save">
-            {p.cloud
-              ? "材料与作品保存到云端"
-              : "本机体验 · 不会自动转入登录账号"}
-          </p>
-          <p className="star-quest">
-            {placed
-              ? "观星灯已点亮！继续布置，或试试星影试炼。"
-              : "找 2 根落枝和 2 颗石子，做一盏观星灯。"}
-          </p>
+          {!p.trialView && (
+            <>
+              <p className="star-save">
+                {p.cloud
+                  ? "材料与作品保存到云端"
+                  : "本机体验 · 不会自动转入登录账号"}
+              </p>
+              <p className="star-quest">
+                {placed
+                  ? "观星灯已点亮！继续布置，或试试星影试炼。"
+                  : "找 2 根落枝和 2 颗石子，做一盏观星灯。"}
+              </p>
+            </>
+          )}
           <nav aria-label="观星角活动">
             {(
               [
@@ -329,7 +417,11 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                 key={id}
                 aria-pressed={p.tab === id}
                 disabled={!!p.preview || (p.activeTrial && id !== "trial")}
-                onClick={() => id === "build" ? menus.open("bag", "blueprints") : p.setTab(id)}
+                onClick={() =>
+                  id === "build"
+                    ? menus.open("bag", "blueprints")
+                    : p.setTab(id)
+                }
               >
                 {title}
               </button>
@@ -613,15 +705,24 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
           )}
           {p.tab === "trial" && (
             <>
-              <div className="star-card">
-                <h3>星影试炼</h3>
-                <p>
-                  和训练星影练习观察与守护。没有倒计时，不损失材料或建筑；跳过也能完成观星角。
-                </p>
-              </div>
+              <label className="trial-motion">
+                <input
+                  type="checkbox"
+                  checked={p.motion}
+                  onChange={(e) => p.setMotion(e.target.checked)}
+                />
+                播放战斗动画
+              </label>
+              {(!trial || trial.phase === "abandoned") && (
+                <div className="star-card">
+                  <h3>月亮伊布的星光投影</h3>
+                  <p>
+                    和训练星影练习观察与守护。没有倒计时，不损失材料或建筑；跳过也能完成观星角。
+                  </p>
+                </div>
+              )}
               {trial && (
                 <div className="star-card star-trial">
-                  <TrialArena trial={trial} />
                   <h3>
                     {trial.phase === "won"
                       ? "试炼完成 ✧"
@@ -660,7 +761,7 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                     <>
                       <div className="star-skills">
                         <button
-                          disabled={locked || trial.points < 2}
+                          disabled={skillLocked || trial.points < 2}
                           onClick={() =>
                             void p.act({ op: "trial.turn", skill: "beam" })
                           }
@@ -669,7 +770,7 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                           <small>耗 2 点 · 冲击 {trial.focused ? 5 : 3}</small>
                         </button>
                         <button
-                          disabled={locked || trial.points < 1}
+                          disabled={skillLocked || trial.points < 1}
                           onClick={() =>
                             void p.act({ op: "trial.turn", skill: "guard" })
                           }
@@ -677,7 +778,7 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                           守护<small>耗 1 点 · 抵挡 3</small>
                         </button>
                         <button
-                          disabled={locked}
+                          disabled={skillLocked}
                           onClick={() =>
                             void p.act({ op: "trial.turn", skill: "observe" })
                           }
@@ -710,11 +811,17 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                       结束本次试炼 · 无损失
                     </button>
                   )}
-                  <ol className="star-log" aria-label="最近回合">
-                    {trial.log.map((line, i) => (
-                      <li key={i}>{line}</li>
-                    ))}
-                  </ol>
+                  <p className="trial-feedback" aria-live="polite">
+                    {p.effectBusy ? "正在展示这一回合…" : trial.log.at(-1)}
+                  </p>
+                  <details className="trial-history">
+                    <summary>查看最近回合</summary>
+                    <ol className="star-log" aria-label="最近回合">
+                      {trial.log.map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ol>
+                  </details>
                 </div>
               )}
               {!p.activeTrial && (

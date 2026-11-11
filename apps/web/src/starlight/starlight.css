@@ -231,3 +231,33 @@
     transition: none !important;
   }
 }
+
+/* The central scene canvas is the arena; the panel holds only decisions. */
+.star-trial-launch{position:fixed;left:24px;bottom:230px;box-shadow:0 6px 28px #07132155}
+.star-battle-mode .room-welcome,.star-battle-mode .bottom-center,.star-battle-mode .view-controls{display:none}
+.star-battle-panel>nav{display:none}
+.star-battle-panel .star-card{margin:10px 0;padding:12px}
+.star-battle-panel .star-feedback:empty{display:none}
+.star-battle-panel .star-trial h3{font-size:18px;color:#f3dca3}
+.star-battle-panel .star-energy progress:first-child{accent-color:#a2dbce}
+.star-battle-panel .star-energy progress:last-child{accent-color:#c3b2e8}
+.star-battle-panel .star-skills button{min-height:70px;border-color:#8d9ca0;background:#294653}
+.star-battle-panel .star-skills button:first-child{border-color:#c4ac6e}
+.star-battle-panel .star-skills button:nth-child(2){border-color:#91bdce}
+.star-battle-panel .star-skills button:nth-child(3){border-color:#91c5ad}
+.trial-motion{margin:10px 0;color:#becfcb;min-height:30px}
+.trial-motion input{width:18px;height:18px;accent-color:#b9d9c4}
+.trial-feedback{padding:10px;border-radius:10px;background:#b5d5d011;min-height:22px;color:#ede0bb}
+.trial-history summary{cursor:pointer;padding:8px 0;font-size:12px;color:#bdd1d2}
+@media(max-width:699px){
+ .star-trial-launch{left:12px;bottom:230px;font-size:13px!important}
+ .has-game-nav .star-panel.star-battle-panel{top:auto;bottom:88px;max-height:44dvh;width:calc(100vw - 16px);right:8px;padding:13px 14px;border-radius:20px}
+ .star-battle-panel header h2{font-size:19px}
+ .star-battle-panel .star-eyebrow{display:none}
+ .star-battle-panel .star-card{padding:8px;margin:7px 0}
+ .star-battle-panel .star-trial h3{font-size:15px;margin-bottom:5px}
+ .star-battle-panel p{font-size:12px;margin:6px 0;line-height:1.45}
+ .star-battle-panel .star-skills button{min-height:57px}
+ .star-battle-panel .trial-motion{font-size:12px;margin:6px 0;min-height:22px}
+ .star-battle-panel .trial-feedback{padding:6px}
+}

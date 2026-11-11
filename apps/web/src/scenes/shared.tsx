@@ -302,6 +302,7 @@ export function SceneFrame({
   min = 18,
   max = 340,
   zoom = 2,
+  locked = false,
 }: {
   reset: number;
   position: [number, number, number];
@@ -309,11 +310,13 @@ export function SceneFrame({
   min?: number;
   max?: number;
   zoom?: number;
+  locked?: boolean;
 }) {
   const camera = useThree((s) => s.camera),
     width = useThree((s) => s.size.width);
   const controls = useRef<any>(null);
   useEffect(() => {
+    if (locked) return;
     const scale = width < 700 ? zoom : 1;
     camera.position.set(
       position[0] * scale,
@@ -326,6 +329,7 @@ export function SceneFrame({
   return (
     <OrbitControls
       ref={controls}
+      enabled={!locked}
       makeDefault
       minDistance={min}
       maxDistance={max}
