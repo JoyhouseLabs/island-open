@@ -104,20 +104,10 @@ export default function SceneMenu({
                 <Footprints size={20} />
                 <span>逛一逛</span>
               </button>
-              {!gardening && scene !== "lab" && scene !== "home" && (
-                <BackpackButton tool label="我的发现" />
-              )}
+
             </>
           )}
-          <button
-            className="tool"
-            disabled={!!reason}
-            title={reason || `布置${short}`}
-            onClick={() => onEdit()}
-          >
-            <Hammer size={20} />
-            <span>布置{short}</span>
-          </button>
+
         </nav>
       )}
       {!editing && reason && (

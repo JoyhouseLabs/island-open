@@ -1,3 +1,4 @@
+import { menus, useMenuPanel } from "../navigation/store";
 import { useCreationSeatPrompt } from "./creationSeatPrompt";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Canvas } from "@react-three/fiber";
@@ -21,23 +22,8 @@ import { AvatarPreview } from "./AvatarModel";
 import { avatarAccents, avatarForms, avatarHats } from "./avatar";
 import { playerAction } from "./actions";
 
-/** Tiny shared open/close state so page buttons and the B key agree. */
-const listeners = new Set<() => void>();
-let openVersion = 0;
-let open = false;
-const toggle = (next?: boolean) => {
-  open = next ?? !open;
-  openVersion++;
-  for (const l of listeners) l();
-};
-const subscribe = (cb: () => void) => {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
-};
-const getVersion = () => openVersion;
 export function usePackOpen() {
-  useSyncExternalStore(subscribe, getVersion);
-  return open;
+  return useMenuPanel() === "bag";
 }
 
 /** The dressing room keeps the same tiny store so the settings drawer,
@@ -45,7 +31,7 @@ export function usePackOpen() {
 let dressingOpen = false,
   dressingVersion = 0;
 const dressingListeners = new Set<() => void>();
-const toggleDressing = (next?: boolean) => {
+export const toggleDressing = (next?: boolean) => {
   dressingOpen = next ?? !dressingOpen;
   dressingVersion++;
   for (const l of dressingListeners) l();
@@ -59,64 +45,6 @@ export function useDressingOpen() {
     () => dressingVersion,
   );
   return dressingOpen;
-}
-
-/**
- * True "mouse not on the panel" closing: pointermove outside the element
- * arms a generous timer (walking the mouse up from the toolbar must not
- * lose the panel halfway), re-entering cancels it, staying away closes.
- * mouseleave alone cannot do this — a mouse that never entered would
- * never "leave".
- */
-const AWAY_CLOSE_MS = 1500;
-/** Hover-capable pointer: buttons open their panel on hover and clicks are
- *  left to touch screens (a tap would otherwise open-then-toggle-close). */
-const canHover =
-  typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches;
-/** The invoking buttons count as panel territory: resting the mouse on the
- *  backpack button must not time the panel out. */
-let packInvoker: HTMLElement | null = null;
-let dressingInvoker: HTMLElement | null = null;
-/** Stable getters so useAwayClose never re-subscribes on a re-render. */
-const packSafe = () => packInvoker;
-const dressingSafe = () => dressingInvoker;
-function useAwayClose(
-  ref: RefObject<HTMLElement | null>,
-  active: boolean,
-  close: () => void,
-  extraSafe?: () => HTMLElement | null,
-) {
-  // Keep the latest close in a ref so re-renders never clear a pending
-  // timer by re-subscribing (the callback identity changes every render).
-  const closeRef = useRef(close);
-  useEffect(() => {
-    closeRef.current = close;
-  }, [close]);
-  useEffect(() => {
-    if (!active) return;
-    let timer: number | undefined;
-    const move = (e: PointerEvent) => {
-      const el = ref.current,
-        target = e.target as Node | null;
-      const extra = extraSafe?.();
-      const inside =
-        !!el &&
-        !!target &&
-        (el === target ||
-          el.contains(target) ||
-          (!!extra && (extra === target || extra.contains(target))));
-      if (inside) {
-        window.clearTimeout(timer);
-        timer = undefined;
-      } else if (timer === undefined)
-        timer = window.setTimeout(() => closeRef.current(), AWAY_CLOSE_MS);
-    };
-    window.addEventListener("pointermove", move);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("pointermove", move);
-    };
-  }, [active, extraSafe, ref]);
 }
 
 /** Backpack entry in a page's view-controls cluster. */
@@ -136,11 +64,8 @@ export function BackpackButton({
       title="背包"
       aria-label={label === "背包" ? "打开背包" : label}
       aria-expanded={isOpen}
-      ref={(el) => {
-        packInvoker = el;
-      }}
       onClick={() => {
-        toggle();
+        menus.toggle("bag");
       }}
     >
       <Backpack size={18} />
@@ -201,12 +126,9 @@ export function DressingButton({ tool = false }: { tool?: boolean }) {
       title="装扮"
       aria-label={isOpen ? "关闭装扮" : "打开装扮"}
       aria-expanded={isOpen}
-      ref={(el) => {
-        dressingInvoker = el;
-      }}
-      onPointerEnter={canHover ? () => toggleDressing(true) : undefined}
+
       onClick={() => {
-        if (!canHover) toggleDressing();
+        toggleDressing();
       }}
     >
       <Shirt size={tool ? 19 : 18} />
@@ -220,7 +142,6 @@ export function DressingButton({ tool = false }: { tool?: boolean }) {
 export function DressingPanel() {
   const isOpen = useDressingOpen();
   const ref = useRef<HTMLElement>(null);
-  useAwayClose(ref, isOpen, () => toggleDressing(false), dressingSafe);
   useEffect(() => {
     if (!isOpen) return;
     const key = (e: KeyboardEvent) => {
@@ -328,127 +249,4 @@ function Dressing() {
  * The backpack: the forage collection, stars, unlocks, the next task and
  * the control cheatsheet — plus one-tap actions and dressing. B toggles it.
  */
-export default function PlayerPanel() {
-  const isOpen = usePackOpen();
-  const [tab, setTab] = useState<"collect" | "goals" | "actions">("collect");
-  const packRef = useRef<HTMLElement>(null);
-  useAwayClose(packRef, isOpen, () => toggle(false), packSafe);
-  const { state, tasks, progress } = useGrowth();
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const el = document.activeElement;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
-      if (e.key.toLowerCase() === "b") toggle();
-      else if (e.key === "Escape" && open) toggle(false);
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, []);
-  if (!isOpen) return null;
-  const nextTask = tasks.find((t) => !state.done[t.id]);
-  const tabs = [
-    { id: "collect", label: "收集" },
-    { id: "goals", label: "小目标" },
-    { id: "actions", label: "动作" },
-  ] as const;
-  return (
-    <aside className="panel pack-panel" aria-label="背包" ref={packRef}>
-      <button
-        className="panel-close"
-        aria-label="关闭背包"
-        onClick={() => toggle(false)}
-      >
-        <X size={19} />
-      </button>
-      <span className="eyebrow">LITTLE THINGS, KEPT</span>
-      <h2>我的背包</h2>
-      <div className="pack-tabs" role="tablist" aria-label="背包分区">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`pack-tab ${tab === t.id ? "active" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      {tab === "collect" && (
-        <>
-          <div className="pack-grid">
-            {forageCatalog.map((c) => {
-              const count = state.collected[c.kind] ?? 0;
-              return (
-                <div
-                  key={c.kind}
-                  className={`pack-cell ${count ? "" : "empty"}`}
-                  title={c.note}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openCard(`forage:${c.kind}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openCard(`forage:${c.kind}`);
-                    }
-                  }}
-                >
-                  <span className="pack-emoji" aria-hidden="true">
-                    {c.emoji}
-                  </span>
-                  <strong>{count}</strong>
-                  <small>{c.name}</small>
-                </div>
-              );
-            })}
-          </div>
-          <p className="tiny-note">
-            在岛上散步时会遇到花瓣、松果、贝壳…走近就能捡起来；每类第一次捡到
-            +1★。
-          </p>
-        </>
-      )}
-      {tab === "goals" && (
-        <>
-          <div className="pack-row">
-            <Star size={15} />
-            <span>星星 {state.stars}</span>
-            <span className="pack-owned">
-              {Object.keys(state.owned).length > 0
-                ? `已换 ${Object.keys(state.owned).length} 件小物件`
-                : "小铺还没换过东西"}
-            </span>
-          </div>
-          {nextTask && (
-            <p className="tiny-note">
-              下一个小目标：「{nextTask.title}」— {progress(nextTask.id)} /{" "}
-              {nextTask.goal.count}
-            </p>
-          )}
-        </>
-      )}
-      {tab === "actions" && (
-        <>
-          <div className="pack-actions">
-            {actions.map((a) => (
-              <button
-                key={a.id}
-                className="small-button"
-                onClick={() => playerAction.trigger(a.id)}
-              >
-                <a.icon size={14} />
-                {a.label} · {a.key}
-              </button>
-            ))}
-          </div>
-          <p className="tiny-note">
-            W/A/S/D 或方向键走路 · Shift 疾跑 ·
-            空格跳跃（靠近伙伴时空格是交谈）· 长椅可以跳上去坐 · B 关闭背包
-          </p>
-        </>
-      )}
-    </aside>
-  );
-}
+export default function PlayerPanel() { return null; }

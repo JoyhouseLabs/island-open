@@ -1,3 +1,4 @@
+import GameNavigation from "./navigation/GameNavigation";
 import { ResidentLife } from "./animals/mind";
 import { residentWorld } from "./animals/mindState";
 import { learningTravel } from "./learning/travel";
@@ -128,6 +129,7 @@ export default function HomeSession() {
       {world.ready ? (
         <IslandConfigProvider userId={world.user?.id ?? null}>
           <Outlet />
+          <GameNavigation context={{ userId: world.user?.id ?? null, homeId: world.record?.id, seed: world.snapshot.seed, scene: location.pathname === paths.wilderness ? "wilderness" : scene, compact: /^\/(books|studio)(\/|$)/.test(location.pathname) }} />
           <CardModal />
           <ResidentLife
             worldId={world.record?.id}

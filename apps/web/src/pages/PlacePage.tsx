@@ -177,7 +177,6 @@ export default function PlacePage() {
             )}
           </button>
         )}
-        <BackpackButton />
         <DressingButton />
         <JumpButton visible={walking} />
       </div>

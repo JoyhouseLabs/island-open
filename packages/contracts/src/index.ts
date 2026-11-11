@@ -242,3 +242,5 @@ export * from "./resident-chain.js";
 
 export * from "./collaboration.js";
 export * from "./starlight-play.js";
+
+export * from "./backpack.js";

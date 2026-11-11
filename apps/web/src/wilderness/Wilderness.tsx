@@ -1,3 +1,4 @@
+import { menus } from "../navigation/store";
 import {
   useEffect,
   useCallback,
@@ -83,6 +84,7 @@ function Walker({
     lastOrigin.current = center;
   }, [center, camera, position, seed]);
   useFrame((_, delta) => {
+    if (menus.panel) { input.current.keys.clear(); input.current.touch = ""; return; }
     const dt = Math.min(delta, 0.05),
       p = position.current,
       oldX = p.x,
@@ -324,7 +326,7 @@ export default function Wilderness({
     ]);
     const down = (e: KeyboardEvent) => {
       if (
-        !codes.has(e.code) ||
+        menus.panel || !codes.has(e.code) ||
         e.ctrlKey ||
         e.metaKey ||
         (e.target as HTMLElement)?.matches(

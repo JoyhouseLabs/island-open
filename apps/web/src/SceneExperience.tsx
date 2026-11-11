@@ -1,3 +1,6 @@
+import { menus, useSceneActions } from "./navigation/store";
+import { toggleDressing } from "./player/PlayerPanel";
+import type { BlueprintId } from "@island/contracts";
 import { StarlightControls, useStarlightActivity } from "./starlight/StarlightPlay";
 import SceneMenu from "./SceneMenu";
 import LearningInvitation from "./learning/LearningInvitation";
@@ -240,6 +243,20 @@ export default function SceneExperience({
       environment: { ...w.environment, weather },
     }));
   };
+  useSceneActions({
+    travel: exit, build: startEditing,
+    buildReason: editReason || (starlight.activeTrial ? "请先结束试炼，再自由布置" : starlight.preview ? "请先完成或取消当前预览" : ""),
+    blocked: starlight.busy || starlight.pending ? "正在确认观星角操作，请稍等；未确认时请先回观星角重试" : starlight.state.trial?.phase === "active" ? "正在暂停试炼，请稍等；失败时关闭背包重试" : "",
+    playUseReason: starlight.activeTrial ? "请先结束试炼，再使用物品" : editing ? "请先完成自由布置" : starlight.preview ? "请先完成或取消当前预览" : "",
+    settings: () => setPanel("time"), save: () => setPanel("save"), sound: () => audio.masterButton(), dress: () => toggleDressing(true),
+    beforeOpen: () => { setPanel(null); toggleDressing(false); if (starlight.state.trial?.phase === "active" && !starlight.busy && !starlight.pending) void starlight.act({ op: "trial.pause" }); },
+    starlight: scene === "starlight" ? (kind, id) => {
+      if (starlight.activeTrial || starlight.busy || starlight.pending || editing || starlight.preview) return;
+      if (kind === "blueprint" && id) starlight.beginBlueprint(id as BlueprintId);
+      else if (kind === "item") { const item = starlight.state.structures.find(i => i.id === id); if (item) starlight.beginPlace(item); }
+      else { starlight.setTab("materials"); starlight.setOpen(true); }
+    } : undefined,
+  });
   return (
     <main
       className={`app scene-room${night ? " night" : ""}`}
@@ -442,7 +459,6 @@ export default function SceneExperience({
             <VolumeX size={18} />
           )}
         </button>
-        <BackpackButton />
         <DressingButton />
         <JumpButton visible={walking} />
       </div>

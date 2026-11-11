@@ -1,3 +1,4 @@
+import { useSceneActions } from "../navigation/store";
 import { useEffect, useMemo, useReducer } from "react";
 import { useNavigate } from "react-router";
 import { useHomeSession } from "../HomeSession";
@@ -56,6 +57,7 @@ function SavedExploration({
       void journal.flush();
     };
   }, [journal]);
+  useSceneActions({ travel: async (path) => { await journal.flush(); void navigate(path); } });
   if (!journal.ready)
     return (
       <div className="scene-loading" role="status">

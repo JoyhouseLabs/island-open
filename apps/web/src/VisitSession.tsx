@@ -1,3 +1,4 @@
+import GameNavigation from "./navigation/GameNavigation";
 import { residentWorld } from "./animals/mindState";
 import {
   createContext,
@@ -151,6 +152,7 @@ export default function VisitSession() {
         token={token}
       >
         <Outlet />
+        <GameNavigation context={{ userId: visit.user?.id ?? null, scene: sceneParam, visiting: true }} visitBase={{ id: worldId, token }} />
         <CardModal />
         <AnimalDetails
           scope={`visit:${visit.user?.id ?? "guest"}:${worldId}`}

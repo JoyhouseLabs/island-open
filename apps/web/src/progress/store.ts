@@ -70,7 +70,7 @@ function fold(base: InventoryState, queue: Queued[]): GrowthState {
  * One growth journal for the whole island. Logged-in play is stored on the
  * server; a browser with no account keeps the same journal locally.
  */
-class GrowthStore {
+export class GrowthStore {
   state: GrowthState = emptyGrowth();
   toasts: string[] = [];
   private listeners = new Set<() => void>();
@@ -82,6 +82,7 @@ class GrowthStore {
   /** null while the journal still belongs to this browser only. */
   private source: string | null = null;
   private queue: Queued[] = [];
+  private epoch = 0;
   private syncing = false;
   private flushing = false;
 
@@ -103,8 +104,10 @@ class GrowthStore {
   async load() {
     if (this.loaded) return;
     this.loaded = true;
+    const epoch = this.epoch;
     try {
       const saved = await readDraft<GrowthState>(KEY);
+      if (epoch !== this.epoch || this.userId) return;
       if (saved) this.state = { ...emptyGrowth(), ...saved };
       this.bump();
     } catch {
@@ -118,39 +121,56 @@ class GrowthStore {
   /** Cloud journal for this account. A different account never inherits the previous one. */
   bind(userId: string | null) {
     if (userId === this.userId && (userId === null || this.source === userId)) return;
+    const localImport = !this.userId && this.source === null ? payload(this.state) : null;
+    this.epoch++;
+    window.clearTimeout(this.saveTimer);
     this.userId = userId;
-    if (userId) void this.sync(userId);
+    this.source = null;
+    this.queue = [];
+    this.pending = [];
+    this.state = emptyGrowth();
+    this.toasts = [];
+    this.syncing = false;
+    this.flushing = false;
+    this.bump();
+    if (userId) void this.sync(userId, localImport);
+    else {
+      const epoch = this.epoch;
+      void readDraft<GrowthState>(KEY).then(saved => {
+        if (epoch !== this.epoch || this.userId) return;
+        if (saved) this.state = { ...emptyGrowth(), ...saved };
+        this.bump();
+      }).catch(() => {});
+    }
   }
 
-  private async sync(userId: string) {
+  private async sync(userId: string, localImport: InventoryState | null = null) {
+    const epoch = this.epoch;
     this.syncing = true;
     try {
-      const remote = await api<Remote>("/inventory");
-      if (this.userId !== userId) return;
-      if (remote.fresh && this.source === null && hasProgress(this.state)) {
-        this.queue = [];
-        await api("/inventory/import", {
-          method: "POST",
-          body: JSON.stringify(payload(this.state)),
+      let remote = await api<Remote>("/inventory");
+      if (epoch !== this.epoch) return;
+      if (remote.fresh && localImport && hasProgress({ ...emptyGrowth(), ...localImport })) {
+        remote = await api<Remote>("/inventory/import", {
+          method: "POST", body: JSON.stringify(localImport),
         });
-      } else {
-        this.state = fold(remote, this.queue);
-        this.bump();
+        if (epoch !== this.epoch) return;
       }
+      this.state = fold(remote, this.queue);
       this.source = userId;
+      this.bump();
       await writeDraft(userKey(userId), this.state).catch(() => {});
     } catch {
-      /* Keep the local journal and try again on the next action. */
+      // Never display another account's journal as an offline fallback.
     } finally {
-      this.syncing = false;
-      void this.flush();
+      if (epoch === this.epoch) { this.syncing = false; void this.flush(); }
     }
   }
 
   private note(action: InventoryAction) {
     if (!this.userId) return;
     this.queue.push({ key: crypto.randomUUID(), action });
-    if (!this.syncing) void this.flush();
+    if (!this.syncing) { if (this.source !== this.userId) void this.sync(this.userId); else void this.flush(); }
   }
 
   private async flush() {
@@ -162,6 +182,7 @@ class GrowthStore {
       !this.queue.length
     )
       return;
+    const epoch = this.epoch, userId = this.userId;
     const item = this.queue[0]!;
     this.flushing = true;
     try {
@@ -169,26 +190,29 @@ class GrowthStore {
         method: "POST",
         body: JSON.stringify({ idempotencyKey: item.key, action: item.action }),
       });
+      if (epoch !== this.epoch) return;
       if (this.queue[0]?.key === item.key) this.queue.shift();
       this.state = fold(remote, this.queue);
       this.bump();
-      await writeDraft(userKey(this.userId), this.state).catch(() => {});
+      await writeDraft(userKey(userId), this.state).catch(() => {});
     } catch (e) {
+      if (epoch !== this.epoch) return;
       const rejected =
         e instanceof RequestError && e.status >= 400 && e.status < 500 && e.status !== 429;
       if (rejected && this.queue[0]?.key === item.key) this.queue.shift();
       if (!rejected) return;
       try {
         const remote = await api<Remote>("/inventory");
+        if (epoch !== this.epoch) return;
         this.state = fold(remote, this.queue);
         this.bump();
       } catch {
         /* The next action will try again. */
       }
     } finally {
-      this.flushing = false;
+      if (epoch === this.epoch) this.flushing = false;
     }
-    if (this.queue.length) void this.flush();
+    if (epoch === this.epoch && this.queue.length) void this.flush();
   }
 
   emit(event: GrowthEvent) {
@@ -208,7 +232,7 @@ class GrowthStore {
     this.bump();
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
-      void writeDraft(KEY, this.state).catch(() => {});
+      void writeDraft(this.userId ? userKey(this.userId) : KEY, this.state).catch(() => {});
     }, 400);
   }
 
@@ -238,7 +262,7 @@ class GrowthStore {
     this.bump();
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
-      void writeDraft(KEY, this.state).catch(() => {});
+      void writeDraft(this.userId ? userKey(this.userId) : KEY, this.state).catch(() => {});
     }, 400);
     return true;
   }
@@ -260,7 +284,7 @@ class GrowthStore {
     this.bump();
     window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
-      void writeDraft(KEY, this.state).catch(() => {});
+      void writeDraft(this.userId ? userKey(this.userId) : KEY, this.state).catch(() => {});
     }, 400);
   }
 

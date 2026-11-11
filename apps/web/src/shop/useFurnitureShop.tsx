@@ -449,5 +449,5 @@ export function useFurnitureShop(world: World, stopWalking: () => void) {
       )}
     </>
   );
-  return { button, ui, editor, cancel, active: !!active };
+  return { button, ui, editor, cancel, active: !!active, show: (tab: "shop" | "bag" | "credits") => { setTab(tab); setOpen(true); } };
 }

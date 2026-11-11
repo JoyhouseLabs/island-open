@@ -69,3 +69,6 @@ export class AnimalDetailsStore {
   }
 }
 export const animalDetails = new AnimalDetailsStore();
+
+/** Mounted residents expose the same inspection action as their mesh. */
+export const animalInspectors = new Map<string, () => void>();

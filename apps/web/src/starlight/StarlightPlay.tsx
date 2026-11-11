@@ -1,3 +1,4 @@
+import { menus } from "../navigation/store";
 import { animalDetails } from "../animals/detailsStore";
 import TrialArena from "./TrialArena";
 import { useEffect, useRef, useState } from "react";
@@ -117,7 +118,8 @@ export function useStarlightActivity(options: {
       setRestingAt(id);
       setNotice("已邀请月亮伊布来休息垫，路上遇到障碍时可换个位置。");
     }
-    setTab(item?.blueprint === "basket" ? "materials" : "build");
+    if (item?.blueprint === "basket") { menus.open("bag", "materials"); return; }
+    setTab("build");
     setOpen(true);
   };
   const onGround = (x: number, z: number) => {
@@ -318,8 +320,8 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
           <nav aria-label="观星角活动">
             {(
               [
-                ["materials", "材料"],
-                ["build", "蓝图与作品"],
+                ["materials", "采摘与点心"],
+                ["build", "蓝图背包"],
                 ["trial", "可选试炼"],
               ] as const
             ).map(([id, title]) => (
@@ -327,7 +329,7 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                 key={id}
                 aria-pressed={p.tab === id}
                 disabled={!!p.preview || (p.activeTrial && id !== "trial")}
-                onClick={() => p.setTab(id)}
+                onClick={() => id === "build" ? menus.open("bag", "blueprints") : p.setTab(id)}
               >
                 {title}
               </button>

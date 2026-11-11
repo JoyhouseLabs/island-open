@@ -1,0 +1,319 @@
+.game-nav {
+  position: fixed;
+  z-index: 71;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  padding: 7px 12px;
+  gap: 7px;
+  border: 1px solid #ffffffaa;
+  border-radius: 24px;
+  background: #fffdf3ed;
+  color: #274e46;
+  box-shadow: 0 9px 36px #163e3230;
+  backdrop-filter: blur(14px);
+}
+.game-nav button {
+  border: 0;
+  background: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 66px;
+  min-height: 54px;
+  border-radius: 17px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.game-nav button.selected,
+.game-nav button:hover {
+  background: #e2ecdf;
+}
+.game-menu-shade {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: #143d3828;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 24px 24px 100px;
+  box-sizing: border-box;
+  backdrop-filter: blur(2px);
+}
+.game-menu {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  background: #fffdf5;
+  color: #294d43;
+  border: 1px solid #fff;
+  border-radius: 28px;
+  padding: 26px;
+  box-shadow: 0 18px 80px #183b3938;
+  font:
+    15px/1.6 system-ui,
+    sans-serif;
+  outline: none;
+}
+.game-menu header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.game-menu h2 {
+  font-size: 26px;
+  margin: 3px 0 15px;
+}
+.game-menu h3 {
+  font-size: 16px;
+  margin: 0 0 5px;
+}
+.game-menu header span,
+.game-menu small,
+.nav-note {
+  font-size: 12px;
+  color: #657b70;
+}
+.game-menu button,
+.game-menu select,
+.game-menu input[type="search"] {
+  font: inherit;
+  color: inherit;
+  border: 1px solid #d8e1d2;
+  border-radius: 12px;
+  padding: 10px 13px;
+  background: #f5f6eb;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.game-menu button {
+  cursor: pointer;
+}
+.game-menu button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.game-menu button:focus-visible,
+.game-nav button:focus-visible {
+  outline: 3px solid #548676;
+  outline-offset: 2px;
+}
+.game-menu button[aria-pressed="true"],
+.game-menu button[aria-current] {
+  background: #dceadb;
+  border-color: #7b9d7e;
+}
+.game-menu .nav-primary {
+  background: #335d4b;
+  color: white;
+}
+.nav-tabs {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.nav-tabs button {
+  flex: 1;
+  white-space: nowrap;
+  font-size: 13px;
+  padding: 8px;
+}
+.nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0;
+}
+.nav-grid button {
+  text-align: left;
+  min-height: 65px;
+}
+.nav-grid small {
+  display: block;
+}
+.bag-home {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+.bag-home select {
+  max-width: 68%;
+}
+.bag-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.bag-filters input[type="search"] {
+  width: 100%;
+}
+.bag-filters label {
+  margin-right: auto;
+  font-size: 13px;
+}
+.bag-item {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border-bottom: 1px solid #e6e9de;
+  padding: 16px 0;
+}
+.bag-item > div {
+  flex: 1;
+}
+.bag-item b {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bag-icon {
+  font-size: 30px;
+}
+.bag-item button {
+  font-size: 12px;
+}
+.bag-recipe {
+  background: #f3f4e8;
+  border-radius: 15px;
+  margin: 12px 0;
+  padding: 15px;
+}
+.bag-recipe p {
+  margin: 6px 0;
+}
+.bag-recipe small {
+  display: block;
+}
+.bag-recipe button {
+  margin-top: 10px;
+}
+.bag-collection {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.bag-collection button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.bag-collection span {
+  font-size: 30px;
+}
+.bag-collection strong {
+  font-size: 13px;
+}
+.compact-backpack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 71;
+  border: 1px solid #c8d7c5;
+  border-radius: 18px;
+  background: #fffdf3;
+  color: #294d43;
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+/* Scene activity stays above the same five-entry dock. Editor drafts remain mounted. */
+.has-game-nav .bottom-dock {
+  bottom: 0;
+}
+.has-game-nav .room-bottom,
+.has-game-nav .wild-activities {
+  bottom: 94px;
+}
+.has-game-nav .starlight-ui {
+  bottom: 170px;
+}
+.has-game-nav .furniture-tray {
+  bottom: 100px;
+}
+.has-game-nav .mobile-controls {
+  bottom: 102px;
+}
+.game-menu-open canvas {
+  pointer-events: none;
+}
+.game-menu-open .starlight-ui,
+.game-menu-open .furniture-tray,
+.game-menu-open .building-controls {
+  visibility: hidden;
+}
+.has-game-nav .footnote {
+  display: none;
+}
+@media (max-width: 600px) {
+  .game-nav {
+    width: calc(100% - 24px);
+    box-sizing: border-box;
+    gap: 0;
+    padding: 5px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    border-radius: 21px;
+  }
+  .game-nav button {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    min-height: 54px;
+  }
+  .game-menu-shade {
+    padding: 0 0 82px;
+    align-items: flex-end;
+  }
+  .game-menu {
+    width: 100%;
+    max-height: calc(100dvh - 110px);
+    border-radius: 25px 25px 0 0;
+    padding: 21px 18px;
+  }
+  .bag-item {
+    gap: 9px;
+  }
+  .bag-item h3 {
+    font-size: 14px;
+  }
+  .has-game-nav .room-bottom {
+    bottom: 85px;
+  }
+  .has-game-nav .starlight-ui {
+    bottom: 158px;
+  }
+}
+
+.has-game-nav .bottom-center {
+  bottom: 94px;
+}
+.has-game-nav .wild-pad {
+  bottom: 170px;
+}
+.game-menu-open .starlight-ui {
+  pointer-events: none;
+}
+
+.has-game-nav .star-launch {
+  bottom: 175px;
+}
+.has-game-nav .star-panel {
+  bottom: 100px;
+  max-height: calc(100dvh - 150px);
+}
+.game-menu-open .scene-editor {
+  visibility: hidden;
+}

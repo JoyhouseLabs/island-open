@@ -1,3 +1,5 @@
+import { growth } from "../progress/store";
+import GameNavigation from "../navigation/GameNavigation";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useOutletContext } from "react-router";
 import type { AuthConfig, User } from "@island/contracts";
@@ -40,8 +42,10 @@ export default function LearningLayout() {
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => { if (ready) growth.bind(user?.id ?? null); }, [ready, user?.id]);
   return (
     <main className="learn-root">
+      {ready && user && <GameNavigation context={{ userId: user.id, scene: "learning", compact: true }} />}
       <header className="learn-header">
         <Link to="/learn" className="learn-brand">
           ✦ 心灵家园 <span>学习中心</span>

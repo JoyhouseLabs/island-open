@@ -84,7 +84,7 @@ export default function App() {
   useEffect(() => {
     const blur = (e: Event) => {
       const btn = (e.target as HTMLElement)?.closest?.("button");
-      if (btn) btn.blur();
+      if (btn && !btn.closest(".game-menu,.game-nav")) btn.blur();
     };
     document.addEventListener("pointerup", blur);
     return () => document.removeEventListener("pointerup", blur);

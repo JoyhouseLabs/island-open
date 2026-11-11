@@ -1,3 +1,4 @@
+import { animalInspectors } from "./detailsStore";
 import { consumeResidentRest, restDestinations, greetings } from "./mindState";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
@@ -166,6 +167,10 @@ export function Animal({
     animalDetails.select({ id, name: resident.name, species: resident.species, scene,
       prefer: resident.prefer, pet: petAnimal });
   };
+  useEffect(() => {
+    animalInspectors.set(id, () => animalDetails.select({ id, name: resident.name, species: resident.species, scene, prefer: resident.prefer, pet: petAnimal }));
+    return () => { animalInspectors.delete(id); };
+  });
   const petFlag = useRef(0);
 
   useFrame(({ clock }, rawDt) => {

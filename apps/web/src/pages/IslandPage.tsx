@@ -1,3 +1,5 @@
+import { menus, useSceneActions } from "../navigation/store";
+import { toggleDressing } from "../player/PlayerPanel";
 import { useCreations } from "../creations/useCreations";
 import { useFurnitureShop } from "../shop/useFurnitureShop";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -169,9 +171,7 @@ export default function IslandPage() {
     [],
   );
   const packOpen = usePackOpen();
-  useEffect(() => {
-    if (packOpen) finishDecorating();
-  }, [packOpen]);
+
   const dockShown = packOpen
     ? null
     : (pinnedDock ?? (canHover ? hoverDock : null));
@@ -357,6 +357,14 @@ export default function IslandPage() {
     beginDecorating();
     if (t !== "explore") world.notify("点击岛上的空地，放下你的小小心意。");
   };
+  useSceneActions({
+    build: beginDecorating, buildReason: editReason, moreContent: creations.button,
+    travel: async (path) => { if (world.status === "dirty" || world.status === "offline") await world.save(); void navigate(path); },
+    shop: () => shop.show("shop"), furniture: () => shop.show("bag"),
+    settings: () => setPanel("environment"), save: () => setPanel("storage"),
+    sound: () => audio.masterButton(), dress: () => toggleDressing(true), about: () => setPanel("credits"),
+    beforeOpen: () => { setPanel(null); toggleDressing(false); },
+  });
   return (
     <main className={night ? "app night" : "app"}>
       <div
@@ -537,119 +545,7 @@ export default function IslandPage() {
                 ? "为草地添一簇花"
                 : "放一把长椅，歇一会儿"}
         </div>
-        <div className="bottom-dock">
-          <nav className="toolbar" aria-label="底部菜单">
-            <div
-              className={`dock-cat${dockShown === "places" ? " open" : ""}`}
-              onMouseEnter={() => enterCat("places")}
-              onMouseLeave={leaveCat}
-            >
-              <button
-                className={`tool ${dockShown === "places" ? "active" : ""}`}
-                aria-expanded={dockShown === "places"}
-                aria-label="去哪里 · 岛上的小地方"
-                title="导航 · 岛上的小地方"
-                onClick={() => {
-                  const next = pinnedDock === "places" ? null : "places";
-                  finishDecorating();
-                  setPinnedDock(next);
-                }}
-              >
-                <MapPin size={19} />
-                <span>去哪里</span>
-              </button>
-              <nav
-                className="dock-drawer place-drawer"
-                aria-label="岛屿分区"
-                inert={dockShown !== "places"}
-              >
-                <span className="section-caption">岛上的小地方</span>
-                {landmarks.map((p) => {
-                  const Icon = places[p.id] ?? Compass,
-                    scene = sceneByLandmark[p.id];
-                  if (!scene)
-                    return (
-                      <button
-                        className={selected === p.id ? "place active" : "place"}
-                        key={p.id}
-                        onClick={() => {
-                          setSelected(p.id);
-                          setTool("explore");
-                          setFocus({ x: p.x, z: p.z, stamp: Date.now() });
-                          setPinnedDock(null);
-                        }}
-                      >
-                        <Icon size={16} strokeWidth={1.6} />
-                        <span>{p.name}</span>
-                        {selected === p.id && <span className="place-dot" />}
-                      </button>
-                    );
-                  return (
-                    <Link
-                      key={p.id}
-                      to={paths[scene]}
-                      className={selected === p.id ? "place active" : "place"}
-                      onClick={() =>
-                        setIslandEntry({ x: p.x, z: p.z, stamp: Date.now() })
-                      }
-                    >
-                      <Icon size={16} strokeWidth={1.6} />
-                      <span>{p.name}</span>
-                      <small className="entry-badge" aria-hidden="true">
-                        进入
-                      </small>
-                    </Link>
-                  );
-                })}
-                {publishedPlaces.length > 0 && (
-                  <>
-                    <span className="place-drawer-separator" />
-                    <span className="section-caption">更多小天地</span>
-                    {publishedPlaces.map((place) => (
-                      <Link
-                        key={place.id}
-                        to={`/place/${place.id}`}
-                        className={
-                          location.pathname === `/place/${place.id}`
-                            ? "place active"
-                            : "place"
-                        }
-                      >
-                        <Sparkles size={16} strokeWidth={1.6} />
-                        <span>{place.name}</span>
-                        <small className="entry-badge" aria-hidden="true">
-                          进入
-                        </small>
-                      </Link>
-                    ))}
-                  </>
-                )}
-              </nav>
-            </div>
-            <div
-              className={`dock-cat${dockShown === "tools" ? " open" : ""}`}
-              onMouseEnter={() => enterCat("tools")}
-              onMouseLeave={leaveCat}
-            >
-              <button
-                className={`tool ${dockShown === "tools" ? "active" : ""}`}
-                aria-expanded={dockShown === "tools"}
-                aria-label="布置家园"
-                title="布置家园"
-                onClick={() => {
-                  if (decorating.current) finishDecorating();
-                  else beginDecorating();
-                }}
-              >
-                <Wrench size={19} />
-                <span>布置家园</span>
-              </button>
-              <nav
-                className="dock-drawer home-editor"
-                aria-label="打理小岛"
-                inert={dockShown !== "tools"}
-              >
-                <header>
+        {decorating.current && !packOpen && <div className="bottom-dock"><section className="scene-editor" aria-label="布置家园">                <header>
                   <strong>布置家园</strong>
                   <button className="small-button" onClick={finishDecorating}>
                     完成布置
@@ -701,86 +597,7 @@ export default function IslandPage() {
                     </button>
                   </div>
                 </fieldset>
-              </nav>
-            </div>
-            <div
-              className={`dock-cat${dockShown === "settings" ? " open" : ""}`}
-              onMouseEnter={() => enterCat("settings")}
-              onMouseLeave={leaveCat}
-            >
-              <button
-                className={`tool ${dockShown === "settings" ? "active" : ""}`}
-                aria-expanded={dockShown === "settings"}
-                aria-label="环境 · 视角与声音"
-                title="配置 · 视角与环境"
-                onClick={() => {
-                  const next = pinnedDock === "settings" ? null : "settings";
-                  finishDecorating();
-                  setPinnedDock(next);
-                }}
-              >
-                <SlidersHorizontal size={19} />
-                <span>环境</span>
-              </button>
-              <nav
-                className="dock-drawer"
-                aria-label="视角与环境"
-                inert={dockShown !== "settings"}
-              >
-                <div className="drawer-row">
-                  <button
-                    className="tool"
-                    title="返回全岛"
-                    aria-label="返回全岛"
-                    onClick={() => {
-                      setFocus(null);
-                      setCameraReset((n) => n + 1);
-                      setTool("explore");
-                      setPinnedDock(null);
-                    }}
-                  >
-                    <Maximize2 size={19} />
-                    <span>全岛</span>
-                  </button>
-                  <button
-                    className={`tool ${panel === "environment" ? "active" : ""}`}
-                    title="时间与季节"
-                    aria-label="时间与季节"
-                    onClick={() => {
-                      setPanel(panel === "environment" ? null : "environment");
-                      setPinnedDock(null);
-                    }}
-                  >
-                    <Sun size={19} />
-                    <span>季节</span>
-                  </button>
-                  <button
-                    className={`tool ${audio.audible ? "active" : ""}`}
-                    title={audio.audible ? "关闭环境声" : "开启环境声"}
-                    aria-label={audio.audible ? "关闭环境声" : "开启环境声"}
-                    onClick={() => {
-                      audio.masterButton();
-                      setPinnedDock(null);
-                    }}
-                  >
-                    {audio.loading ? (
-                      <LoaderCircle className="spin" size={19} />
-                    ) : audio.audible ? (
-                      <Volume2 size={19} />
-                    ) : (
-                      <VolumeX size={19} />
-                    )}
-                    <span>声音</span>
-                  </button>
-                </div>
-              </nav>
-            </div>
-            <span className="toolbar-line" />
-            <span onClickCapture={creations.cancel}>{shop.button}</span>
-            {creations.button}
-            <BackpackButton tool label="我的发现" />
-          </nav>
-        </div>
+</section></div>}
       </div>
       <footer className="footnote">
         <span>{world.snapshot.entities.length} 个生命与心意</span>

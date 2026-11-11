@@ -1,3 +1,4 @@
+import { menus } from "../navigation/store";
 import { animalDetails } from "../animals/detailsStore";
 import { creationSeatPrompt } from "./creationSeatPrompt";
 import { learningTravel } from "../learning/travel";
@@ -344,7 +345,7 @@ export function PlayerRig({
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (pausedRef.current || animalDetails.selected) return;
+      if (menus.panel || pausedRef.current || animalDetails.selected) return;
       if ((e.target as HTMLElement)?.closest("button,select,[contenteditable=true]")) return;
       const el = document.activeElement;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
@@ -385,7 +386,7 @@ export function PlayerRig({
 
   useFrame(({ clock }, rawDt) => {
     if (!group.current) return;
-    if (pausedRef.current) {
+    if (menus.panel || pausedRef.current) {
       keys.current.clear(); target.current = null; wantJump.current = false; moveBus.take();
       return;
     }
