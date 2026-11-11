@@ -21,18 +21,20 @@ describe("baseEcology", () => {
       "island-水伊布",
       "island-方方",
       "island-皮卡丘",
+      "island-仙子伊布",
     ]);
     expect(base.members.every((m) => m.bornTick === 0)).toBe(true);
   });
 
   it("keeps the summit companion unique and preserves existing encounter plans", () => {
     const roster = baseEcology().members;
-    const previous = roster.filter(m => m.species !== "pikachu");
+    const previous = roster.filter(m => m.species !== "pikachu" && m.species !== "sylveon");
     for (let slot = 0; slot < 100; slot++)
       expect(ecologyPlan(SEED, slot, roster)).toEqual(ecologyPlan(SEED, slot, previous));
     for (const tick of [100, 300, 1000, 10000]) {
       const state = ecologyState(SEED, tick, "summer");
       expect(state.members.filter(m => m.species === "pikachu").map(m => m.id)).toEqual(["island-皮卡丘"]);
+      expect(state.members.filter(m => m.species === "sylveon").map(m => m.id)).toEqual(["island-仙子伊布"]);
     }
   });
 });

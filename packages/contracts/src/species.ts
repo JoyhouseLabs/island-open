@@ -7,7 +7,7 @@
  * every other consumer derives from this table and must not grow its own
  * species lists.
  */
-export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon", "cat", "umbreon", "pikachu"] as const;
+export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon", "cat", "umbreon", "pikachu", "sylveon"] as const;
 export type Species = (typeof SPECIES)[number];
 
 export type Interest = "flower" | "tree" | "bench" | "water" | "grass";
@@ -193,6 +193,33 @@ export const speciesProfiles: Record<Species, SpeciesProfile> = {
         first: ["小", "方", "暖", "橘"],
         second: ["方", "米", "喵", "团"],
       },
+    },
+  },
+  sylveon: {
+    label: "仙子伊布",
+    persona: {
+      temperament: "温柔、亲近伙伴，喜欢陪朋友在花园边散步",
+      speechStyle: "轻柔的短句，喜欢邀请一起观察颜色和花朵",
+      likes: "花香、粉蓝色飘带、蝴蝶结和安静的陪伴",
+    },
+    lines: {
+      greeting: ["${name}轻轻摇着粉蓝飘带，蓝眼睛望向你。"],
+      smallTalk: [
+        "我的飘带有白色、粉色和蓝色，像把花园的颜色带在身边。",
+        "你发现了吗？我的耳边和胸前都有一个蝴蝶结。",
+        "一起慢慢走吧，看看今天哪朵花开得最漂亮。",
+      ],
+      taskHint: "找一朵喜欢的花，停下来陪我看看它的颜色吧。",
+      taskLabel: "一起赏花",
+    },
+    voice: "voice-sylveon",
+    voiceBeats: [[0.04, 0.3], [0.4, 0.74], [0.84, 1.12]],
+    behavior: { speed: 1.45, headY: 2.3, shadow: "#c5a3bd", browse: "flower" },
+    ecology: {
+      naturalBirth: false,
+      encounters: false,
+      prefer: "flower",
+      nameParts: { first: ["花", "绒", "彩"], second: ["铃", "带", "梦"] },
     },
   },
   pikachu: {

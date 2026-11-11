@@ -42,3 +42,20 @@ test("Pikachu's summit home stays above the foothills and clear of gates and roc
   for (const rock of islandRocks())
     expect(Math.hypot(x - rock.x, z - rock.z) - r).toBeGreaterThan(rock.size + 0.6);
 });
+
+test("Sylveon's flower-garden home is clear of scene gates and fixed obstacles", async () => {
+  const { staticObstacles } = await import("./src/index.js");
+  const sylveon = residents.island!.find(r => r.species === "sylveon")!;
+  expect(sylveon).toBeDefined();
+  const { x, z, r } = sylveon.home;
+  for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16)
+    expect(walkSpecs.island.walkable(x + Math.cos(angle) * r, z + Math.sin(angle) * r)).toBe(true);
+  for (const gate of walkSpecs.island.gates)
+    expect(Math.hypot(x - gate.x, z - gate.z) - r).toBeGreaterThan(gate.radius + 0.5);
+  for (const obstacle of staticObstacles("island")) {
+    const distance = obstacle.halfSize
+      ? Math.hypot(Math.max(0, Math.abs(x - obstacle.x) - obstacle.halfSize.x), Math.max(0, Math.abs(z - obstacle.z) - obstacle.halfSize.z))
+      : Math.hypot(x - obstacle.x, z - obstacle.z) - obstacle.r;
+    expect(distance - r).toBeGreaterThan(1.6);
+  }
+});

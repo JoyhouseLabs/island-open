@@ -91,6 +91,14 @@
       "mime": "audio/wav"
     },
     {
+      "id": "voice-sylveon",
+      "file": "voice-sylveon.wav",
+      "url": "/api/content/core/voice-sylveon",
+      "sha256": "38860abe9b1285cee8265fc200fec8e8ca52c439f51dfc2e317f7d463dc6894a",
+      "bytes": 53846,
+      "mime": "audio/wav"
+    },
+    {
       "id": "voice-pikachu",
       "file": "voice-pikachu.wav",
       "url": "/api/content/core/voice-pikachu",

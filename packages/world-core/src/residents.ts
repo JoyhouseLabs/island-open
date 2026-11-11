@@ -26,6 +26,7 @@ export const residents: Partial<
     { species: "cat", name: "方方", home: { x: 6, z: 76, r: 6 }, prefer: "flower" },
     // Main-island summit, west of the mountain gate and clear of its rocks.
     { species: "pikachu", name: "皮卡丘", home: { x: -4, z: -80, r: 3 }, prefer: "grass" },
+    { species: "sylveon", name: "仙子伊布", home: { x: -43, z: 56, r: 4 }, prefer: "flower" },
   ],
   mountain: [
     { species: "wolf", name: "风哨", home: { x: 12, z: -16, r: 8 }, prefer: "grass", unlockId: "resident-wolf" },

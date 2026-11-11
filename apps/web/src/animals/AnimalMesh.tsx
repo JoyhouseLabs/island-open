@@ -919,6 +919,186 @@ function PikachuMesh({ anim }: { anim: AnimalAnim }) {
   </group>;
 }
 
+/** Flat cloth strips with forked ends; cached samples keep per-frame work bounded. */
+function SylveonRibbon({ points, anim, reduced, offset }: {
+  points: [number, number, number][];
+  anim: AnimalAnim;
+  reduced: { current: boolean };
+  offset: number;
+}) {
+  const strip = useMemo(() => {
+    const steps = 28, curve = new T.CatmullRomCurve3(points.map(p => new T.Vector3(...p)));
+    const geometry = new T.BufferGeometry();
+    const base = new Float32Array(((steps + 1) * 2 + 1) * 3);
+    const colors = new Float32Array(base.length), weights = new Float32Array(base.length / 3);
+    const indices: number[] = [];
+    const color = new T.Color();
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps, p = curve.getPoint(t), tangent = curve.getTangent(t);
+      const normal = new T.Vector3(-tangent.y, tangent.x, 0).normalize();
+      const width = 0.065 + Math.sin(t * Math.PI / 2) * 0.035;
+      color.set(t < 0.68 ? "#fff8f2" : t < 0.79 ? "#ed9fb7" : t < 0.89 ? "#748fc1" : "#a5e0f0");
+      for (let side = 0; side < 2; side++) {
+        const v = i * 2 + side, sign = side === 0 ? -1 : 1;
+        base.set([p.x + normal.x * width * sign, p.y + normal.y * width * sign, p.z], v * 3);
+        color.toArray(colors, v * 3); weights[v] = t;
+      }
+      if (i < steps - 1) {
+        const k = i * 2;
+        indices.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+      }
+    }
+    const end = curve.getPoint(1), tangent = curve.getTangent(1), notch = (steps + 1) * 2;
+    base.set(end.addScaledVector(tangent, -0.13).toArray(), notch * 3);
+    color.toArray(colors, notch * 3); weights[notch] = 1;
+    const last = (steps - 1) * 2, tip = steps * 2;
+    indices.push(last, last + 1, notch, last, notch, tip, last + 1, tip + 1, notch);
+    geometry.setAttribute("position", new T.BufferAttribute(base.slice(), 3).setUsage(T.DynamicDrawUsage));
+    geometry.setAttribute("color", new T.BufferAttribute(colors, 3));
+    geometry.setIndex(indices); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
+    if (geometry.boundingSphere) geometry.boundingSphere.radius += 0.18;
+    return { geometry, base, weights };
+  }, [points]);
+  useEffect(() => () => strip.geometry.dispose(), [strip]);
+  useFrame(() => {
+    const attr = strip.geometry.getAttribute("position") as T.BufferAttribute;
+    const target = attr.array as Float32Array;
+    const t = anim.phase, happy = anim.action === "pet" || anim.action === "greet";
+    for (let i = 0; i < strip.weights.length; i++) {
+      const w = strip.weights[i]!, k = i * 3;
+      const wave = reduced.current ? 0 : Math.sin(t * (happy ? 3 : 1.6) + w * 5 + offset) * w;
+      target[k] = strip.base[k]!;
+      target[k + 1] = strip.base[k + 1]! + wave * (happy ? 0.075 : 0.04);
+      target[k + 2] = strip.base[k + 2]! + wave * 0.06;
+    }
+    attr.needsUpdate = true; strip.geometry.computeVertexNormals();
+  });
+  return <mesh geometry={strip.geometry} castShadow>
+    <meshStandardMaterial vertexColors side={T.DoubleSide} roughness={0.88} />
+  </mesh>;
+}
+
+function SylveonBow() {
+  const lobe = useMemo(() => {
+    const s = new T.Shape();
+    s.moveTo(0, 0); s.bezierCurveTo(0.1, 0.12, 0.21, 0.42, 0.31, 0.34);
+    s.bezierCurveTo(0.42, 0.15, 0.37, -0.18, 0.26, -0.3);
+    s.bezierCurveTo(0.16, -0.35, 0.05, -0.04, 0, 0); s.closePath();
+    return new T.ExtrudeGeometry(s, { depth: 0.045, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.009, bevelThickness: 0.009, curveSegments: 10 });
+  }, []);
+  useEffect(() => () => lobe.dispose(), [lobe]);
+  return <group>
+    {[-1, 1].map(side => <group key={side} scale={[side, 1, 1]}>
+      <mesh geometry={lobe} castShadow><meshStandardMaterial color="#fff8f2" roughness={0.9} /></mesh>
+      <mesh geometry={lobe} position={[0.012, 0, 0.075]} scale={[0.56, 0.5, 0.5]}>
+        <meshStandardMaterial color="#ef9eb8" roughness={0.88} />
+      </mesh>
+    </group>)}
+    <mesh position={[0, 0, 0.073]} scale={[0.085, 0.105, 0.06]}>
+      <sphereGeometry args={[1, 12, 10]} /><meshStandardMaterial color="#ef9eb8" roughness={0.88} />
+    </mesh>
+  </group>;
+}
+
+/** White/pink coat, blue eyes, two bows and four flowing ribbon feelers. */
+function SylveonMesh({ anim }: { anim: AnimalAnim }) {
+  const body = useRef<T.Group>(null), head = useRef<T.Group>(null), tail = useRef<T.Group>(null), eyes = useRef<T.Group>(null);
+  const legs = useRef<(T.Group | null)[]>([]), ears = useRef<(T.Group | null)[]>([]);
+  const reduced = useRef(false);
+  const white = "#fff8f2", pink = "#ed9fb7", blue = "#91d7ec";
+  const leaf = useMemo(() => new T.LatheGeometry([
+    new T.Vector2(0.065, 0), new T.Vector2(0.17, 0.2), new T.Vector2(0.17, 0.47),
+    new T.Vector2(0.1, 0.76), new T.Vector2(0, 0.98),
+  ], 14), []);
+  const ribbons = useMemo(() => ({
+    neckLeft: [[-0.11, 1.04, 0.7], [-0.65, 0.82, 0.67], [-0.84, 0.46, 0.17], [-0.68, 0.33, -0.26], [-0.46, 0.48, -0.52]],
+    neckRight: [[0.1, 1.04, 0.7], [0.53, 0.87, 0.63], [0.98, 1.04, 0.15], [0.85, 1.38, -0.46], [0.39, 1.31, -0.79]],
+    earLeft: [[0, 0.02, 0.06], [-0.33, 0.39, 0.13], [-0.66, 0.64, 0.07], [-0.57, 0.97, 0.01], [-0.27, 1.14, 0.02]],
+    earRight: [[0.05, 0, 0.04], [0.48, -0.08, 0.02], [0.93, 0.12, -0.14], [1.16, 0.42, -0.25], [1.31, 0.55, -0.26]],
+  }) as Record<string, [number, number, number][]>, []);
+  useEffect(() => () => leaf.dispose(), [leaf]);
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => { reduced.current = preference.matches; };
+    sync(); preference.addEventListener("change", sync);
+    return () => preference.removeEventListener("change", sync);
+  }, []);
+  useFrame((_, dt) => {
+    const t = reduced.current ? 0 : anim.phase, pose = poses[anim.action];
+    const happy = anim.action === "pet" || anim.action === "greet";
+    const blend = 1 - Math.exp(-Math.min(dt, 0.05) * 9);
+    if (body.current) {
+      body.current.position.y = -pose.sink * 0.7 + Math.sin(t * 2) * 0.012;
+      body.current.rotation.x = T.MathUtils.lerp(body.current.rotation.x, pose.body * 0.25, blend);
+    }
+    if (head.current) {
+      head.current.rotation.x = T.MathUtils.lerp(head.current.rotation.x, pose.neck * 0.6, blend);
+      head.current.rotation.z = Math.sin(t * (happy ? 2.5 : 0.8)) * (happy ? 0.08 : 0.025);
+    }
+    if (tail.current) tail.current.rotation.z = Math.sin(t * (happy ? 4 : 1.6)) * (happy ? 0.24 : 0.1);
+    if (eyes.current) eyes.current.scale.y = t % 5.8 > 5.63 ? 0.13 : 1;
+    legs.current.forEach((leg, i) => { if (leg) leg.rotation.x = anim.moving ? Math.sin(t * 7 + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.4 : 0; });
+    ears.current.forEach((ear, i) => { if (ear) ear.rotation.z = (i ? -1 : 1) * (0.37 + Math.sin(t * 1.4 + i) * 0.035); });
+  });
+  return <group ref={body} name="sylveon-model">
+    <mesh position={[0, 0.78, -0.08]} scale={[0.32, 0.35, 0.57]} castShadow>
+      <sphereGeometry args={[1, 18, 14]} /><meshStandardMaterial color={white} roughness={0.9} />
+    </mesh>
+    <mesh position={[0, 0.95, 0.33]} scale={[0.26, 0.4, 0.29]} castShadow>
+      <sphereGeometry args={[1, 16, 12]} /><meshStandardMaterial color={white} roughness={0.9} />
+    </mesh>
+    <group ref={head} position={[0, 1.32, 0.42]}>
+      <mesh scale={[0.36, 0.33, 0.34]} castShadow>
+        <sphereGeometry args={[1, 20, 16]} /><meshStandardMaterial color={pink} roughness={0.88} />
+      </mesh>
+      {/* Two white face lobes leave a pink forehead and brow between them. */}
+      {[-1, 1].map(side => <mesh key={side} position={[side * 0.14, -0.075, 0.18]} scale={[0.21, 0.25, 0.205]}>
+        <sphereGeometry args={[1, 16, 12]} /><meshStandardMaterial color={white} roughness={0.9} />
+      </mesh>)}
+      <group ref={eyes} position={[0, -0.035, 0]}>
+        {[-1, 1].map(side => <group key={side} position={[side * 0.175, 0, 0.367]} rotation={[0, side * 0.18, 0]}>
+          <mesh scale={[0.105, 0.14, 0.028]}><sphereGeometry args={[1, 16, 12]} /><meshStandardMaterial color="#416784" /></mesh>
+          <mesh position={[0, 0, 0.025]} scale={[0.087, 0.121, 0.017]}><sphereGeometry args={[1, 16, 12]} /><meshStandardMaterial color={blue} roughness={0.65} /></mesh>
+          <mesh position={[-0.021, 0.044, 0.045]} scale={[0.027, 0.046, 0.009]}><sphereGeometry args={[1, 12, 8]} /><meshBasicMaterial color="#fffefa" /></mesh>
+        </group>)}
+      </group>
+      <mesh position={[0, -0.13, 0.374]} scale={[0.026, 0.016, 0.018]}><sphereGeometry args={[1, 10, 8]} /><meshStandardMaterial color="#56536a" /></mesh>
+      <Mouth anim={anim} position={[0, -0.205, 0.337]} width={0.09} color="#746176" />
+      {[-1, 1].map((side, i) => <group key={side} ref={el => { ears.current[i] = el; }} position={[side * 0.21, 0.22, -0.015]} rotation={[-0.13, 0, -side * 0.37]} scale={[1, 0.9, 0.53]}>
+        <mesh geometry={leaf} castShadow><meshStandardMaterial color={pink} roughness={0.88} /></mesh>
+        <mesh geometry={leaf} position={[0, 0.12, 0.12]} scale={[0.5, 0.69, 0.2]}>
+          <meshStandardMaterial color="#748fc1" roughness={0.9} />
+        </mesh>
+      </group>)}
+      <group position={[0.29, 0.25, 0.26]} rotation={[0, 0, -0.28]}>
+        <group scale={0.66}><SylveonBow /></group>
+        <SylveonRibbon points={ribbons.earLeft!} anim={anim} reduced={reduced} offset={0.6} />
+        <SylveonRibbon points={ribbons.earRight!} anim={anim} reduced={reduced} offset={2.3} />
+      </group>
+    </group>
+    <group position={[0, 1.03, 0.64]} scale={0.72}><SylveonBow /></group>
+    <SylveonRibbon points={ribbons.neckLeft!} anim={anim} reduced={reduced} offset={1.2} />
+    <SylveonRibbon points={ribbons.neckRight!} anim={anim} reduced={reduced} offset={3.1} />
+    {([[-0.23, 0.31], [0.23, 0.31], [-0.23, -0.42], [0.23, -0.42]] as const).map(([x, z], i) =>
+      <group key={i} ref={el => { legs.current[i] = el; }} position={[x, 0.66, z]}>
+        <mesh position={[0, -0.23, 0]} scale={[0.105, 0.3, 0.12]} castShadow>
+          <sphereGeometry args={[1, 12, 10]} /><meshStandardMaterial color={white} roughness={0.9} />
+        </mesh>
+        <mesh position={[0, -0.46, 0.035]} scale={[0.108, 0.18, 0.14]} castShadow>
+          <sphereGeometry args={[1, 12, 10]} /><meshStandardMaterial color={pink} roughness={0.88} />
+        </mesh>
+        <mesh position={[0, -0.6, 0.09]} scale={[0.115, 0.06, 0.18]} castShadow>
+          <sphereGeometry args={[1, 12, 8]} /><meshStandardMaterial color={pink} roughness={0.88} />
+        </mesh>
+      </group>)}
+    <group ref={tail} position={[0, 0.86, -0.58]}>
+      <mesh geometry={leaf} rotation={[-0.95, 0, 0.08]} scale={[0.75, 1.12, 0.6]} castShadow>
+        <meshStandardMaterial color={pink} roughness={0.88} />
+      </mesh>
+    </group>
+  </group>;
+}
+
 /** Which mesh each species renders with. The walking fox is the shared GLB
  *  (useFox); admin-placed "fox" animals reuse the panda build, as before.
  *  Adding a species without a mesh entry is a compile error here — the
@@ -935,6 +1115,7 @@ const meshes: Record<
   cat: CatMesh,
   umbreon: UmbreonMesh,
   pikachu: PikachuMesh,
+  sylveon: SylveonMesh,
 };
 
 export function AnimalMesh({

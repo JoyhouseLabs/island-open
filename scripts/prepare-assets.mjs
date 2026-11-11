@@ -164,6 +164,16 @@ const voiceRecipes = [
       [offset + 0.15, 0.43, [820, 410], { vib: 0.018, vibHz: 7, curve: 1.4 }],
     ]),
   },
+  // Sylveon: three soft rising/falling original notes, no sampled character audio.
+  {
+    id: "voice-sylveon",
+    seconds: 1.22,
+    tones: [
+      [0.04, 0.26, [620, 900, 780], { vib: 0.012, vibHz: 5, curve: 1.5 }],
+      [0.4, 0.34, [780, 1050, 850], { vib: 0.014, vibHz: 6, curve: 1.4 }],
+      [0.84, 0.28, [850, 720, 560], { vib: 0.012, vibHz: 5, curve: 1.6 }],
+    ],
+  },
   // Pikachu: original bright two-part chirp, not a sampled character voice.
   {
     id: "voice-pikachu",
