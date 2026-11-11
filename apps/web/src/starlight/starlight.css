@@ -233,31 +233,190 @@
 }
 
 /* The central scene canvas is the arena; the panel holds only decisions. */
-.star-trial-launch{position:fixed;left:24px;bottom:230px;box-shadow:0 6px 28px #07132155}
-.star-battle-mode .room-welcome,.star-battle-mode .bottom-center,.star-battle-mode .view-controls{display:none}
-.star-battle-panel>nav{display:none}
-.star-battle-panel .star-card{margin:10px 0;padding:12px}
-.star-battle-panel .star-feedback:empty{display:none}
-.star-battle-panel .star-trial h3{font-size:18px;color:#f3dca3}
-.star-battle-panel .star-energy progress:first-child{accent-color:#a2dbce}
-.star-battle-panel .star-energy progress:last-child{accent-color:#c3b2e8}
-.star-battle-panel .star-skills button{min-height:70px;border-color:#8d9ca0;background:#294653}
-.star-battle-panel .star-skills button:first-child{border-color:#c4ac6e}
-.star-battle-panel .star-skills button:nth-child(2){border-color:#91bdce}
-.star-battle-panel .star-skills button:nth-child(3){border-color:#91c5ad}
-.trial-motion{margin:10px 0;color:#becfcb;min-height:30px}
-.trial-motion input{width:18px;height:18px;accent-color:#b9d9c4}
-.trial-feedback{padding:10px;border-radius:10px;background:#b5d5d011;min-height:22px;color:#ede0bb}
-.trial-history summary{cursor:pointer;padding:8px 0;font-size:12px;color:#bdd1d2}
-@media(max-width:699px){
- .star-trial-launch{left:12px;bottom:230px;font-size:13px!important}
- .has-game-nav .star-panel.star-battle-panel{top:auto;bottom:88px;max-height:44dvh;width:calc(100vw - 16px);right:8px;padding:13px 14px;border-radius:20px}
- .star-battle-panel header h2{font-size:19px}
- .star-battle-panel .star-eyebrow{display:none}
- .star-battle-panel .star-card{padding:8px;margin:7px 0}
- .star-battle-panel .star-trial h3{font-size:15px;margin-bottom:5px}
- .star-battle-panel p{font-size:12px;margin:6px 0;line-height:1.45}
- .star-battle-panel .star-skills button{min-height:57px}
- .star-battle-panel .trial-motion{font-size:12px;margin:6px 0;min-height:22px}
- .star-battle-panel .trial-feedback{padding:6px}
+.star-trial-launch {
+  position: fixed;
+  left: 24px;
+  bottom: 230px;
+  box-shadow: 0 6px 28px #07132155;
+}
+.star-battle-mode .room-welcome,
+.star-battle-mode .bottom-center,
+.star-battle-mode .view-controls {
+  display: none;
+}
+.star-battle-panel > nav {
+  display: none;
+}
+.star-battle-panel .star-card {
+  margin: 10px 0;
+  padding: 12px;
+}
+.star-battle-panel .star-feedback:empty {
+  display: none;
+}
+.star-battle-panel .star-trial h3 {
+  font-size: 18px;
+  color: #f3dca3;
+}
+.star-battle-panel .star-energy progress:first-child {
+  accent-color: #a2dbce;
+}
+.star-battle-panel .star-energy progress:last-child {
+  accent-color: #c3b2e8;
+}
+.star-battle-panel .star-skills button {
+  min-height: 70px;
+  border-color: #8d9ca0;
+  background: #294653;
+}
+.star-battle-panel .star-skills button:first-child {
+  border-color: #c4ac6e;
+}
+.star-battle-panel .star-skills button:nth-child(2) {
+  border-color: #91bdce;
+}
+.star-battle-panel .star-skills button:nth-child(3) {
+  border-color: #91c5ad;
+}
+.trial-motion {
+  margin: 10px 0;
+  color: #becfcb;
+  min-height: 30px;
+}
+.trial-motion input {
+  width: 18px;
+  height: 18px;
+  accent-color: #b9d9c4;
+}
+.trial-feedback {
+  padding: 10px;
+  border-radius: 10px;
+  background: #b5d5d011;
+  min-height: 22px;
+  color: #ede0bb;
+}
+.trial-history summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 12px;
+  color: #bdd1d2;
+}
+@media (max-width: 699px) {
+  .star-trial-launch {
+    left: 12px;
+    bottom: 230px;
+    font-size: 13px !important;
+  }
+  .has-game-nav .star-panel.star-battle-panel {
+    top: auto;
+    bottom: 88px;
+    max-height: 44dvh;
+    width: calc(100vw - 16px);
+    right: 8px;
+    padding: 13px 14px;
+    border-radius: 20px;
+  }
+  .star-battle-panel header h2 {
+    font-size: 19px;
+  }
+  .star-battle-panel .star-eyebrow {
+    display: none;
+  }
+  .star-battle-panel .star-card {
+    padding: 8px;
+    margin: 7px 0;
+  }
+  .star-battle-panel .star-trial h3 {
+    font-size: 15px;
+    margin-bottom: 5px;
+  }
+  .star-battle-panel p {
+    font-size: 12px;
+    margin: 6px 0;
+    line-height: 1.45;
+  }
+  .star-battle-panel .star-skills button {
+    min-height: 57px;
+  }
+  .star-battle-panel .trial-motion {
+    font-size: 12px;
+    margin: 6px 0;
+    min-height: 22px;
+  }
+  .star-battle-panel .trial-feedback {
+    padding: 6px;
+  }
+}
+.trial-head-label {
+  display: block;
+  white-space: nowrap;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: #142936e8;
+  border: 1px solid #e1d6a1;
+  color: #fff2c7;
+  font:
+    600 11px/1.4 system-ui,
+    sans-serif;
+  box-shadow: 0 3px 10px #0003;
+}
+.trial-turn-cue {
+  border: 1px solid #dbc884;
+  border-radius: 10px;
+  padding: 9px !important;
+  background: #e0c77218;
+  color: #fff0b9;
+  font-weight: 650;
+}
+.trial-skill-symbol {
+  display: block;
+  font-size: 18px;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.trial-extra-skills summary {
+  cursor: pointer;
+  padding: 12px 3px;
+  color: #d5e1cf;
+  font-size: 13px;
+  min-height: 24px;
+}
+.trial-extra-skills .star-skills {
+  margin: 0 0 10px;
+}
+.trial-skill-reason {
+  color: #e6c797;
+}
+@media (max-width: 699px) {
+  .trial-head-label {
+    font-size: 10px;
+    padding: 4px 7px;
+  }
+  .trial-turn-cue {
+    padding: 7px !important;
+  }
+  .trial-extra-skills summary {
+    padding: 10px 2px;
+    font-size: 12px;
+  }
+}
+
+.trial-key {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font:
+    600 11px/1.3 system-ui,
+    sans-serif;
+  vertical-align: middle;
+  opacity: 0.8;
+}
+.star-panel:focus-visible {
+  outline: 2px solid #f1da95;
+  outline-offset: -3px;
+}
+.trial-key-help {
+  color: #c7d7d6;
 }

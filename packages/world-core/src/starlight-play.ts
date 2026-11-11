@@ -1,3 +1,4 @@
+import { trialSkills } from "@island/contracts";
 import type {
   BlueprintId,
   IslandEntity,
@@ -234,30 +235,36 @@ export function applyStarlight(
     } else if (a.op === "trial.turn") {
       if (t.phase !== "active")
         refuse("TRIAL_PAUSED", "先继续试炼，再选择动作。");
-      const cost = a.skill === "beam" ? 2 : a.skill === "guard" ? 1 : 0;
+      const skill = trialSkills[a.skill];
+      const cost = skill.cost;
+      if (skill.heal && t.energy === 10)
+        refuse("ENERGY_FULL", "能量已满，可以选择其他招式。");
       if (t.points < cost) refuse("NO_POINTS", "行动点不够，先守护或观察吧。");
       t.points -= cost;
+      const healed = Math.min(skill.heal, 10 - t.energy);
+      t.energy += healed;
       let dealt = 0;
-      if (a.skill === "beam") {
-        dealt = t.focused ? 5 : 3;
-        t.focused = false;
+      if (skill.damage) {
+        dealt = a.skill === "beam" && t.focused ? 5 : skill.damage;
+        if (a.skill === "beam") t.focused = false;
         t.shadow = Math.max(0, t.shadow - dealt);
       }
       if (a.skill === "observe") t.focused = true;
       const hit =
         t.shadow === 0
           ? 0
-          : Math.max(
-              0,
-              trialIntent(t.turn).damage - (a.skill === "guard" ? 3 : 0),
-            );
+          : Math.max(0, trialIntent(t.turn).damage - skill.guard);
       t.energy = Math.max(0, t.energy - hit);
       const label =
         a.skill === "beam"
           ? `光波，星影能量 -${dealt}`
           : a.skill === "guard"
             ? "守护，抵挡 3 点冲击"
-            : "观察，下次光波增强为 5 点";
+            : a.skill === "observe"
+              ? "观察，下次光波增强为 5 点"
+              : skill.heal
+                ? `${skill.name}，恢复 ${healed} 点能量`
+                : `${skill.name}，星影能量 -${dealt}`;
       t.log = [
         ...t.log,
         `第 ${t.turn} 回合：${label}；伙伴能量 -${hit}。`,

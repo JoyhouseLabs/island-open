@@ -1,5 +1,82 @@
 import { z } from "zod";
 
+export const trialSkillIds = [
+  "beam",
+  "guard",
+  "observe",
+  "double",
+  "rush",
+  "moonlight",
+] as const;
+export type TrialSkillId = (typeof trialSkillIds)[number];
+export const trialSkills: Record<
+  TrialSkillId,
+  {
+    name: string;
+    symbol: string;
+    cost: number;
+    damage: number;
+    guard: number;
+    heal: number;
+    note: string;
+  }
+> = {
+  beam: {
+    name: "光波",
+    symbol: "✦",
+    cost: 2,
+    damage: 3,
+    guard: 0,
+    heal: 0,
+    note: "冲击 3 · 观察后冲击 5",
+  },
+  guard: {
+    name: "守护",
+    symbol: "◇",
+    cost: 1,
+    damage: 0,
+    guard: 3,
+    heal: 0,
+    note: "抵挡本回合 3 点冲击",
+  },
+  observe: {
+    name: "观察",
+    symbol: "◎",
+    cost: 0,
+    damage: 0,
+    guard: 0,
+    heal: 0,
+    note: "下次光波增强为 5 点",
+  },
+  double: {
+    name: "双星连击",
+    symbol: "✧✧",
+    cost: 3,
+    damage: 4,
+    guard: 0,
+    heal: 0,
+    note: "两道星环 · 共冲击 4",
+  },
+  rush: {
+    name: "影跃突袭",
+    symbol: "➶",
+    cost: 4,
+    damage: 6,
+    guard: 0,
+    heal: 0,
+    note: "向前跃击 · 冲击 6",
+  },
+  moonlight: {
+    name: "月光恢复",
+    symbol: "☾",
+    cost: 3,
+    damage: 0,
+    guard: 0,
+    heal: 4,
+    note: "先恢复最多 4 能量，再承受回应",
+  },
+};
+
 export const materialIds = ["moonfruit", "branch", "pebble"] as const;
 export type MaterialId = (typeof materialIds)[number];
 export const blueprintIds = ["lantern", "basket", "mat"] as const;
@@ -90,7 +167,7 @@ export const starlightActionSchema = z.discriminatedUnion("op", [
   z
     .object({
       op: z.literal("trial.turn"),
-      skill: z.enum(["beam", "guard", "observe"]),
+      skill: z.enum(trialSkillIds),
     })
     .strict(),
   z

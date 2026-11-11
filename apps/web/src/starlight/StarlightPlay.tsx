@@ -1,9 +1,21 @@
 import {
+  trialSkillIds,
+  trialSkills,
+  type TrialSkillId,
+} from "@island/contracts";
+import {
   confirmedTrialEffect,
   TRIAL_EFFECT_SECONDS,
   type TrialEffect,
+  trialCue,
+  type TrialCue,
 } from "./trialEffects";
 import { useTrialMotion } from "./useTrialMotion";
+import {
+  trialShortcut,
+  trialSkillKeys,
+  trialSkillUnavailable,
+} from "./trialKeyboard";
 import { menus, useMenuPanel } from "../navigation/store";
 import { animalDetails } from "../animals/detailsStore";
 import { useEffect, useRef, useState } from "react";
@@ -44,6 +56,8 @@ export type PlaySceneBindings = {
   trialView: boolean;
   motion: boolean;
   effect: TrialEffect | null;
+  effectStarted: number;
+  cue: TrialCue;
   effectsPaused: boolean;
   onTrial: () => void;
   selectedNode: string | null;
@@ -68,7 +82,10 @@ export function useStarlightActivity(options: {
   const menu = useMenuPanel();
   const [effect, setEffect] = useState<TrialEffect | null>(null);
   const [effectBusy, setEffectBusy] = useState(false);
+  const [effectStarted, setEffectStarted] = useState(0);
+  const [responding, setResponding] = useState(false);
   useEffect(() => {
+    setResponding(false);
     if (!effect) {
       setEffectBusy(false);
       return;
@@ -81,7 +98,13 @@ export function useStarlightActivity(options: {
       },
       motion ? TRIAL_EFFECT_SECONDS * 1000 : 0,
     );
-    return () => clearTimeout(timer);
+    const response = motion
+      ? window.setTimeout(() => setResponding(true), 1150)
+      : undefined;
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(response);
+    };
   }, [effect?.id, motion]);
   const act = async (action: StarlightAction) => {
     if (action.op === "trial.turn" && effectBusy) return null;
@@ -94,6 +117,7 @@ export function useStarlightActivity(options: {
         action.skill,
       );
       if (next) {
+        setEffectStarted(performance.now());
         setEffect(next);
         setEffectBusy(motion);
       }
@@ -273,8 +297,17 @@ export function useStarlightActivity(options: {
     setOpen(false);
     setPreview(null);
   };
+  const cue = trialCue(
+    data.state.trial,
+    data.busy || !!data.pending,
+    effectBusy ? effect : null,
+    responding,
+    !!menu,
+  );
   return {
     ...data,
+    cue,
+    displayTurn: effectBusy && effect ? effect.turn : data.state.trial?.turn,
     act,
     motion,
     setMotion,
@@ -318,6 +351,8 @@ export function useStarlightActivity(options: {
       trialView,
       motion,
       effect,
+      effectStarted,
+      cue,
       effectsPaused: !!menu || data.state.trial?.phase === "paused",
       onTrial,
       selectedNode: nodeId,
@@ -342,6 +377,33 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
     (s) => s.blueprint === "lantern" && s.placement,
   );
   const stage = p.node ? resourceStage(p.state, p.node.id, p.now) : null;
+  const skillButton = (id: TrialSkillId) => {
+    const skill = trialSkills[id];
+    const reason = trialSkillUnavailable(trial, id);
+    return (
+      <button
+        key={id}
+        aria-keyshortcuts={trialSkillKeys[id]}
+        disabled={skillLocked || !!reason}
+        title={reason || skill.note}
+        onClick={() => void p.act({ op: "trial.turn", skill: id })}
+      >
+        <span className="trial-skill-symbol" aria-hidden="true">
+          {skill.symbol}
+        </span>
+        {skill.name}{" "}
+        <kbd className="trial-key" aria-hidden="true">
+          {trialSkillKeys[id]}
+        </kbd>
+        <small>
+          耗 {skill.cost} 点 ·{" "}
+          {id === "beam" ? `冲击 ${trial?.focused ? 5 : 3}` : skill.note}
+        </small>
+        {reason && <small className="trial-skill-reason">{reason}</small>}
+      </button>
+    );
+  };
+
   return (
     <div className="starlight-ui">
       {!p.open && (
@@ -369,10 +431,36 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
         <section
           className={`star-panel${p.trialView ? " star-battle-panel" : ""}`}
           ref={p.panel}
-          tabIndex={-1}
-          aria-label="我的观星角"
+          tabIndex={0}
+          aria-label={p.trialView ? "星影试炼操作面板" : "我的观星角"}
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
+            const editable = !!(e.target as HTMLElement).closest(
+              'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"],[role="spinbutton"]',
+            );
+            const action = trialShortcut(
+              e.nativeEvent,
+              {
+                enabled: p.trialView && !p.editing && !document.hidden,
+                locked: locked || !!menus.panel,
+                effectBusy: p.effectBusy,
+                trial,
+              },
+              editable,
+            );
+            if (action) {
+              e.preventDefault();
+              e.stopPropagation();
+              void p.act(action);
+              return;
+            }
+            if (
+              e.key === "Escape" &&
+              !e.repeat &&
+              !e.nativeEvent.isComposing &&
+              !editable &&
+              !e.defaultPrevented
+            ) {
+              e.preventDefault();
               e.stopPropagation();
               void p.close();
             }
@@ -730,7 +818,7 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                         ? "休息一下，再试一次"
                         : trial.phase === "abandoned"
                           ? "已结束试炼"
-                          : `第 ${trial.turn} 回合${trial.phase === "paused" ? " · 已暂停" : ""}`}
+                          : `第 ${p.displayTurn} 回合${trial.phase === "paused" ? " · 已暂停" : ""}`}
                   </h3>
                   <p>
                     月亮伊布 <strong>{trial.energy}/10</strong>　星影{" "}
@@ -752,7 +840,15 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                     行动点 {trial.points}/4
                     {trial.focused ? " · 已观察：下次光波 5 点" : ""}
                   </p>
-                  {p.activeTrial && (
+                  <p
+                    className="trial-turn-cue"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {p.cue.actor && <span aria-hidden="true">▼ </span>}
+                    {p.cue.label}
+                  </p>
+                  {p.activeTrial && !p.effectBusy && (
                     <p className="star-intent">
                       {trialIntent(trial.turn).label}
                     </p>
@@ -760,47 +856,37 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                   {trial.phase === "active" && (
                     <>
                       <div className="star-skills">
-                        <button
-                          disabled={skillLocked || trial.points < 2}
-                          onClick={() =>
-                            void p.act({ op: "trial.turn", skill: "beam" })
-                          }
-                        >
-                          光波
-                          <small>耗 2 点 · 冲击 {trial.focused ? 5 : 3}</small>
-                        </button>
-                        <button
-                          disabled={skillLocked || trial.points < 1}
-                          onClick={() =>
-                            void p.act({ op: "trial.turn", skill: "guard" })
-                          }
-                        >
-                          守护<small>耗 1 点 · 抵挡 3</small>
-                        </button>
-                        <button
-                          disabled={skillLocked}
-                          onClick={() =>
-                            void p.act({ op: "trial.turn", skill: "observe" })
-                          }
-                        >
-                          观察<small>耗 0 点 · 下次光波增强</small>
-                        </button>
+                        {trialSkillIds.slice(0, 3).map((id) => skillButton(id))}
                       </div>
+                      <details className="trial-extra-skills">
+                        <summary>更多招式 · 连击 / 突袭 / 恢复（4–6）</summary>
+                        <div className="star-skills">
+                          {trialSkillIds.slice(3).map((id) => skillButton(id))}
+                        </div>
+                      </details>
                       <p>每次选择都会推进一回合，星影行动后恢复 2 行动点。</p>
                       <button
                         disabled={locked}
+                        aria-keyshortcuts="p"
                         onClick={() => void p.act({ op: "trial.pause" })}
                       >
-                        暂停并保存
+                        暂停并保存{" "}
+                        <kbd className="trial-key" aria-hidden="true">
+                          P
+                        </kbd>
                       </button>
                     </>
                   )}
                   {trial.phase === "paused" && (
                     <button
                       disabled={locked}
+                      aria-keyshortcuts="p"
                       onClick={() => void p.act({ op: "trial.resume" })}
                     >
-                      继续这个回合
+                      继续这个回合{" "}
+                      <kbd className="trial-key" aria-hidden="true">
+                        P
+                      </kbd>
                     </button>
                   )}
                   {p.activeTrial && (
@@ -810,6 +896,12 @@ export function StarlightControls({ play: p }: { play: StarlightActivity }) {
                     >
                       结束本次试炼 · 无损失
                     </button>
+                  )}
+                  {p.activeTrial && (
+                    <p className="trial-key-help">
+                      键盘 1–6 出招 · P 暂停 / 继续 · Esc
+                      收起。快捷键仅在此面板内有效，点选面板或用 Tab 移入即可。
+                    </p>
                   )}
                   <p className="trial-feedback" aria-live="polite">
                     {p.effectBusy ? "正在展示这一回合…" : trial.log.at(-1)}

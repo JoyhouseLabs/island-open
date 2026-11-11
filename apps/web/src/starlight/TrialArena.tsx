@@ -1,3 +1,4 @@
+import { Html } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import * as T from "three";
@@ -34,6 +35,11 @@ export default function TrialArena({
     halo = useRef<T.Mesh>(null),
     impact = useRef<T.Mesh>(null),
     receive = useRef<T.Mesh>(null);
+  const firstRing = useRef<T.Mesh>(null),
+    secondRing = useRef<T.Mesh>(null),
+    healing = useRef<T.Mesh>(null);
+  const arrow = useRef<T.Group>(null),
+    trail = useRef<T.Group>(null);
   const sparks = useRef<T.Group>(null),
     localLight = useRef<T.PointLight>(null);
   const elapsed = useRef(TRIAL_EFFECT_SECONDS),
@@ -56,7 +62,9 @@ export default function TrialArena({
     const dt = Math.min(rawDt, 0.05);
     if (!paused && !still) {
       clock.current += dt;
-      elapsed.current += dt;
+      elapsed.current = play?.effect
+        ? Math.max(0, (performance.now() - play.effectStarted) / 1000)
+        : TRIAL_EFFECT_SECONDS;
       anim.current.phase += dt;
     }
     const f = trialEffectFrame(
@@ -71,12 +79,14 @@ export default function TrialArena({
           ? "rest"
           : "none";
     anim.current.mouth = f.charge * 0.3;
+    anim.current.moving = f.dash > 0.1;
     if (actor.current) {
       actor.current.position.x =
         -1.08 +
-        f.charge * 0.12 -
+        f.charge * 0.12 +
+        f.dash * 1.3 -
         (play?.effect?.received ? f.receive * 0.08 : 0);
-      actor.current.position.y = stage.top + f.celebrate * 0.12;
+      actor.current.position.y = stage.top + f.celebrate * 0.12 + f.dash * 0.18;
     }
     if (shadow.current) {
       shadow.current.rotation.y = still ? 0 : clock.current * 0.3;
@@ -109,6 +119,29 @@ export default function TrialArena({
       counter.current.visible = f.counter !== null;
       counter.current.position.x = 1.1 - (f.counter ?? 0) * 1.7;
     }
+    for (const [mesh, progress, y] of [
+      [firstRing.current, f.firstRing, 0.72],
+      [secondRing.current, f.secondRing, 0.9],
+    ] as const) {
+      if (mesh) {
+        mesh.visible = progress !== null;
+        mesh.position.set(-0.65 + (progress ?? 0) * 1.8, stage.top + y, 0);
+      }
+    }
+    set(healing.current, f.heal, 0.8 + f.heal * 0.3);
+    if (trail.current) {
+      trail.current.visible = f.dash > 0.05;
+      trail.current.position.x = (actor.current?.position.x ?? -1.08) - 0.3;
+    }
+    if (arrow.current && play?.cue.actor) {
+      arrow.current.position.set(
+        play.cue.actor === "ally" ? (actor.current?.position.x ?? -1.08) : 1.1,
+        stage.top +
+          (play.cue.actor === "ally" ? 2.05 : 1.65) +
+          (still || paused ? 0 : Math.sin(clock.current * 3) * 0.05),
+        0,
+      );
+    }
     set(shield.current, f.shield, 1 + f.receive * 0.08);
     set(
       halo.current,
@@ -118,12 +151,13 @@ export default function TrialArena({
     set(impact.current, f.impact, 0.45 + f.impact * 0.4);
     set(receive.current, f.receive, 0.4 + f.receive * 0.3);
     if (sparks.current) {
-      sparks.current.visible = !still && (f.impact > 0 || f.celebrate > 0);
-      const burst = f.celebrate || f.impact;
+      sparks.current.visible =
+        !still && (f.impact > 0 || f.celebrate > 0 || f.heal > 0);
+      const burst = f.heal || f.celebrate || f.impact;
       sparks.current.children.forEach((child, i) => {
         const p = particlePaths[i]!;
         child.position.set(
-          1.1 + Math.cos(p.a) * p.r * (1 + burst),
+          (f.heal ? -1.08 : 1.1) + Math.cos(p.a) * p.r * (1 + burst),
           stage.top + 0.8 + p.y + burst * 0.7,
           Math.sin(p.a) * p.r,
         );
@@ -199,6 +233,81 @@ export default function TrialArena({
       )}
       {focused && trial && (
         <>
+          {play?.cue.actor && !play.effectsPaused && (
+            <group
+              ref={arrow}
+              position={[
+                play.cue.actor === "ally" ? -1.08 : 1.1,
+                stage.top + 2.05,
+                0,
+              ]}
+            >
+              <mesh rotation={[0, 0, Math.PI]}>
+                <coneGeometry args={[0.17, 0.24, 4]} />
+                <meshBasicMaterial
+                  color={play.cue.actor === "ally" ? "#ffe59b" : "#ddd0ff"}
+                />
+              </mesh>
+              <mesh position={[0, 0.18, 0]}>
+                <boxGeometry args={[0.13, 0.22, 0.13]} />
+                <meshBasicMaterial color="#fff5d6" />
+              </mesh>
+              <Html
+                center
+                position={[0, 0.47, 0]}
+                zIndexRange={[30, 20]}
+                style={{ pointerEvents: "none" }}
+              >
+                <span className="trial-head-label" aria-hidden="true">
+                  {play.cue.label}
+                </span>
+              </Html>
+            </group>
+          )}
+          <mesh ref={firstRing} visible={false}>
+            <torusGeometry args={[0.18, 0.035, 6, 20]} />
+            <meshBasicMaterial color="#f8d78e" />
+          </mesh>
+          <mesh ref={secondRing} visible={false}>
+            <torusGeometry args={[0.18, 0.035, 6, 20]} />
+            <meshBasicMaterial color="#c4e1ee" />
+          </mesh>
+          <mesh
+            ref={healing}
+            visible={false}
+            position={[-1.08, stage.top + 0.05, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry args={[0.42, 0.61, 24]} />
+            <meshBasicMaterial
+              color="#a3f1cb"
+              transparent
+              opacity={0}
+              depthWrite={false}
+            />
+          </mesh>
+          <group
+            ref={trail}
+            position={[-1.3, stage.top + 0.6, 0]}
+            visible={false}
+          >
+            {[0, 1, 2].map((i) => (
+              <mesh
+                key={i}
+                position={[-i * 0.22, -0.03 * i, 0]}
+                scale={[0.34 - i * 0.07, 0.13, 0.13]}
+              >
+                <octahedronGeometry args={[1]} />
+                <meshBasicMaterial
+                  color="#bca8e9"
+                  transparent
+                  opacity={0.38 - i * 0.08}
+                  depthWrite={false}
+                />
+              </mesh>
+            ))}
+          </group>
+
           <group
             ref={actor}
             position={[-1.08, stage.top, 0]}

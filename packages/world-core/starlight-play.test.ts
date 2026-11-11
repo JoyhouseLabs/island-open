@@ -247,3 +247,76 @@ describe("friendly turn trial", () => {
     expect(apply(s, { op: "trial.start" }).trial!.energy).toBe(10);
   });
 });
+
+describe("expanded trial techniques", () => {
+  const start = () => apply(rich(), { op: "trial.start" });
+  test("new skills validate but reject insufficient points without altering the snapshot", () => {
+    const s = start(),
+      before = structuredClone(s);
+    for (const skill of ["double", "rush", "moonlight"] as const) {
+      expect(
+        starlightRequestSchema.safeParse(
+          request(s, { op: "trial.turn", skill }),
+        ).success,
+      ).toBe(true);
+      expect(() => apply(s, { op: "trial.turn", skill })).toThrow();
+      expect(s).toEqual(before);
+    }
+    expect(
+      starlightRequestSchema.safeParse(
+        request(s, { op: "trial.turn", skill: "unknown" } as never),
+      ).success,
+    ).toBe(false);
+  });
+  test("double and rush differ in cost and damage, preserving focus for a later beam", () => {
+    const s = apply(start(), { op: "trial.turn", skill: "observe" });
+    const double = apply(s, { op: "trial.turn", skill: "double" });
+    expect(double.trial).toMatchObject({
+      points: 3,
+      shadow: 6,
+      energy: 5,
+      focused: true,
+      turn: 3,
+    });
+    const rush = apply(s, { op: "trial.turn", skill: "rush" });
+    expect(rush.trial).toMatchObject({
+      points: 2,
+      shadow: 4,
+      energy: 5,
+      focused: true,
+      turn: 3,
+    });
+    const win = apply(rush, { op: "trial.turn", skill: "beam" });
+    expect(win.trial).toMatchObject({
+      phase: "won",
+      shadow: 0,
+      energy: 5,
+      focused: false,
+    });
+    expect(win.starReward).toBe(true);
+  });
+  test("recovery caps at ten, precedes response, advances the turn and costs three", () => {
+    const s = start();
+    Object.assign(s.trial!, { energy: 8, points: 4, turn: 2 });
+    const healed = apply(s, { op: "trial.turn", skill: "moonlight" });
+    expect(healed.trial).toMatchObject({
+      energy: 5,
+      points: 3,
+      turn: 3,
+      shadow: 10,
+    });
+    expect(healed.trial!.log.at(-1)).toContain("恢复 2");
+    const again = apply(healed, { op: "trial.turn", skill: "moonlight" });
+    expect(again.trial).toMatchObject({ energy: 9, points: 2, turn: 4 });
+    expect(again.materials).toEqual(s.materials);
+    const full = start();
+    full.trial!.points = 4;
+    expect(() => apply(full, { op: "trial.turn", skill: "moonlight" })).toThrow(
+      "能量已满",
+    );
+    const paused = apply(s, { op: "trial.pause" });
+    expect(() =>
+      apply(paused, { op: "trial.turn", skill: "moonlight" }),
+    ).toThrow("继续试炼");
+  });
+});
