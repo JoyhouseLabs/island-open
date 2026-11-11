@@ -25,3 +25,20 @@ test("every resident lives and roams on walkable ground", () => {
     }
   }
 });
+
+test("Pikachu's summit home stays above the foothills and clear of gates and rocks", async () => {
+  const { groundHeight, islandRocks } = await import("./src/index.js");
+  const pikachu = residents.island!.find(r => r.species === "pikachu")!;
+  expect(pikachu).toBeDefined();
+  const { x, z, r } = pikachu.home;
+  // Includes the initial +/-2-unit jitter as well as the complete roam disc.
+  for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 16) {
+    const px = x + Math.cos(angle) * r, pz = z + Math.sin(angle) * r;
+    expect(groundHeight(px, pz)).toBeGreaterThan(39);
+    expect(walkSpecs.island.walkable(px, pz)).toBe(true);
+  }
+  for (const gate of walkSpecs.island.gates)
+    expect(Math.hypot(x - gate.x, z - gate.z) - r).toBeGreaterThan(gate.radius + 0.5);
+  for (const rock of islandRocks())
+    expect(Math.hypot(x - rock.x, z - rock.z) - r).toBeGreaterThan(rock.size + 0.6);
+});

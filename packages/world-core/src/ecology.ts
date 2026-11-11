@@ -140,7 +140,10 @@ export function stepEcology(
         name: leaver.name,
       });
     } else if (bornIdx.length < MAX_BORN && rng() < 0.08 * seasonFactor) {
-      const speciesList = base.members.map((m) => m.species);
+      const speciesList = base.members
+        .filter((m) => speciesProfiles[m.species].ecology.naturalBirth !== false)
+        .map((m) => m.species);
+      if (!speciesList.length) { s = { tick, members, log: log.slice(-12) }; continue; }
       const species = speciesList[Math.floor(rng() * speciesList.length)]!;
       const count = members.filter((m) => m.species === species).length;
       const baseCount = base.members.filter(
@@ -192,10 +195,11 @@ export function ecologyPlan(
   slot: number,
   members: EcologyMember[],
 ): EcologyEncounter | null {
-  if (members.length < 2) return null;
+  const eligible = members.filter((m) => speciesProfiles[m.species].ecology.encounters !== false);
+  if (eligible.length < 2) return null;
   const rng = random((seed ^ Math.imul(slot, 0x85ebca77)) >>> 0);
   if (rng() < 0.25) return null;
-  const sorted = [...members].sort((a, b) => (a.id < b.id ? -1 : 1));
+  const sorted = [...eligible].sort((a, b) => (a.id < b.id ? -1 : 1));
   const i = Math.floor(rng() * sorted.length);
   let j = Math.floor(rng() * (sorted.length - 1));
   if (j >= i) j++;

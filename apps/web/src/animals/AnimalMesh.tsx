@@ -814,6 +814,111 @@ function UmbreonMesh({ anim }: { anim: AnimalAnim }) {
   </group>;
 }
 
+/** Upright summit companion; silhouette follows the user's Pikachu reference. */
+function PikachuMesh({ anim }: { anim: AnimalAnim }) {
+  const body = useRef<T.Group>(null), head = useRef<T.Group>(null),
+    tail = useRef<T.Group>(null), eyes = useRef<T.Group>(null);
+  const ears = useRef<(T.Group | null)[]>([]), arms = useRef<(T.Group | null)[]>([]),
+    feet = useRef<(T.Group | null)[]>([]);
+  const reduced = useRef(false);
+  const yellow = "#ffdc35", ink = "#262a30", brown = "#9a6033";
+  const geometry = useMemo(() => {
+    const ring = (r: number, y: number) => new T.Vector2(r, y);
+    const ear = new T.LatheGeometry([ring(0.055, 0), ring(0.115, 0.2), ring(0.1, 0.48), ring(0.075, 0.61)], 12);
+    const tip = new T.LatheGeometry([ring(0.075, 0.61), ring(0.055, 0.76), ring(0, 0.91)], 12);
+    const polygon = (points: [number, number][]) => {
+      const shape = new T.Shape(points.map(([x, y]) => new T.Vector2(x, y)));
+      shape.closePath();
+      return new T.ExtrudeGeometry(shape, { depth: 0.11, bevelEnabled: false });
+    };
+    return {
+      ear, tip,
+      tail: polygon([[0.06, 0.3], [0.3, 0.32], [0.12, 0.44], [0.34, 0.75], [0.9, 1.08], [0.75, 1.39], [-0.05, 0.97], [0.11, 0.62], [-0.13, 0.7]]),
+      root: polygon([[0, 0], [0.16, 0.02], [0.3, 0.32], [0.06, 0.3], [-0.1, 0.2]]),
+    };
+  }, []);
+  useEffect(() => () => Object.values(geometry).forEach(g => g.dispose()), [geometry]);
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => { reduced.current = preference.matches; };
+    sync(); preference.addEventListener("change", sync);
+    return () => preference.removeEventListener("change", sync);
+  }, []);
+  useFrame((_, dt) => {
+    const t = reduced.current ? 0 : anim.phase;
+    const happy = anim.action === "pet" || anim.action === "greet";
+    const resting = anim.action === "rest";
+    const blend = 1 - Math.exp(-Math.min(dt, 0.05) * 9);
+    if (body.current) {
+      const hop = anim.moving ? Math.abs(Math.sin(t * 7)) * 0.045 : happy ? Math.abs(Math.sin(t * 4)) * 0.07 : Math.sin(t * 2) * 0.012;
+      body.current.position.y = T.MathUtils.lerp(body.current.position.y, (resting ? -0.12 : 0) + hop, blend);
+    }
+    if (head.current) {
+      head.current.rotation.x = T.MathUtils.lerp(head.current.rotation.x, poses[anim.action].neck * 0.35, blend);
+      head.current.rotation.z = Math.sin(t * (happy ? 2.7 : 0.8)) * (happy ? 0.09 : 0.025);
+    }
+    if (tail.current) tail.current.rotation.y = Math.sin(t * (happy ? 5 : 1.8)) * (happy ? 0.24 : 0.12);
+    if (eyes.current) eyes.current.scale.y = t % 5.2 > 5.04 ? 0.12 : 1;
+    ears.current.forEach((ear, i) => { if (ear) ear.rotation.z = (i ? -1 : 1) * (0.32 + Math.sin(t * 1.6 + i) * 0.045); });
+    arms.current.forEach((arm, i) => {
+      if (!arm) return;
+      arm.rotation.z = (i ? 1 : -1) * (happy ? 0.95 + Math.sin(t * 6) * 0.2 : 0.25);
+      arm.rotation.x = anim.moving ? Math.sin(t * 7 + i * Math.PI) * 0.35 : 0;
+    });
+    feet.current.forEach((foot, i) => { if (foot) foot.rotation.x = anim.moving ? Math.sin(t * 7 + i * Math.PI) * 0.45 : 0; });
+  });
+  return <group ref={body} name="pikachu-model">
+    <mesh position={[0, 0.65, 0]} scale={[0.4, 0.54, 0.31]} castShadow>
+      <sphereGeometry args={[1, 18, 14]} /><meshStandardMaterial color={yellow} roughness={0.88} />
+    </mesh>
+    {/* Rounded brown back stripes stand proud of the coat; no coplanar decals. */}
+    {[0.57, 0.79].map(y => <mesh key={y} position={[0, y, -0.29]} scale={[0.27, 0.055, 0.045]}>
+      <sphereGeometry args={[1, 14, 8]} /><meshStandardMaterial color={brown} roughness={0.95} />
+    </mesh>)}
+    {[-1, 1].map((side, i) => <group key={side}>
+      <group ref={el => { feet.current[i] = el; }} position={[side * 0.24, 0.23, 0]}>
+        <mesh position={[0, -0.13, 0.12]} scale={[0.16, 0.1, 0.25]} castShadow>
+          <sphereGeometry args={[1, 14, 10]} /><meshStandardMaterial color={yellow} roughness={0.88} />
+        </mesh>
+      </group>
+      <group ref={el => { arms.current[i] = el; }} position={[side * 0.32, 0.94, 0.08]}>
+        <mesh position={[0, -0.18, 0.06]} scale={[0.125, 0.27, 0.13]} castShadow>
+          <sphereGeometry args={[1, 14, 10]} /><meshStandardMaterial color={yellow} roughness={0.88} />
+        </mesh>
+      </group>
+    </group>)}
+    <group ref={head} position={[0, 1.3, 0.05]}>
+      <mesh scale={[0.43, 0.38, 0.36]} castShadow>
+        <sphereGeometry args={[1, 20, 16]} /><meshStandardMaterial color={yellow} roughness={0.88} />
+      </mesh>
+      {[-1, 1].map((side, i) => <group key={side}>
+        <group ref={el => { ears.current[i] = el; }} position={[side * 0.28, 0.25, -0.025]} rotation={[-0.12, 0, -side * 0.32]} scale={[1, 0.86, 0.58]}>
+          <mesh geometry={geometry.ear} castShadow><meshStandardMaterial color={yellow} roughness={0.88} /></mesh>
+          <mesh geometry={geometry.tip} castShadow><meshStandardMaterial color={ink} roughness={0.95} /></mesh>
+        </group>
+        <mesh position={[side * 0.327, -0.13, 0.236]} rotation={[0, side * 0.45, 0]} scale={[0.102, 0.107, 0.035]}>
+          <sphereGeometry args={[1, 16, 12]} /><meshStandardMaterial color="#ee493d" roughness={0.85} />
+        </mesh>
+      </group>)}
+      <group ref={eyes} position={[0, 0.045, 0]}>
+        {[-1, 1].map(side => <group key={side} position={[side * 0.19, 0, 0.318]} rotation={[0, side * 0.25, 0]}>
+          <mesh scale={[0.071, 0.082, 0.035]}><sphereGeometry args={[1, 14, 10]} /><meshStandardMaterial color={ink} roughness={0.7} /></mesh>
+          <mesh position={[-0.018, 0.027, 0.031]}><sphereGeometry args={[0.023, 10, 8]} /><meshBasicMaterial color="#fffbea" /></mesh>
+        </group>)}
+      </group>
+      <mesh position={[0, -0.035, 0.366]} scale={[0.03, 0.019, 0.018]}><sphereGeometry args={[1, 10, 8]} /><meshStandardMaterial color={ink} /></mesh>
+      {[-1, 1].map(side => <mesh key={side} position={[side * 0.043, -0.103, 0.35]} rotation={[0, 0, Math.PI]}>
+        <torusGeometry args={[0.044, 0.009, 6, 14, Math.PI]} /><meshStandardMaterial color={ink} />
+      </mesh>)}
+      <Mouth anim={anim} position={[0, -0.15, 0.33]} width={0.065} color="#a7484c" />
+    </group>
+    <group ref={tail} position={[0.1, 0.34, -0.4]}>
+      <mesh geometry={geometry.root} castShadow><meshStandardMaterial color={brown} roughness={0.9} /></mesh>
+      <mesh geometry={geometry.tail} castShadow><meshStandardMaterial color={yellow} roughness={0.88} /></mesh>
+    </group>
+  </group>;
+}
+
 /** Which mesh each species renders with. The walking fox is the shared GLB
  *  (useFox); admin-placed "fox" animals reuse the panda build, as before.
  *  Adding a species without a mesh entry is a compile error here — the
@@ -829,6 +934,7 @@ const meshes: Record<
   vaporeon: VaporeonMesh,
   cat: CatMesh,
   umbreon: UmbreonMesh,
+  pikachu: PikachuMesh,
 };
 
 export function AnimalMesh({

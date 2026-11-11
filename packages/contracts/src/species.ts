@@ -7,7 +7,7 @@
  * every other consumer derives from this table and must not grow its own
  * species lists.
  */
-export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon", "cat", "umbreon"] as const;
+export const SPECIES = ["fox", "panda", "giraffe", "wolf", "vaporeon", "cat", "umbreon", "pikachu"] as const;
 export type Species = (typeof SPECIES)[number];
 
 export type Interest = "flower" | "tree" | "bench" | "water" | "grass";
@@ -45,6 +45,10 @@ export type SpeciesProfile = {
     browse?: Interest;
   };
   ecology: {
+    /** False for a unique placed companion: keep the established birth pool stable. */
+    naturalBirth?: boolean;
+    /** False keeps a landmark companion out of automatic cross-island outings. */
+    encounters?: boolean;
     /** 生态出生朋友的目标偏好。 */
     prefer: Interest;
     /** 出生朋友的名字库。 */
@@ -189,6 +193,33 @@ export const speciesProfiles: Record<Species, SpeciesProfile> = {
         first: ["小", "方", "暖", "橘"],
         second: ["方", "米", "喵", "团"],
       },
+    },
+  },
+  pikachu: {
+    label: "皮卡丘",
+    persona: {
+      temperament: "活泼、友好，喜欢和伙伴一起登高看风景",
+      speechStyle: "轻快的短句，偶尔用“皮卡”打招呼，鼓励慢慢探索",
+      likes: "山顶的风、云朵、闪电形状的尾巴和朋友的陪伴",
+    },
+    lines: {
+      greeting: ["皮卡！${name}竖起黑尖耳朵，摇着闪电尾巴向你打招呼。"],
+      smallTalk: [
+        "山顶的风轻轻吹过来，我的耳朵先听见啦。",
+        "我的尾巴像一道闪电。你能找到它的几个转弯吗？",
+        "站在这里，可以看见我们的家园。一起慢慢看吧！",
+      ],
+      taskHint: "一起看看山下的池塘和小屋吧，走累了就停下来休息。",
+      taskLabel: "一起看风景",
+    },
+    voice: "voice-pikachu",
+    voiceBeats: [[0.02, 0.2], [0.28, 0.58]],
+    behavior: { speed: 1.7, headY: 2.25, shadow: "#c9b16e" },
+    ecology: {
+      naturalBirth: false,
+      encounters: false,
+      prefer: "grass",
+      nameParts: { first: ["金", "晴", "闪"], second: ["点", "光", "铃"] },
     },
   },
   umbreon: {

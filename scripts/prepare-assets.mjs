@@ -164,6 +164,15 @@ const voiceRecipes = [
       [offset + 0.15, 0.43, [820, 410], { vib: 0.018, vibHz: 7, curve: 1.4 }],
     ]),
   },
+  // Pikachu: original bright two-part chirp, not a sampled character voice.
+  {
+    id: "voice-pikachu",
+    seconds: 0.68,
+    tones: [
+      [0.02, 0.18, [820, 1120, 940], { vib: 0.014, vibHz: 8, curve: 1.4 }],
+      [0.28, 0.3, [960, 1320, 780], { vib: 0.018, vibHz: 7, curve: 1.5 }],
+    ],
+  },
   // Umbreon: an original soft two-note night call (not a game recording).
   {
     id: "voice-umbreon",
