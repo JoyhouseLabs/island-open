@@ -7,7 +7,7 @@ const roomPaths = Object.fromEntries(
 ) as Record<SubSceneId, string>;
 
 // Only implemented scenes are routable. New modules get their own page and path.
-export const paths: { island: string; books: string; studio: string; wilderness: string } & Record<
+export const paths: { island: string; books: string; studio: string; stories: string; wilderness: string } & Record<
   SubSceneId,
   string
 > = {
@@ -15,12 +15,14 @@ export const paths: { island: string; books: string; studio: string; wilderness:
   wilderness: "/dinosaur/explore",
   books: "/books",
   studio: "/studio",
+  stories: "/stories",
   ...roomPaths,
 };
 
 export const pageTitles: Record<string, string> = {
   [paths.wilderness]: "外围探索 · 心灵家园",
   [paths.books]: "共读书架 · 心灵家园",
+  [paths.stories]: "故事工坊 · 心灵家园",
   [paths.studio]: "AI 工坊 · 心灵家园",
 };
 for (const scene of sceneRegistry)

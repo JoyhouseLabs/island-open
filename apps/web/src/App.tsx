@@ -17,6 +17,7 @@ const SubScenePage = lazy(() => import("./pages/SubScenePage"));
 const PlacePage = lazy(() => import("./pages/PlacePage"));
 const BooksPage = lazy(() => import("./pages/BooksPage"));
 const BookReaderPage = lazy(() => import("./pages/BookReaderPage"));
+const StoryWorkshop = lazy(() => import("./stories/StoryWorkshop"));
 const StudioPage = lazy(() => import("./pages/StudioPage"));
 const VisitIslandPage = lazy(() => import("./pages/VisitIslandPage"));
 const VisitScenePage = lazy(() => import("./pages/VisitScenePage"));
@@ -127,6 +128,7 @@ export default function App() {
             <Route path="/learn/sessions/:sessionId" element={<LearningPlayer />} />
           </Route>
           <Route element={<HomeSession />}>
+            <Route path={paths.stories} element={<StoryWorkshop />} />
             <Route path={paths.island} element={<IslandPage />} />
             <Route path={paths.wilderness} element={<WildernessPage />} />
             {subSceneIds.map((scene) => (

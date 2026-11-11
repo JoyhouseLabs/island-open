@@ -342,6 +342,7 @@ export default function GameNavigation({
                       </button>
                     )
                   )}
+                  <button onClick={() => go("/stories")}>故事工坊 · 编故事</button>
                   <button onClick={() => go("/books")}>书籍与共读</button>
                   <button onClick={() => go("/learn")}>学习中心</button>
                   {actions?.settings && (

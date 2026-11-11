@@ -1,3 +1,4 @@
+import StoryPlayLayer from "./stories/StoryPlayLayer";
 import GameNavigation from "./navigation/GameNavigation";
 import { ResidentLife } from "./animals/mind";
 import { residentWorld } from "./animals/mindState";
@@ -129,7 +130,8 @@ export default function HomeSession() {
       {world.ready ? (
         <IslandConfigProvider userId={world.user?.id ?? null}>
           <Outlet />
-          <GameNavigation context={{ userId: world.user?.id ?? null, homeId: world.record?.id, seed: world.snapshot.seed, scene: location.pathname === paths.wilderness ? "wilderness" : scene, compact: /^\/(books|studio)(\/|$)/.test(location.pathname) }} />
+          <StoryPlayLayer key={world.user?.id ?? "local"} userId={world.user?.id ?? null} />
+          <GameNavigation context={{ userId: world.user?.id ?? null, homeId: world.record?.id, seed: world.snapshot.seed, scene: location.pathname === paths.wilderness ? "wilderness" : scene, compact: /^\/(books|studio|stories)(\/|$)/.test(location.pathname) }} />
           <CardModal />
           <ResidentLife
             worldId={world.record?.id}
